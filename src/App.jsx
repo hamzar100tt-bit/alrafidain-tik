@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Home, Compass, Users, PlusSquare, UserRound, Search, Heart, MessageCircle, Bookmark, Share2, Volume2, VolumeX, Play, Menu, X, LogOut, Send, Video, LoaderCircle } from "lucide-react";
 import { supabase } from "./lib/supabase.js";
-import { signIn, signUp, signOut, publishVideo, getFeed, addComment, getComments, toggleLike, toggleFollow, getFollowingFeed, getMyVideos, getProfile, getFollowState, getLikedVideoIds, getProfileStats } from "./services/videoService.js";
+import { signIn, signUp, signOut, publishVideo, getFeed, addComment, getComments, toggleLike, toggleFollow, getFollowingFeed, getMyVideos, getProfile, getFollowState, getLikedVideoIds, getProfileStats, findProfileByUsername, getDirectMessages, sendDirectMessage } from "./services/videoService.js";
 
 const demoVideos = [
   { id: "demo-1", user: "iraq_daily", name: "يوميات العراق 🇮🇶", caption: "جمال بلادنا ما ينتهي ❤️ #العراق #الرافدين", image: "https://images.unsplash.com/photo-1565008576549-57569a49371d?auto=format&fit=crop&w=900&q=85", avatar: "🇮🇶", demo: true },
@@ -30,6 +30,11 @@ function App() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [file, setFile] = useState(null);
   const [caption, setCaption] = useState("");
+  const [messagesOpen, setMessagesOpen] = useState(false);
+  const [messageUsername, setMessageUsername] = useState("");
+  const [messagePeer, setMessagePeer] = useState(null);
+  const [directMessages, setDirectMessages] = useState([]);
+  const [directText, setDirectText] = useState("");
   const [commentsFor, setCommentsFor] = useState(null);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
@@ -169,6 +174,27 @@ function App() {
     setCommentsFor(v); setComments([]);
     try { setComments(await getComments(v.id)); } catch (e) { setError(e.message); }
   };
+  const openMessages = () => { if (!user) { openAuth(); return; } setMessagesOpen(true); };
+  const findMessagePeer = async (e) => {
+    e.preventDefault(); setBusy(true); setError("");
+    try {
+      const peer = await findProfileByUsername(messageUsername);
+      if (peer.id === user.id) throw new Error("ما تكدر تراسل نفسك.");
+      setMessagePeer(peer);
+      setDirectMessages(await getDirectMessages(user.id, peer.id));
+    } catch (e) { setError(e.message || "تعذر فتح المحادثة."); }
+    finally { setBusy(false); }
+  };
+  const submitDirectMessage = async (e) => {
+    e.preventDefault(); if (!user || !messagePeer || !directText.trim()) return;
+    setBusy(true);
+    try {
+      const sent = await sendDirectMessage({ senderId: user.id, receiverId: messagePeer.id, body: directText });
+      setDirectMessages(items => [...items, sent]); setDirectText("");
+    } catch (e) { setError(e.message || "تعذر إرسال الرسالة."); }
+    finally { setBusy(false); }
+  };
+
   const sendComment = async (e) => {
     e.preventDefault(); if (!user) { openAuth(); return; }
     if (!commentText.trim() || !commentsFor) return;
@@ -181,7 +207,7 @@ function App() {
       <button className="icon-btn mobile-only" onClick={() => setMobileMenu(!mobileMenu)} aria-label="القائمة">{mobileMenu ? <X/> : <Menu/>}</button>
       <a className="brand" href="#"><span className="brand-mark">ر</span><span>الرافدين <b>تيك</b></span></a>
       <label className="search"><Search size={18}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="ابحث عن فيديوهات أو حسابات"/></label>
-      <button className="upload-btn" onClick={() => user ? setUploadOpen(true) : openAuth()}><PlusSquare size={18}/> رفع فيديو</button>
+      <button className="upload-btn" onClick={() => user ? setUploadOpen(true) : openAuth()}><PlusSquare size={18}/> رفع فيديو</button><button className="login-btn" onClick={openMessages}><MessageCircle size={16}/> رسائل</button>
       {user ? <button className="login-btn" onClick={async () => { await signOut(); setUser(null); }}> <LogOut size={16}/> خروج</button> : <button className="login-btn" onClick={openAuth}>تسجيل الدخول</button>}
     </header>
     <div className="layout">
@@ -227,6 +253,8 @@ function App() {
       <input required minLength="6" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="كلمة المرور"/>
       <button className="login-btn modal-submit" disabled={busy}>{busy ? "انتظر..." : authMode === "signup" ? "إنشاء الحساب" : "دخول"}</button>
     </form><button className="switch-auth" onClick={() => setAuthMode(authMode === "signup" ? "signin" : "signup")}>{authMode === "signup" ? "عندك حساب؟ سجل دخول" : "ما عندك حساب؟ أنشئ حساب"}</button></section></div>}
+
+    {messagesOpen && <div className="modal-backdrop" onClick={() => setMessagesOpen(false)}><section className="modal messages-modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setMessagesOpen(false)}><X/></button><h2>الرسائل الخاصة</h2><form onSubmit={findMessagePeer}><input value={messageUsername} onChange={e => setMessageUsername(e.target.value)} placeholder="اكتب اسم المستخدم" required/><button className="login-btn modal-submit" disabled={busy}>{busy ? "انتظر..." : "فتح المحادثة"}</button></form>{messagePeer && <><h3>محادثة مع @{messagePeer.username}</h3><div className="comment-list direct-message-list">{directMessages.map(m => <p key={m.id} className={m.sender_id === user.id ? "my-message" : "their-message"}>{m.body}</p>)}{!directMessages.length && <p>ابدأ المحادثة برسالة ترحيب.</p>}</div><form onSubmit={submitDirectMessage}><textarea value={directText} onChange={e => setDirectText(e.target.value)} maxLength="2000" placeholder="اكتب رسالتك…"/><button className="login-btn modal-submit" disabled={busy || !directText.trim()}><Send size={16}/> إرسال</button></form></>}</section></div>}
 
     {uploadOpen && <div className="modal-backdrop" onClick={() => setUploadOpen(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setUploadOpen(false)}><X/></button><h2><Video size={20}/> نشر فيديو</h2><form onSubmit={handleUpload}>
       <input ref={fileRef} required type="file" accept="video/mp4,video/webm,video/quicktime" onChange={e => setFile(e.target.files?.[0] || null)}/>
