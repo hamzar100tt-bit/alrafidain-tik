@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Home, Compass, Users, PlusSquare, UserRound, Search, Heart, MessageCircle, Bookmark, Share2, Volume2, VolumeX, Play, Menu, X, LogOut, Send, Video, LoaderCircle } from "lucide-react";
 import { supabase } from "./lib/supabase.js";
-import { signIn, signUp, signOut, publishVideo, getFeed, addComment, getComments, toggleLike, toggleFollow, getFollowingFeed, getMyVideos, getProfile } from "./services/videoService.js";
+import { signIn, signUp, signOut, publishVideo, getFeed, addComment, getComments, toggleLike, toggleFollow, getFollowingFeed, getMyVideos, getProfile, getFollowState, getLikedVideoIds } from "./services/videoService.js";
 
 const demoVideos = [
   { id: "demo-1", user: "iraq_daily", name: "يوميات العراق 🇮🇶", caption: "جمال بلادنا ما ينتهي ❤️ #العراق #الرافدين", image: "https://images.unsplash.com/photo-1565008576549-57569a49371d?auto=format&fit=crop&w=900&q=85", avatar: "🇮🇶", demo: true },
@@ -78,6 +78,26 @@ function App() {
   }, []);
 
   useEffect(() => { loadFeed(active, user); setIndex(0); }, [active, user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadSocialState = async () => {
+      if (!user || !videos.length) { setLiked({}); setFollowing({}); return; }
+      const ids = videos.filter(v => !v.demo).map(v => v.id);
+      const userIds = [...new Set(videos.map(v => v.userId).filter(id => id && id !== user.id))];
+      try {
+        const [likedIds, followedIds] = await Promise.all([
+          getLikedVideoIds(user.id, ids), getFollowState(user.id, userIds)
+        ]);
+        if (!cancelled) {
+          setLiked(Object.fromEntries(likedIds.map(id => [id, true])));
+          setFollowing(Object.fromEntries(followedIds.map(id => [id, true])));
+        }
+      } catch (e) { if (!cancelled) setError(e.message || "تعذر تحميل حالة الإعجاب والمتابعة."); }
+    };
+    loadSocialState();
+    return () => { cancelled = true; };
+  }, [user, videos]);
 
   const shownVideos = videos.length ? videos : (active === "الرئيسية" || active === "اكتشف" ? demoVideos : []);
   const [index, setIndex] = useState(0);
