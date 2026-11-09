@@ -35,3 +35,6 @@
   .app-bottom-nav .nav-create svg{width:28px;height:28px;color:#ff3157}
   .modal-backdrop{z-index:40}
 }
+
+
+.profile-stats{display:flex;gap:22px;align-items:center;margin:14px 0;color:var(--muted,#777);font-size:14px}.profile-stats span{display:flex;gap:5px;align-items:center}.profile-stats b{color:inherit;font-size:17px;font-weight:800}
