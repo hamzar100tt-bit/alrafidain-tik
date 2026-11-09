@@ -160,3 +160,34 @@ export async function getProfileStats(userId) {
   if (failed) throw failed.error;
   return { videos: videos.count || 0, followers: followers.count || 0, following: following.count || 0 };
 }
+
+
+export async function findProfileByUsername(username) {
+  requireSupabase();
+  const clean = username.trim().replace(/^@/, "");
+  if (!clean) throw new Error("اكتب اسم المستخدم.");
+  const { data, error } = await supabase.from("profiles")
+    .select("id, username, display_name, avatar_url").ilike("username", clean).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("ما لكيت هذا الحساب.");
+  return data;
+}
+
+export async function getDirectMessages(userId, otherId) {
+  requireSupabase();
+  const { data, error } = await supabase.from("messages").select("id, sender_id, receiver_id, body, created_at")
+    .or(`and(sender_id.eq.${userId},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${userId})`)
+    .order("created_at", { ascending: true }).limit(200);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function sendDirectMessage({ senderId, receiverId, body }) {
+  requireSupabase();
+  const clean = body.trim();
+  if (!clean || clean.length > 2000) throw new Error("الرسالة لازم تكون بين حرف و2000 حرف.");
+  const { data, error } = await supabase.from("messages")
+    .insert({ sender_id: senderId, receiver_id: receiverId, body: clean }).select().single();
+  if (error) throw error;
+  return data;
+}
