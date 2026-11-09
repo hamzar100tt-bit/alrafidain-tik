@@ -70,30 +70,46 @@ alter table public.comments enable row level security;
 alter table public.likes enable row level security;
 alter table public.follows enable row level security;
 
+drop policy if exists "Profiles are publicly readable" on public.profiles;
 create policy "Profiles are publicly readable" on public.profiles for select using (true);
+drop policy if exists "Users update their own profile" on public.profiles;
 create policy "Users update their own profile" on public.profiles for update using (auth.uid() = id) with check (auth.uid() = id);
 
+drop policy if exists "Videos are publicly readable" on public.videos;
 create policy "Videos are publicly readable" on public.videos for select using (true);
+drop policy if exists "Authenticated users publish videos" on public.videos;
 create policy "Authenticated users publish videos" on public.videos for insert with check (auth.uid() = user_id);
+drop policy if exists "Owners update videos" on public.videos;
 create policy "Owners update videos" on public.videos for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "Owners delete videos" on public.videos;
 create policy "Owners delete videos" on public.videos for delete using (auth.uid() = user_id);
 
+drop policy if exists "Comments are publicly readable" on public.comments;
 create policy "Comments are publicly readable" on public.comments for select using (true);
+drop policy if exists "Authenticated users comment as themselves" on public.comments;
 create policy "Authenticated users comment as themselves" on public.comments for insert with check (auth.uid() = user_id);
+drop policy if exists "Comment owners delete" on public.comments;
 create policy "Comment owners delete" on public.comments for delete using (auth.uid() = user_id);
 
+drop policy if exists "Likes are publicly readable" on public.likes;
 create policy "Likes are publicly readable" on public.likes for select using (true);
+drop policy if exists "Users manage own likes" on public.likes;
 create policy "Users manage own likes" on public.likes for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "Follows are publicly readable" on public.follows;
 create policy "Follows are publicly readable" on public.follows for select using (true);
+drop policy if exists "Users manage own follows" on public.follows;
 create policy "Users manage own follows" on public.follows for all using (auth.uid() = follower_id) with check (auth.uid() = follower_id);
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('videos', 'videos', true, 104857600, array['video/mp4','video/webm','video/quicktime'])
 on conflict (id) do nothing;
 
+drop policy if exists "Public can view video files" on storage.objects;
 create policy "Public can view video files" on storage.objects for select using (bucket_id = 'videos');
+drop policy if exists "Users upload into own folder" on storage.objects;
 create policy "Users upload into own folder" on storage.objects for insert to authenticated
 with check (bucket_id = 'videos' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "Users delete own video files" on storage.objects;
 create policy "Users delete own video files" on storage.objects for delete to authenticated
 using (bucket_id = 'videos' and (storage.foldername(name))[1] = auth.uid()::text);
