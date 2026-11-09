@@ -10,6 +10,28 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = ''
+as $$
+declare
+  chosen_username text;
+begin
+  chosen_username := coalesce(
+    nullif(new.raw_user_meta_data ->> 'username', ''),
+    'user_' || replace(substr(new.id::text, 1, 8), '-', '')
+  );
+  insert into public.profiles (id, username, display_name)
+  values (new.id, chosen_username, chosen_username)
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+after insert on auth.users
+for each row execute procedure public.handle_new_user();
+
 create table if not exists public.videos (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
@@ -49,7 +71,6 @@ alter table public.likes enable row level security;
 alter table public.follows enable row level security;
 
 create policy "Profiles are publicly readable" on public.profiles for select using (true);
-create policy "Users create their own profile" on public.profiles for insert with check (auth.uid() = id);
 create policy "Users update their own profile" on public.profiles for update using (auth.uid() = id) with check (auth.uid() = id);
 
 create policy "Videos are publicly readable" on public.videos for select using (true);
