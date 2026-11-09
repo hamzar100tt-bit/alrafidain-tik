@@ -85,3 +85,55 @@ export async function toggleLike({ videoId, userId, liked }) {
   const { error } = await request;
   if (error) throw error;
 }
+
+
+export async function toggleFollow({ followerId, followedId, following }) {
+  requireSupabase();
+  if (followerId === followedId) throw new Error("ما تكدر تتابع حسابك.");
+  const request = following
+    ? supabase.from("follows").delete().match({ follower_id: followerId, followed_id: followedId })
+    : supabase.from("follows").insert({ follower_id: followerId, followed_id: followedId });
+  const { error } = await request;
+  if (error) throw error;
+}
+
+export async function getFollowingFeed(userId) {
+  requireSupabase();
+  const { data: relations, error: relationError } = await supabase
+    .from("follows").select("followed_id").eq("follower_id", userId);
+  if (relationError) throw relationError;
+  const ids = (relations || []).map(item => item.followed_id);
+  if (!ids.length) return [];
+  const { data, error } = await supabase.from("videos")
+    .select("id, caption, video_url, created_at, user_id, profiles(username, display_name, avatar_url)")
+    .in("user_id", ids).order("created_at", { ascending: false }).limit(50);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getMyVideos(userId) {
+  requireSupabase();
+  const { data, error } = await supabase.from("videos")
+    .select("id, caption, video_url, created_at, profiles(username, display_name, avatar_url)")
+    .eq("user_id", userId).order("created_at", { ascending: false }).limit(50);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getProfile(userId) {
+  requireSupabase();
+  const { data, error } = await supabase.from("profiles")
+    .select("id, username, display_name, bio, avatar_url")
+    .eq("id", userId).single();
+  if (error) throw error;
+  return data;
+}
+
+export async function getFollowState(followerId, followedIds) {
+  requireSupabase();
+  if (!followedIds.length) return [];
+  const { data, error } = await supabase.from("follows")
+    .select("followed_id").eq("follower_id", followerId).in("followed_id", followedIds);
+  if (error) throw error;
+  return (data || []).map(item => item.followed_id);
+}
