@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Home, Compass, Users, PlusSquare, UserRound, Search, Heart, MessageCircle, Bookmark, Share2, Volume2, VolumeX, Play, Menu, X, LogOut, Send, Video, LoaderCircle } from "lucide-react";
 import { supabase } from "./lib/supabase.js";
-import { signIn, signUp, signOut, publishVideo, getFeed, addComment, getComments, toggleLike, toggleFollow, getFollowingFeed, getMyVideos, getProfile, getFollowState, getLikedVideoIds } from "./services/videoService.js";
+import { signIn, signUp, signOut, publishVideo, getFeed, addComment, getComments, toggleLike, toggleFollow, getFollowingFeed, getMyVideos, getProfile, getFollowState, getLikedVideoIds, getProfileStats } from "./services/videoService.js";
 
 const demoVideos = [
   { id: "demo-1", user: "iraq_daily", name: "يوميات العراق 🇮🇶", caption: "جمال بلادنا ما ينتهي ❤️ #العراق #الرافدين", image: "https://images.unsplash.com/photo-1565008576549-57569a49371d?auto=format&fit=crop&w=900&q=85", avatar: "🇮🇶", demo: true },
@@ -34,6 +34,7 @@ function App() {
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
   const [profile, setProfile] = useState(null);
+  const [profileStats, setProfileStats] = useState({ videos: 0, followers: 0, following: 0 });
   const [profileEditOpen, setProfileEditOpen] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
@@ -59,6 +60,8 @@ function App() {
         try {
           const ownProfile = await getProfile(currentUser.id);
           setProfile(ownProfile);
+          const stats = await getProfileStats(currentUser.id);
+          setProfileStats(stats);
           setDisplayName(ownProfile.display_name || "");
           setBio(ownProfile.bio || "");
         } catch { setProfile(null); }
@@ -232,7 +235,7 @@ function App() {
     </form></section></div>}
 
     {profileEditOpen && <div className="modal-backdrop" onClick={() => setProfileEditOpen(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setProfileEditOpen(false)}><X/></button><h2>تعديل الملف الشخصي</h2><form onSubmit={saveProfile}><input maxLength="60" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="الاسم الظاهر"/><textarea maxLength="160" value={bio} onChange={e => setBio(e.target.value)} placeholder="نبذة عنك"/><button className="login-btn modal-submit" disabled={busy}>{busy ? "حفظ..." : "حفظ التغييرات"}</button></form></section></div>}
-    {active === "الملف الشخصي" && user && <div className="profile-tools"><h2>@{profile?.username || "حسابي"}</h2><p>{profile?.bio || "أضف نبذة تعريفية عنك"}</p><button className="login-btn" onClick={() => setProfileEditOpen(true)}>تعديل الملف الشخصي</button></div>}
+    {active === "الملف الشخصي" && user && <div className="profile-tools"><h2>@{profile?.username || "حسابي"}</h2><p>{profile?.bio || "أضف نبذة تعريفية عنك"}</p><div className="profile-stats"><span><b>{profileStats.videos}</b> فيديو</span><span><b>{profileStats.followers}</b> متابع</span><span><b>{profileStats.following}</b> يتابع</span></div><button className="login-btn" onClick={() => setProfileEditOpen(true)}>تعديل الملف الشخصي</button></div>}
     {commentsFor && <div className="modal-backdrop" onClick={() => setCommentsFor(null)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setCommentsFor(null)}><X/></button><h2>التعليقات</h2><div className="comment-list">{comments.map(c => <p key={c.id}><b>@{c.profiles?.username || "مستخدم"}</b> {c.body}</p>)}{!comments.length && <p>لا توجد تعليقات بعد.</p>}</div><form onSubmit={sendComment}><input value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="اكتب تعليقاً…"/><button className="login-btn modal-submit" disabled={!commentText.trim()}><Send size={16}/> إرسال</button></form></section></div>}
   </div>;
 }
