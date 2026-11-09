@@ -34,39 +34,56 @@ function App() {
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
   const [profile, setProfile] = useState(null);
+  const [profileEditOpen, setProfileEditOpen] = useState(false);
+  const [displayName, setDisplayName] = useState("");
+  const [bio, setBio] = useState("");
   const videoRef = useRef(null);
   const fileRef = useRef(null);
   const touchStartY = useRef(0);
   const handleTouchStart = (e) => { touchStartY.current = e.touches[0]?.clientY || 0; };
   const handleTouchEnd = (e) => { const delta = touchStartY.current - (e.changedTouches[0]?.clientY || touchStartY.current); if (Math.abs(delta) > 45) go(delta > 0 ? 1 : -1); };
 
-  const loadFeed = async () => {
+  const loadFeed = async (target = "الرئيسية", currentUser = user) => {
+    setLoading(true);
     try {
-      const data = await getFeed();
+      let data = [];
+      if (target === "المتابَعون") data = currentUser ? await getFollowingFeed(currentUser.id) : [];
+      else if (target === "الملف الشخصي") data = currentUser ? await getMyVideos(currentUser.id) : [];
+      else data = await getFeed();
       setVideos(data.map(v => ({
-        id: v.id, user: v.profiles?.username || "مستخدم", name: v.profiles?.display_name || v.profiles?.username || "مستخدم الرافدين",
-        caption: v.caption, videoUrl: v.video_url, avatar: "🇮🇶", demo: false
+        id: v.id, userId: v.user_id, user: v.profiles?.username || "مستخدم",
+        name: v.profiles?.display_name || v.profiles?.username || "مستخدم الرافدين",
+        caption: v.caption, videoUrl: v.video_url, avatar: v.profiles?.avatar_url || "🇮🇶", demo: false
       })));
+      if (currentUser) {
+        try {
+          const ownProfile = await getProfile(currentUser.id);
+          setProfile(ownProfile);
+          setDisplayName(ownProfile.display_name || "");
+          setBio(ownProfile.bio || "");
+        } catch { setProfile(null); }
+      }
       setError("");
-    } catch (e) { setError(e.message || "تعذر تحميل الفيديوهات."); }
-    finally { setLoading(false); }
+    } catch (e) {
+      setVideos([]);
+      setError(e.message || "تعذر تحميل الفيديوهات.");
+    } finally { setLoading(false); }
   };
 
   useEffect(() => {
     let alive = true;
     supabase.auth.getSession().then(({ data }) => { if (alive) setUser(data.session?.user || null); });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
-    });
-    loadFeed();
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user || null));
     return () => { alive = false; listener.subscription.unsubscribe(); };
   }, []);
 
-  const shownVideos = videos.length ? videos : demoVideos;
+  useEffect(() => { loadFeed(active, user); setIndex(0); }, [active, user]);
+
+  const shownVideos = videos.length ? videos : (active === "الرئيسية" || active === "اكتشف" ? demoVideos : []);
   const [index, setIndex] = useState(0);
   useEffect(() => { if (index >= shownVideos.length) setIndex(0); }, [shownVideos.length, index]);
   const video = shownVideos[index] || demoVideos[0];
-  const filtered = shownVideos;
+  const filtered = query.trim() ? shownVideos.filter(v => (v.name + v.caption + v.user).toLowerCase().includes(query.toLowerCase())) : shownVideos;
   const nav = [{ label: "الرئيسية", icon: Home }, { label: "اكتشف", icon: Compass }, { label: "المتابَعون", icon: Users }, { label: "رفع فيديو", icon: PlusSquare }, { label: "الملف الشخصي", icon: UserRound }];
 
   const go = (step) => { if (shownVideos.length) setIndex(i => (i + step + shownVideos.length) % shownVideos.length); };
@@ -87,10 +104,20 @@ function App() {
     setBusy(true); setError("");
     try {
       await publishVideo({ file, caption, userId: user.id });
-      setUploadOpen(false); setFile(null); setCaption(""); setActive("الرئيسية"); setIndex(0); setLoading(true); await loadFeed("الرئيسية", user);
+      setUploadOpen(false); setFile(null); setCaption(""); setActive("الرئيسية"); setIndex(0); await loadFeed("الرئيسية", user);
     } catch (e) { setError(e.message || "تعذر رفع الفيديو."); }
     finally { setBusy(false); }
   };
+  const saveProfile = async (e) => {
+    e.preventDefault(); if (!user) return; setBusy(true);
+    try {
+      const { error: updateError } = await supabase.from("profiles").update({ display_name: displayName.trim(), bio: bio.trim() }).eq("id", user.id);
+      if (updateError) throw updateError;
+      setProfile(p => ({ ...p, display_name: displayName.trim(), bio: bio.trim() })); setProfileEditOpen(false);
+    } catch (e) { setError(e.message || "تعذر حفظ الملف الشخصي."); }
+    finally { setBusy(false); }
+  };
+
   const handleFollow = async (v) => {
     if (!user) { openAuth(); return; }
     if (!v.userId || v.userId === user.id) return;
@@ -184,6 +211,8 @@ function App() {
       <button className="login-btn modal-submit" disabled={busy || !file}>{busy ? "جاري الرفع..." : "نشر الفيديو"}</button>
     </form></section></div>}
 
+    {profileEditOpen && <div className="modal-backdrop" onClick={() => setProfileEditOpen(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setProfileEditOpen(false)}><X/></button><h2>تعديل الملف الشخصي</h2><form onSubmit={saveProfile}><input maxLength="60" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="الاسم الظاهر"/><textarea maxLength="160" value={bio} onChange={e => setBio(e.target.value)} placeholder="نبذة عنك"/><button className="login-btn modal-submit" disabled={busy}>{busy ? "حفظ..." : "حفظ التغييرات"}</button></form></section></div>}
+    {active === "الملف الشخصي" && user && <div className="profile-tools"><h2>@{profile?.username || "حسابي"}</h2><p>{profile?.bio || "أضف نبذة تعريفية عنك"}</p><button className="login-btn" onClick={() => setProfileEditOpen(true)}>تعديل الملف الشخصي</button></div>}
     {commentsFor && <div className="modal-backdrop" onClick={() => setCommentsFor(null)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setCommentsFor(null)}><X/></button><h2>التعليقات</h2><div className="comment-list">{comments.map(c => <p key={c.id}><b>@{c.profiles?.username || "مستخدم"}</b> {c.body}</p>)}{!comments.length && <p>لا توجد تعليقات بعد.</p>}</div><form onSubmit={sendComment}><input value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="اكتب تعليقاً…"/><button className="login-btn modal-submit" disabled={!commentText.trim()}><Send size={16}/> إرسال</button></form></section></div>}
   </div>;
 }
