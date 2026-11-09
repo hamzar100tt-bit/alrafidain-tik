@@ -147,3 +147,16 @@ export async function getLikedVideoIds(userId, videoIds) {
   if (error) throw error;
   return (data || []).map(item => item.video_id);
 }
+
+
+export async function getProfileStats(userId) {
+  requireSupabase();
+  const [videos, followers, following] = await Promise.all([
+    supabase.from("videos").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("followed_id", userId),
+    supabase.from("follows").select("followed_id", { count: "exact", head: true }).eq("follower_id", userId)
+  ]);
+  const failed = [videos, followers, following].find(result => result.error);
+  if (failed) throw failed.error;
+  return { videos: videos.count || 0, followers: followers.count || 0, following: following.count || 0 };
+}
