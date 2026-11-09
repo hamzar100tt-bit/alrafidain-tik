@@ -6,3 +6,32 @@
 @media(max-width:380px){.login-btn{display:none}.video-card{min-height:390px}.video-info{left:66px}.video-actions{left:8px}.video-actions svg{width:22px;height:22px}}
 
 .modal-backdrop{position:fixed;inset:0;z-index:30;background:#000b;display:grid;place-items:center;padding:18px}.modal{position:relative;width:min(100%,430px);max-height:90vh;overflow:auto;background:#19191f;border:1px solid #393941;border-radius:16px;padding:25px;color:#fff;box-shadow:0 20px 70px #0009}.modal h2{display:flex;align-items:center;gap:8px;margin:0 0 20px;font-size:22px}.modal-close{position:absolute;left:15px;top:15px;border:0;background:transparent;color:#ddd}.modal form{display:grid;gap:12px}.modal input,.modal textarea{width:100%;min-width:0;background:#25252d;color:#fff;border:1px solid #41414a;border-radius:8px;padding:12px;outline:none}.modal textarea{min-height:110px;resize:vertical}.modal-submit{justify-content:center;width:100%;margin-top:5px}.modal-submit:disabled{opacity:.55;cursor:not-allowed}.switch-auth{width:100%;margin-top:16px;border:0;background:none;color:#ff7890}.comment-list{max-height:260px;overflow:auto;margin-bottom:15px}.comment-list p{padding:9px 0;border-bottom:1px solid #333;font-size:13px}.comment-list b{color:#ff7890;margin-left:6px}
+
+
+/* TikTok-style full-screen mobile app layout */
+.app-bottom-nav{display:none}
+@media(max-width:700px){
+  body,.app-shell{height:100%;min-height:100dvh;overflow:hidden;background:#000}
+  .topbar,.sidebar,.right-panel{display:none!important}
+  .layout{display:block;padding:0;margin:0;width:100%;height:100dvh;max-width:none}
+  .main-content{height:100dvh;width:100%;padding:0;margin:0;position:relative;overflow:hidden}
+  .feed-heading,.feed-footer,.search-count,.mobile-actions{display:none!important}
+  .video-stage{display:block;position:absolute;inset:0;width:100%;height:100dvh;margin:0;padding:0}
+  .video-card{position:absolute;inset:0;width:100%;height:100%;min-height:0;max-height:none;max-width:none;aspect-ratio:auto;border-radius:0;margin:0;background:#000}
+  .video-image{width:100%;height:100%;object-fit:cover}
+  .video-shade{background:linear-gradient(0deg,rgba(0,0,0,.78) 0%,rgba(0,0,0,.06) 42%,rgba(0,0,0,.12) 100%)}
+  .video-info{right:16px;left:82px;bottom:calc(78px + env(safe-area-inset-bottom));z-index:2}
+  .creator b{font-size:14px}.creator small{font-size:12px}.video-info p{font-size:14px;line-height:1.8}
+  .video-actions{left:12px;bottom:calc(94px + env(safe-area-inset-bottom));gap:22px;z-index:3}
+  .video-actions button{font-size:11px;text-shadow:0 1px 4px #000}
+  .video-actions svg{width:29px;height:29px;filter:drop-shadow(0 1px 3px #000)}
+  .sound-toggle{top:calc(16px + env(safe-area-inset-top));left:14px;z-index:4}
+  .play-indicator{pointer-events:none}
+  .arrow{display:none}
+  .app-bottom-nav{position:fixed;display:flex;align-items:center;justify-content:space-around;left:0;right:0;bottom:0;height:calc(58px + env(safe-area-inset-bottom));padding:4px 5px env(safe-area-inset-bottom);background:rgba(8,8,10,.94);border-top:1px solid #29292e;z-index:12}
+  .app-bottom-nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;flex:1;background:none;border:0;color:#aaa;font-size:9px}
+  .app-bottom-nav button svg{width:21px;height:21px}
+  .app-bottom-nav button.active{color:#fff}
+  .app-bottom-nav .nav-create svg{width:28px;height:28px;color:#ff3157}
+  .modal-backdrop{z-index:40}
+}
