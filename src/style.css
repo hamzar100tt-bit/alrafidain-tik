@@ -38,3 +38,6 @@
 
 
 .profile-stats{display:flex;gap:22px;align-items:center;margin:14px 0;color:var(--muted,#777);font-size:14px}.profile-stats span{display:flex;gap:5px;align-items:center}.profile-stats b{color:inherit;font-size:17px;font-weight:800}
+
+
+.messages-modal{max-height:85vh;overflow:auto}.direct-message-list{display:flex;flex-direction:column;gap:8px;max-height:42vh;overflow:auto;padding:12px 0}.direct-message-list p{padding:10px 13px;border-radius:14px;max-width:85%;margin:0;overflow-wrap:anywhere}.direct-message-list .my-message{align-self:flex-start;background:#dff5e9;color:#173d2b}.direct-message-list .their-message{align-self:flex-end;background:#f0f0f0;color:#222}
