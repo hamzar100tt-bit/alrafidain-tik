@@ -54,7 +54,7 @@ export async function publishVideo({ file, caption, userId }) {
 export async function getFeed() {
   requireSupabase();
   const { data, error } = await supabase.from("videos")
-    .select("id, caption, video_url, created_at, profiles(username, display_name, avatar_url)")
+    .select("id, user_id, caption, video_url, created_at, profiles(username, display_name, avatar_url)")
     .order("created_at", { ascending: false }).limit(30);
   if (error) throw error;
   return data ?? [];
@@ -114,7 +114,7 @@ export async function getFollowingFeed(userId) {
 export async function getMyVideos(userId) {
   requireSupabase();
   const { data, error } = await supabase.from("videos")
-    .select("id, caption, video_url, created_at, profiles(username, display_name, avatar_url)")
+    .select("id, user_id, caption, video_url, created_at, profiles(username, display_name, avatar_url)")
     .eq("user_id", userId).order("created_at", { ascending: false }).limit(50);
   if (error) throw error;
   return data ?? [];
@@ -136,4 +136,14 @@ export async function getFollowState(followerId, followedIds) {
     .select("followed_id").eq("follower_id", followerId).in("followed_id", followedIds);
   if (error) throw error;
   return (data || []).map(item => item.followed_id);
+}
+
+
+export async function getLikedVideoIds(userId, videoIds) {
+  requireSupabase();
+  if (!videoIds.length) return [];
+  const { data, error } = await supabase.from("likes")
+    .select("video_id").eq("user_id", userId).in("video_id", videoIds);
+  if (error) throw error;
+  return (data || []).map(item => item.video_id);
 }
