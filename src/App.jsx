@@ -34,6 +34,9 @@ function App() {
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
   const fileRef = useRef(null);
+  const touchStartY = useRef(0);
+  const handleTouchStart = (e) => { touchStartY.current = e.touches[0]?.clientY || 0; };
+  const handleTouchEnd = (e) => { const delta = touchStartY.current - (e.changedTouches[0]?.clientY || touchStartY.current); if (Math.abs(delta) > 45) go(delta > 0 ? 1 : -1); };
 
   const loadFeed = async () => {
     try {
@@ -124,7 +127,7 @@ function App() {
         {error && <p className="search-count" role="status">{error}</p>}
         {loading ? <p className="search-count">جاري تحميل الفيديوهات…</p> : <section className="video-stage">
           <button className="arrow prev" onClick={() => go(-1)} aria-label="الفيديو السابق">‹</button>
-          <article className="video-card">
+          <article className="video-card" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
             {video.videoUrl ? <video className="video-image" src={video.videoUrl} controls playsInline loop muted={muted}/> : <img className="video-image" src={video.image || demoVideos[0].image} alt="معاينة الفيديو"/>}
             <div className="video-shade"/>
             <button className="sound-toggle" onClick={() => setMuted(!muted)} aria-label="الصوت">{muted ? <VolumeX/> : <Volume2/>}</button>
@@ -147,6 +150,8 @@ function App() {
       </main>
       <aside className="right-panel"><h3>حسابات مقترحة</h3><div className="community-card"><span>🇮🇶</span><b>صوتك يوصل</b><p>انشر إبداعك وخلي العالم يشوف جمال العراق.</p></div></aside>
     </div>
+
+    <nav className="app-bottom-nav"><button className={active === "الرئيسية" ? "active" : ""} onClick={() => setActive("الرئيسية")}><Home/><span>الرئيسية</span></button><button className={active === "اكتشف" ? "active" : ""} onClick={() => setActive("اكتشف")}><Compass/><span>اكتشف</span></button><button className="nav-create" onClick={() => user ? setUploadOpen(true) : openAuth()}><PlusSquare/><span>نشر</span></button><button className={active === "المتابَعون" ? "active" : ""} onClick={() => setActive("المتابَعون")}><Users/><span>أتابع</span></button><button className={active === "الملف الشخصي" ? "active" : ""} onClick={() => user ? setActive("الملف الشخصي") : openAuth()}><UserRound/><span>حسابي</span></button></nav>
 
     {authOpen && <div className="modal-backdrop" onClick={() => setAuthOpen(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setAuthOpen(false)}><X/></button><h2>{authMode === "signup" ? "إنشاء حساب جديد" : "تسجيل الدخول"}</h2><form onSubmit={handleAuth}>
       {authMode === "signup" && <input required minLength="3" maxLength="24" value={username} onChange={e => setUsername(e.target.value)} placeholder="اسم المستخدم"/>}
