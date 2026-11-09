@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Home, Compass, Users, PlusSquare, UserRound, Search, Heart, MessageCircle, Bookmark, Share2, Volume2, VolumeX, Play, Menu, X, LogOut, Send, Video, LoaderCircle } from "lucide-react";
 import { supabase } from "./lib/supabase.js";
-import { signIn, signUp, signOut, publishVideo, getFeed, addComment, getComments, toggleLike } from "./services/videoService.js";
+import { signIn, signUp, signOut, publishVideo, getFeed, addComment, getComments, toggleLike, toggleFollow, getFollowingFeed, getMyVideos, getProfile } from "./services/videoService.js";
 
 const demoVideos = [
   { id: "demo-1", user: "iraq_daily", name: "يوميات العراق 🇮🇶", caption: "جمال بلادنا ما ينتهي ❤️ #العراق #الرافدين", image: "https://images.unsplash.com/photo-1565008576549-57569a49371d?auto=format&fit=crop&w=900&q=85", avatar: "🇮🇶", demo: true },
@@ -33,6 +33,8 @@ function App() {
   const [commentsFor, setCommentsFor] = useState(null);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
+  const [profile, setProfile] = useState(null);
+  const videoRef = useRef(null);
   const fileRef = useRef(null);
   const touchStartY = useRef(0);
   const handleTouchStart = (e) => { touchStartY.current = e.touches[0]?.clientY || 0; };
@@ -64,10 +66,10 @@ function App() {
   const [index, setIndex] = useState(0);
   useEffect(() => { if (index >= shownVideos.length) setIndex(0); }, [shownVideos.length, index]);
   const video = shownVideos[index] || demoVideos[0];
-  const filtered = useMemo(() => shownVideos.filter(v => (v.name + v.caption + v.user).toLowerCase().includes(query.toLowerCase())), [shownVideos, query]);
+  const filtered = shownVideos;
   const nav = [{ label: "الرئيسية", icon: Home }, { label: "اكتشف", icon: Compass }, { label: "المتابَعون", icon: Users }, { label: "رفع فيديو", icon: PlusSquare }, { label: "الملف الشخصي", icon: UserRound }];
 
-  const go = (step) => setIndex(i => (i + step + shownVideos.length) % shownVideos.length);
+  const go = (step) => { if (shownVideos.length) setIndex(i => (i + step + shownVideos.length) % shownVideos.length); };
   const openAuth = () => { setError(""); setAuthOpen(true); };
   const handleAuth = async (e) => {
     e.preventDefault(); setBusy(true); setError("");
@@ -85,10 +87,26 @@ function App() {
     setBusy(true); setError("");
     try {
       await publishVideo({ file, caption, userId: user.id });
-      setUploadOpen(false); setFile(null); setCaption(""); setIndex(0); setLoading(true); await loadFeed();
+      setUploadOpen(false); setFile(null); setCaption(""); setActive("الرئيسية"); setIndex(0); setLoading(true); await loadFeed("الرئيسية", user);
     } catch (e) { setError(e.message || "تعذر رفع الفيديو."); }
     finally { setBusy(false); }
   };
+  const handleFollow = async (v) => {
+    if (!user) { openAuth(); return; }
+    if (!v.userId || v.userId === user.id) return;
+    const wasFollowing = Boolean(following[v.userId]);
+    setFollowing(s => ({ ...s, [v.userId]: !wasFollowing }));
+    try { await toggleFollow({ followerId: user.id, followedId: v.userId, following: wasFollowing }); }
+    catch (e) { setFollowing(s => ({ ...s, [v.userId]: wasFollowing })); setError(e.message || "تعذر تحديث المتابعة."); }
+  };
+
+  useEffect(() => {
+    if (videoRef.current && video?.videoUrl) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [video?.id, video?.videoUrl]);
+
   const handleLike = async (v) => {
     if (v.demo || !user) { if (!user) openAuth(); return; }
     const wasLiked = Boolean(liked[v.id]);
@@ -122,17 +140,17 @@ function App() {
         <div className="side-note"><b>مجتمع الرافدين</b><p>اكتشف صناع المحتوى العراقيين وشارك لحظاتك مع الجميع.</p><small>© 2026 الرافدين تيك</small></div>
       </aside>
       <main className="main-content">
-        <div className="feed-heading"><div><span className="eyebrow">اكتشف الجديد</span><h1>{active === "الرئيسية" ? "لك" : active}</h1></div><div className="feed-tabs"><button className="tab active">لك</button><button className="tab" onClick={() => setActive("المتابَعون")}>أتابع</button></div></div>
+        <div className="feed-heading"><div><span className="eyebrow">اكتشف الجديد</span><h1>{active === "الرئيسية" ? "لك" : active}</h1></div><div className="feed-tabs"><button className={`tab ${active !== "المتابَعون" ? "active" : ""}`} onClick={() => setActive("الرئيسية")}>لك</button><button className={`tab ${active === "المتابَعون" ? "active" : ""}`} onClick={() => setActive("المتابَعون")}>أتابع</button></div></div>
         {query && <p className="search-count">نتائج البحث: {filtered.length}</p>}
         {error && <p className="search-count" role="status">{error}</p>}
-        {loading ? <p className="search-count">جاري تحميل الفيديوهات…</p> : <section className="video-stage">
+        {loading ? <p className="search-count">جاري تحميل الفيديوهات…</p> : shownVideos.length === 0 ? <section className="empty-state"><h2>{active === "الملف الشخصي" ? "ملفك الشخصي" : active === "المتابَعون" ? "ماكو فيديوهات من الحسابات اللي تتابعها بعد" : "ماكو نتائج"}</h2><p>{profile ? `@${profile.username} · ${profile.bio || "شارك أول فيديو إلك"}` : "سجّل الدخول أو تابع حسابات حتى تظهر الفيديوهات هنا."}</p>{active === "الملف الشخصي" && <button className="upload-btn" onClick={() => setUploadOpen(true)}>انشر أول فيديو</button>}</section> : <section className="video-stage">
           <button className="arrow prev" onClick={() => go(-1)} aria-label="الفيديو السابق">‹</button>
           <article className="video-card" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-            {video.videoUrl ? <video className="video-image" src={video.videoUrl} controls playsInline loop muted={muted}/> : <img className="video-image" src={video.image || demoVideos[0].image} alt="معاينة الفيديو"/>}
+            {video.videoUrl ? <video ref={videoRef} className="video-image" src={video.videoUrl} playsInline loop autoPlay muted={muted} controls/> : <img className="video-image" src={video.image || demoVideos[0].image} alt="معاينة الفيديو"/>}
             <div className="video-shade"/>
             <button className="sound-toggle" onClick={() => setMuted(!muted)} aria-label="الصوت">{muted ? <VolumeX/> : <Volume2/>}</button>
             <div className="video-info">
-              <div className="creator"><span className="avatar">{video.avatar}</span><div><b>@{video.user}</b><small>{video.name}</small></div><button className="follow-btn" onClick={() => user ? setFollowing(f => ({...f, [video.id]: !f[video.id]})) : openAuth()}>{following[video.id] ? "تتابعه" : "متابعة"}</button></div>
+              <div className="creator"><span className="avatar">{video.avatar}</span><div><b>@{video.user}</b><small>{video.name}</small></div><button className="follow-btn" onClick={() => handleFollow(video)}>{following[video.userId] ? "تتابعه" : "متابعة"}</button></div>
               <p>{video.caption}</p><small className="sound-line">♫ الرافدين تيك</small>
             </div>
             <div className="video-actions">
