@@ -3,7 +3,10 @@ package com.alrafidain.tik
 import android.os.Bundle
 import android.net.Uri
 import android.content.Intent
+import coil.ImageLoader
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.video.VideoFrameDecoder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -710,6 +713,12 @@ private fun ProfileScreen(repository: SupabaseRepository, onSignOut: () -> Unit)
 @Composable
 private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit, onSignOut: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val profileVideoImageLoader = remember(context) {
+        ImageLoader.Builder(context).components {
+            add(VideoFrameDecoder.Factory())
+        }.build()
+    }
     var profile by remember { mutableStateOf<org.json.JSONObject?>(null) }
     var stats by remember { mutableStateOf<TikProfileStats?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -860,9 +869,21 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                                 AsyncImage(model = post.videoUrl, contentDescription = post.caption,
                                     contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                             } else {
-                                Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.PlayArrow, null, tint = Color.White, modifier = Modifier.size(36.dp))
-                                    if (post.caption.isNotBlank()) Text(post.caption, color = Color.White, fontSize = 10.sp, maxLines = 2)
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context)
+                                        .data(post.videoUrl)
+                                        .videoFrameMillis(1000)
+                                        .crossfade(true)
+                                        .build(),
+                                    imageLoader = profileVideoImageLoader,
+                                    contentDescription = post.caption,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                Box(Modifier.align(Alignment.Center).size(34.dp)
+                                    .background(Color.Black.copy(alpha = 0.42f), CircleShape),
+                                    contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.PlayArrow, null, tint = Color.White, modifier = Modifier.size(27.dp))
                                 }
                             }
                             Row(Modifier.align(Alignment.BottomEnd).padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
