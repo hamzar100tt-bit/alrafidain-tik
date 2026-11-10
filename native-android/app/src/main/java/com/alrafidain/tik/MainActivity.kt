@@ -2,11 +2,15 @@ package com.alrafidain.tik
 
 import android.os.Bundle
 import android.net.Uri
+import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.pager.VerticalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -133,7 +138,7 @@ private fun AlrafidainApp() {
                 } else IconButton(onClick = { }) { Icon(Icons.Default.NotificationsNone, contentDescription = "الإشعارات", tint = Ink) }
             }
             when (selected) {
-                0 -> FeedScreen(videos, loading, error, ::refreshFeed)
+                0 -> FeedScreen(videos, loading, error, ::refreshFeed, repository)
                 1 -> NativePlaceholder("اكتشف", "قريباً: البحث عن الفيديوهات والحسابات", Icons.Default.Explore)
                 2 -> UploadScreen(repository, onUploaded = { refreshFeed(); selected = 0 })
                 3 -> NativePlaceholder("الرسائل", "محادثاتك ورسائلك الخاصة", Icons.Default.ChatBubble)
@@ -189,7 +194,13 @@ private fun AuthScreen(
 }
 
 @Composable
-private fun FeedScreen(videos: List<TikVideo>, loading: Boolean, error: String?, onRefresh: () -> Unit) {
+private fun FeedScreen(
+    videos: List<TikVideo>,
+    loading: Boolean,
+    error: String?,
+    onRefresh: () -> Unit,
+    repository: SupabaseRepository
+) {
     when {
         loading && videos.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = Brand)
@@ -202,32 +213,109 @@ private fun FeedScreen(videos: List<TikVideo>, loading: Boolean, error: String?,
         videos.isEmpty() -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
             Text("ماكو فيديوهات منشورة حالياً", color = Muted)
         }
-        else -> LazyColumn(contentPadding = PaddingValues(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(videos, key = { it.id }) { video ->
-                Column(Modifier.fillMaxWidth().background(Color.White)) {
-                    NativeVideoPlayer(video.videoUrl)
-                    if (video.caption.isNotBlank()) Text(video.caption, Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                        color = Ink, fontSize = 15.sp)
-                }
+        else -> {
+            val pagerState = rememberPagerState(pageCount = { videos.size })
+            VerticalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                key = { index -> videos[index].id }
+            ) { page ->
+                VideoFeedPage(video = videos[page], repository = repository, active = pagerState.currentPage == page)
             }
         }
     }
 }
 
 @Composable
-private fun NativeVideoPlayer(url: String) {
+private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, active: Boolean) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var liked by remember(video.id) { mutableStateOf(false) }
+    var saved by remember(video.id) { mutableStateOf(false) }
+    var commentsOpen by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    LaunchedEffect(video.id) {
+        withContext(Dispatchers.IO) {
+            liked = repository.isLiked(video.id)
+            saved = repository.isSaved(video.id)
+        }
+    }
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        NativeVideoPlayer(video.videoUrl, active)
+        Column(
+            Modifier.align(Alignment.CenterEnd).padding(end = 10.dp, bottom = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                IconButton(enabled = !busy, onClick = {
+                    scope.launch {
+                        busy = true
+                        try { liked = withContext(Dispatchers.IO) { repository.toggleLike(video.id) } }
+                        finally { busy = false }
+                    }
+                }) {
+                    Icon(if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = "إعجاب", tint = if (liked) Brand else Color.White, modifier = Modifier.size(32.dp))
+                }
+                Text("إعجاب", color = Color.White, fontSize = 11.sp)
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                IconButton(onClick = { commentsOpen = true }) {
+                    Icon(Icons.Default.ChatBubbleOutline, contentDescription = "تعليق", tint = Color.White, modifier = Modifier.size(30.dp))
+                }
+                Text("تعليق", color = Color.White, fontSize = 11.sp)
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                IconButton(onClick = {
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, video.videoUrl)
+                    }
+                    context.startActivity(Intent.createChooser(send, "مشاركة الفيديو"))
+                }) {
+                    Icon(Icons.Default.Share, contentDescription = "مشاركة", tint = Color.White, modifier = Modifier.size(30.dp))
+                }
+                Text("مشاركة", color = Color.White, fontSize = 11.sp)
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                IconButton(enabled = !busy, onClick = {
+                    scope.launch {
+                        busy = true
+                        try { saved = withContext(Dispatchers.IO) { repository.toggleSaved(video.id) } }
+                        finally { busy = false }
+                    }
+                }) {
+                    Icon(if (saved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                        contentDescription = "حفظ", tint = if (saved) Brand else Color.White, modifier = Modifier.size(30.dp))
+                }
+                Text("حفظ", color = Color.White, fontSize = 11.sp)
+            }
+        }
+        if (video.caption.isNotBlank()) {
+            Text(video.caption, color = Color.White, fontSize = 15.sp,
+                modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, end = 84.dp, bottom = 20.dp))
+        }
+    }
+    if (commentsOpen) CommentDialog(video.id, repository, onDismiss = { commentsOpen = false })
+}
+
+@Composable
+private fun NativeVideoPlayer(url: String, active: Boolean) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val player = remember(url) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(url))
+            repeatMode = ExoPlayer.REPEAT_MODE_ONE
             prepare()
-            playWhenReady = false
         }
     }
+    LaunchedEffect(active, player) { player.playWhenReady = active; if (!active) player.pause() }
     DisposableEffect(player, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_PAUSE) player.pause()
+            if (event == Lifecycle.Event.ON_RESUME && active) player.play()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
@@ -236,9 +324,59 @@ private fun NativeVideoPlayer(url: String) {
         }
     }
     AndroidView(
-        factory = { viewContext -> PlayerView(viewContext).apply { this.player = player; useController = true } },
+        factory = { viewContext -> PlayerView(viewContext).apply {
+            this.player = player
+            useController = false
+            resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+        } },
         update = { it.player = player },
-        modifier = Modifier.fillMaxWidth().height(480.dp).background(Color.Black)
+        modifier = Modifier.fillMaxSize()
+    )
+}
+
+@Composable
+private fun CommentDialog(videoId: String, repository: SupabaseRepository, onDismiss: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var comments by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var text by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var loading by remember { mutableStateOf(true) }
+    fun reload() {
+        scope.launch {
+            loading = true
+            try { comments = withContext(Dispatchers.IO) { repository.loadComments(videoId) }; error = null }
+            catch (e: Exception) { error = e.message }
+            finally { loading = false }
+        }
+    }
+    LaunchedEffect(videoId) { reload() }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("التعليقات") },
+        text = {
+            Column(Modifier.fillMaxWidth()) {
+                if (loading) CircularProgressIndicator(color = Brand)
+                comments.forEach { item ->
+                    Text(item.second, color = Ink, modifier = Modifier.padding(vertical = 5.dp))
+                }
+                if (error != null) Text(error!!, color = MaterialTheme.colorScheme.error)
+                OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text("اكتب تعليقك") },
+                    modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = text.isNotBlank(), onClick = {
+                scope.launch {
+                    try {
+                        withContext(Dispatchers.IO) { repository.addComment(videoId, text.trim()) }
+                        text = ""
+                        reload()
+                    } catch (e: Exception) { error = e.message }
+                }
+            }) { Text("إرسال", color = Brand) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إغلاق") } }
     )
 }
 
@@ -303,14 +441,29 @@ private fun UploadScreen(repository: SupabaseRepository, onUploaded: () -> Unit)
 }
 
 @Composable
-private fun ProfileScreen(onSignOut: () -> Unit) {
+private fun ProfileScreen(repository: SupabaseRepository, onSignOut: () -> Unit) {
+    var profile by remember { mutableStateOf<org.json.JSONObject?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        try { profile = withContext(Dispatchers.IO) { repository.loadProfile() } }
+        catch (e: Exception) { error = e.message }
+    }
     Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center) {
-        Icon(Icons.Default.AccountCircle, null, tint = Brand, modifier = Modifier.size(64.dp))
+        Icon(Icons.Default.AccountCircle, null, tint = Brand, modifier = Modifier.size(86.dp))
         Spacer(Modifier.height(12.dp))
-        Text("حسابي", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(18.dp))
-        OutlinedButton(onClick = onSignOut) { Text("تسجيل الخروج") }
+        Text(profile?.optString("display_name")?.takeIf { !it.isNullOrBlank() }
+            ?: profile?.optString("username")?.takeIf { !it.isNullOrBlank() } ?: "حسابي",
+            fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        profile?.optString("username")?.takeIf { it.isNotBlank() }?.let {
+            Text("@$it", color = Muted, fontSize = 14.sp)
+        }
+        profile?.optString("bio")?.takeIf { it.isNotBlank() }?.let {
+            Text(it, color = Ink, modifier = Modifier.padding(top = 10.dp), textAlign = TextAlign.Center)
+        }
+        if (error != null) Text(error!!, color = Muted, fontSize = 12.sp)
+        Spacer(Modifier.height(22.dp))
+        OutlinedButton(onClick = onSignOut) { Text("تسجيل الخروج", color = Brand) }
     }
 }
 
