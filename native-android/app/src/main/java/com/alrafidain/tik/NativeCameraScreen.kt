@@ -3,6 +3,10 @@ package com.alrafidain.tik
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
+import android.view.View
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,6 +25,7 @@ import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -74,6 +79,7 @@ fun NativeCameraScreen(
     var videoCapture by remember { mutableStateOf<VideoCapture<Recorder>?>(null) }
     var activeRecording by remember { mutableStateOf<Recording?>(null) }
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    var previewViewState by remember { mutableStateOf<PreviewView?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -122,6 +128,8 @@ fun NativeCameraScreen(
                             scaleType = PreviewView.ScaleType.FILL_CENTER
                             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
                         }
+                        previewViewState = previewView
+                        applyCameraFilter(previewView, filter)
                         val future = ProcessCameraProvider.getInstance(ctx)
                         future.addListener({
                             val provider = future.get()
@@ -147,7 +155,7 @@ fun NativeCameraScreen(
                         }, executor)
                         previewView
                     },
-                    update = { }
+                    update = { view -> applyCameraFilter(view, filter) }
                 )
                 // Camera preview is edge-to-edge, with TikTok-style capture controls.
                 Column(
@@ -280,10 +288,34 @@ fun NativeCameraScreen(
                                 }
                             }) { Icon(Icons.Default.Cameraswitch, "تبديل الكاميرا", tint = Color.White, modifier = Modifier.size(28.dp)) }
                         }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                            listOf("طبيعي", "دافئ", "أبيض وأسود", "زاهي").forEach { item ->
-                                TextButton(onClick = { filter = item }) {
-                                    Text(if (filter == item) "● $item" else item, color = if (filter == item) CameraBrand else Color.White, fontSize = 11.sp)
+                        val filters = listOf("طبيعي", "ناعم", "دافئ", "ذهبي", "بارد", "أبيض وأسود", "رمادي", "زاهي", "سينما", "وردي", "قديم", "ليلي")
+                        Text("الفلاتر", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp))
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            filters.forEach { item ->
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.width(62.dp)
+                                ) {
+                                    Box(
+                                        Modifier.size(48.dp).background(
+                                            filterSwatch(item),
+                                            RoundedCornerShape(14.dp)
+                                        ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("Aa", color = Color.White, fontSize = 16.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                                    }
+                                    TextButton(
+                                        onClick = { filter = item },
+                                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
+                                    ) {
+                                        Text(item, color = if (filter == item) CameraBrand else Color.White, fontSize = 10.sp)
+                                    }
+                                    if (filter == item) Box(Modifier.width(26.dp).height(3.dp).background(CameraBrand, CircleShape))
                                 }
                             }
                         }
@@ -322,4 +354,70 @@ private fun findPreviewView(view: android.view.View?): PreviewView? {
         }
     }
     return null
+}
+
+
+private fun filterSwatch(name: String): Color = when (name) {
+    "ناعم" -> Color(0xFFE8B8A8)
+    "دافئ" -> Color(0xFFE69B55)
+    "ذهبي" -> Color(0xFFC58B35)
+    "بارد" -> Color(0xFF729BBF)
+    "أبيض وأسود", "رمادي" -> Color(0xFF777777)
+    "زاهي" -> Color(0xFFCB4C70)
+    "سينما" -> Color(0xFF465C53)
+    "وردي" -> Color(0xFFE58BAA)
+    "قديم" -> Color(0xFF9A7956)
+    "ليلي" -> Color(0xFF343A61)
+    else -> Color(0xFF8B9A83)
+}
+
+private fun applyCameraFilter(view: PreviewView, name: String) {
+    val matrix = when (name) {
+        "أبيض وأسود", "رمادي" -> ColorMatrix().apply { setSaturation(0f) }
+        "دافئ" -> ColorMatrix(floatArrayOf(
+            1.18f, 0f, 0f, 0f, 18f, 0f, 1.02f, 0f, 0f, 5f,
+            0f, 0f, 0.82f, 0f, 0f, 0f, 0f, 0f, 1f, 0f
+        ))
+        "ذهبي" -> ColorMatrix(floatArrayOf(
+            1.22f, 0f, 0f, 0f, 22f, 0f, 1.08f, 0f, 0f, 10f,
+            0f, 0f, 0.70f, 0f, 0f, 0f, 0f, 0f, 1f, 0f
+        ))
+        "بارد" -> ColorMatrix(floatArrayOf(
+            0.90f, 0f, 0f, 0f, 0f, 0f, 1.02f, 0f, 0f, 0f,
+            0f, 0f, 1.22f, 0f, 18f, 0f, 0f, 0f, 1f, 0f
+        ))
+        "زاهي" -> ColorMatrix(floatArrayOf(
+            1.28f, -0.10f, -0.10f, 0f, 4f, -0.08f, 1.20f, -0.08f, 0f, 4f,
+            -0.08f, -0.08f, 1.28f, 0f, 4f, 0f, 0f, 0f, 1f, 0f
+        ))
+        "سينما" -> ColorMatrix(floatArrayOf(
+            1.12f, 0f, 0f, 0f, -8f, 0f, 1.05f, 0f, 0f, -5f,
+            0f, 0f, 0.92f, 0f, 5f, 0f, 0f, 0f, 1f, 0f
+        ))
+        "وردي" -> ColorMatrix(floatArrayOf(
+            1.12f, 0f, 0f, 0f, 10f, 0f, 0.94f, 0f, 0f, 0f,
+            0f, 0f, 1.02f, 0f, 8f, 0f, 0f, 0f, 1f, 0f
+        ))
+        "قديم" -> ColorMatrix(floatArrayOf(
+            0.92f, 0.12f, 0.04f, 0f, 12f, 0.08f, 0.90f, 0.02f, 0f, 7f,
+            0.04f, 0.08f, 0.72f, 0f, 0f, 0f, 0f, 0f, 1f, 0f
+        ))
+        "ليلي" -> ColorMatrix(floatArrayOf(
+            0.78f, 0f, 0.08f, 0f, 0f, 0f, 0.86f, 0.04f, 0f, 0f,
+            0.08f, 0.04f, 1.16f, 0f, 12f, 0f, 0f, 0f, 1f, 0f
+        ))
+        "ناعم" -> ColorMatrix(floatArrayOf(
+            1.06f, 0f, 0f, 0f, 8f, 0f, 1.02f, 0f, 0f, 5f,
+            0f, 0f, 1.00f, 0f, 5f, 0f, 0f, 0f, 1f, 0f
+        ))
+        else -> null
+    }
+    if (matrix == null) {
+        view.setLayerType(View.LAYER_TYPE_NONE, null)
+    } else {
+        view.setLayerType(
+            View.LAYER_TYPE_HARDWARE,
+            Paint().apply { colorFilter = ColorMatrixColorFilter(matrix) }
+        )
+    }
 }
