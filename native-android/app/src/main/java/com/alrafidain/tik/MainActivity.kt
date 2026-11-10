@@ -719,6 +719,8 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var selectedTab by remember { mutableIntStateOf(0) }
+    var extraPosts by remember { mutableStateOf<List<TikVideo>>(emptyList()) }
+    var extraLoading by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
 
     fun load() {
@@ -740,6 +742,20 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
     }
 
     LaunchedEffect(Unit) { load() }
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == 3 || selectedTab == 4) {
+            extraLoading = true
+            try {
+                extraPosts = withContext(Dispatchers.IO) {
+                    if (selectedTab == 3) repository.loadSavedVideos() else repository.loadLikedVideos()
+                }
+            } catch (_: Exception) {
+                extraPosts = emptyList()
+            } finally {
+                extraLoading = false
+            }
+        }
+    }
     val displayName = profile?.optString("display_name")?.takeIf { it.isNotBlank() } ?: "مستخدم الرافدين"
     val username = profile?.optString("username").orEmpty()
     val bio = profile?.optString("bio").orEmpty()
@@ -832,16 +848,38 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                         TextButton(onClick = { load() }) { Text("إعادة المحاولة", color = Brand) }
                     }
                 }
-                selectedTab != 0 -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text(
-                        when (selectedTab) {
-                            1 -> "المحتوى الخاص يظهر لك وحدك"
-                            2 -> "إعادات النشر ستظهر هنا"
-                            3 -> "الفيديوهات المحفوظة ستظهر هنا"
-                            else -> "الإعجابات ستظهر هنا"
-                        },
-                        color = Muted
-                    )
+                selectedTab == 1 || selectedTab == 2 -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text(if (selectedTab == 1) "المحتوى الخاص يظهر لك وحدك" else "إعادات النشر ستظهر هنا", color = Muted)
+                }
+                selectedTab == 3 || selectedTab == 4 -> {
+                    when {
+                        extraLoading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = Brand)
+                        }
+                        extraPosts.isEmpty() -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Text(if (selectedTab == 3) "ماكو فيديوهات محفوظة" else "ماكو إعجابات لحد الآن", color = Muted)
+                        }
+                        else -> LazyVerticalGrid(
+                            columns = GridCells.Fixed(3),
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            contentPadding = PaddingValues(bottom = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            items(extraPosts.size, key = { index -> extraPosts[index].id }) { index ->
+                                val post = extraPosts[index]
+                                Box(Modifier.fillMaxWidth().aspectRatio(0.72f).background(Color(0xFF181818))) {
+                                    if (post.mediaType == "image") {
+                                        AsyncImage(model = post.videoUrl, contentDescription = post.caption,
+                                            contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                    } else {
+                                        VideoPostThumbnail(videoUrl = post.videoUrl, contentDescription = post.caption, modifier = Modifier.fillMaxSize())
+                                        Icon(Icons.Default.PlayArrow, null, tint = Color.White, modifier = Modifier.align(Alignment.Center).size(28.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 stats?.posts.isNullOrEmpty() -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
