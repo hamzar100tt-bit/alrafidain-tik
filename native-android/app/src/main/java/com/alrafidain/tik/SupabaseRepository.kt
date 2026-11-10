@@ -216,14 +216,51 @@ class SupabaseRepository(private val context: Context) {
         }
     }
 
-    fun uploadPhoto(uri: Uri, caption: String): String {
+    private fun applyPhotoFilter(source: android.graphics.Bitmap, filter: String): android.graphics.Bitmap {
+        if (filter == "طبيعي") return source
+        val width = source.width
+        val height = source.height
+        val pixels = IntArray(width * height)
+        source.getPixels(pixels, 0, width, 0, 0, width, height)
+        for (i in pixels.indices) {
+            val color = pixels[i]
+            var r = android.graphics.Color.red(color).toFloat()
+            var g = android.graphics.Color.green(color).toFloat()
+            var b = android.graphics.Color.blue(color).toFloat()
+            when (filter) {
+                "أبيض وأسود" -> {
+                    val gray = 0.299f * r + 0.587f * g + 0.114f * b
+                    r = gray; g = gray; b = gray
+                }
+                "دافئ" -> { r = (r + 22f).coerceAtMost(255f); g = (g + 8f).coerceAtMost(255f); b = (b - 14f).coerceAtLeast(0f) }
+                "زاهي" -> {
+                    val avg = (r + g + b) / 3f
+                    r = (avg + (r - avg) * 1.28f).coerceIn(0f,255f)
+                    g = (avg + (g - avg) * 1.28f).coerceIn(0f,255f)
+                    b = (avg + (b - avg) * 1.28f).coerceIn(0f,255f)
+                }
+            }
+            pixels[i] = android.graphics.Color.argb(android.graphics.Color.alpha(color), r.toInt(), g.toInt(), b.toInt())
+        }
+        return android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888).apply {
+            setPixels(pixels, 0, width, 0, 0, width, height)
+        }
+    }
+
+    fun uploadPhoto(uri: Uri, caption: String, filter: String = "طبيعي"): String {
         val token = accessToken ?: throw IOException("سجّل الدخول أولاً")
         val userId = currentUserId() ?: throw IOException("تعذر تحديد الحساب الحالي")
         val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
         if (!mime.startsWith("image/")) throw IOException("الملف المحدد ليس صورة")
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        val original = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             ?: throw IOException("تعذر قراءة الصورة")
-        if (bytes.isEmpty()) throw IOException("الصورة فارغة")
+        if (original.isEmpty()) throw IOException("الصورة فارغة")
+        val decoded = android.graphics.BitmapFactory.decodeByteArray(original, 0, original.size)
+            ?: throw IOException("صيغة الصورة غير مدعومة")
+        val filtered = applyPhotoFilter(decoded, filter)
+        val output = java.io.ByteArrayOutputStream()
+        filtered.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, output)
+        val bytes = output.toByteArray()
         if (bytes.size > 15 * 1024 * 1024) throw IOException("حجم الصورة أكبر من 15 ميغابايت")
         val ext = when (mime.substringAfter("/")) { "png" -> "png"; "webp" -> "webp"; else -> "jpg" }
         val path = "$userId/${UUID.randomUUID()}.$ext"
