@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Home, Compass, Users, PlusSquare, UserRound, Search, Heart, MessageCircle, Bookmark, Share2, Volume2, VolumeX, Play, Menu, X, LogOut, Send, Video, LoaderCircle } from "lucide-react";
 import { supabase } from "./lib/supabase.js";
-import { signIn, signUp, signOut, publishVideo, getFeed, addComment, getComments, toggleLike, toggleFollow, getFollowingFeed, getMyVideos, getProfile, getFollowState, getLikedVideoIds, getProfileStats, findProfileByUsername, getDirectMessages, sendDirectMessage } from "./services/videoService.js";
+import { signIn, signUp, signOut, publishVideo, getFeed, addComment, getComments, toggleLike, toggleFollow, getFollowingFeed, getMyVideos, getProfile, getFollowState, getLikedVideoIds, getProfileStats, findProfileByUsername, getDirectMessages, sendDirectMessage, updateProfile, uploadProfileAvatar } from "./services/videoService.js";
 
 const demoVideos = [
   { id: "demo-1", user: "iraq_daily", name: "يوميات العراق 🇮🇶", caption: "جمال بلادنا ما ينتهي ❤️ #العراق #الرافدين", image: "https://images.unsplash.com/photo-1565008576549-57569a49371d?auto=format&fit=crop&w=900&q=85", avatar: "🇮🇶", demo: true },
@@ -44,6 +44,8 @@ function App() {
   const [profileEditOpen, setProfileEditOpen] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
+  const [profileUsername, setProfileUsername] = useState("");
+  const profileAvatarRef = useRef(null);
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
   const videoRef = useRef(null);
   const fileRef = useRef(null);
@@ -72,6 +74,7 @@ function App() {
           setProfileStats(stats);
           setDisplayName(ownProfile.display_name || "");
           setBio(ownProfile.bio || "");
+          setProfileUsername(ownProfile.username || "");
         } catch { setProfile(null); }
       }
       setError("");
@@ -140,13 +143,22 @@ function App() {
     finally { setBusy(false); }
   };
   const saveProfile = async (e) => {
-    e.preventDefault(); if (!user) return; setBusy(true);
+    e.preventDefault(); if (!user) return; setBusy(true); setError("");
     try {
-      const { error: updateError } = await supabase.from("profiles").update({ display_name: displayName.trim(), bio: bio.trim() }).eq("id", user.id);
-      if (updateError) throw updateError;
-      setProfile(p => ({ ...p, display_name: displayName.trim(), bio: bio.trim() })); setProfileEditOpen(false);
+      const updated = await updateProfile({ userId: user.id, username: profileUsername, displayName, bio });
+      setProfile(updated); setProfileEditOpen(false);
     } catch (e) { setError(e.message || "تعذر حفظ الملف الشخصي."); }
     finally { setBusy(false); }
+  };
+  const handleAvatarChange = async (e) => {
+    const selected = e.target.files?.[0];
+    if (!selected || !user) return;
+    setBusy(true); setError("");
+    try {
+      const updated = await uploadProfileAvatar({ file: selected, userId: user.id });
+      setProfile(updated);
+    } catch (e) { setError(e.message || "تعذر تغيير الصورة."); }
+    finally { setBusy(false); e.target.value = ""; }
   };
 
   const handleFollow = async (v) => {
@@ -266,7 +278,7 @@ function App() {
       <button className="login-btn modal-submit" disabled={busy || !file}>{busy ? "جاري الرفع..." : "نشر الفيديو"}</button>
     </form></section></div>}
 
-    {profileEditOpen && <div className="modal-backdrop" onClick={() => setProfileEditOpen(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setProfileEditOpen(false)}><X/></button><h2>تعديل الملف الشخصي</h2><form onSubmit={saveProfile}><input maxLength="60" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="الاسم الظاهر"/><textarea maxLength="160" value={bio} onChange={e => setBio(e.target.value)} placeholder="نبذة عنك"/><button className="login-btn modal-submit" disabled={busy}>{busy ? "حفظ..." : "حفظ التغييرات"}</button></form></section></div>}
+    {profileEditOpen && <div className="modal-backdrop" onClick={() => setProfileEditOpen(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setProfileEditOpen(false)}><X/></button><h2>تعديل الملف الشخصي</h2><form onSubmit={saveProfile}><label className="avatar-upload-control">صورة الحساب<input ref={profileAvatarRef} type="file" accept="image/*" onChange={handleAvatarChange}/></label><input required minLength="3" maxLength="24" value={profileUsername} onChange={e => setProfileUsername(e.target.value)} placeholder="اسم المستخدم (إنكليزي)"/><input maxLength="60" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="الاسم الظاهر"/><textarea maxLength="160" value={bio} onChange={e => setBio(e.target.value)} placeholder="نبذة عنك"/><button className="login-btn modal-submit" disabled={busy}>{busy ? "حفظ..." : "حفظ التغييرات"}</button></form></section></div>}
     
     {commentsFor && <div className="modal-backdrop" onClick={() => setCommentsFor(null)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setCommentsFor(null)}><X/></button><h2>التعليقات</h2><div className="comment-list">{comments.map(c => <p key={c.id}><b>@{c.profiles?.username || "مستخدم"}</b> {c.body}</p>)}{!comments.length && <p>لا توجد تعليقات بعد.</p>}</div><form onSubmit={sendComment}><input value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="اكتب تعليقاً…"/><button className="login-btn modal-submit" disabled={!commentText.trim()}><Send size={16}/> إرسال</button></form></section></div>}
   </div>;
