@@ -228,6 +228,27 @@ class SupabaseRepository(private val context: Context) {
         }
     }
 
+    fun isFollowing(userId: String): Boolean {
+        val me = currentUserId() ?: return false
+        val rows = fetchAuthedRows("follows?follower_id=eq.$me&followed_id=eq.$userId&select=followed_id")
+        return rows.length() > 0
+    }
+
+    fun toggleFollow(userId: String): Boolean {
+        val me = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
+        if (me == userId) throw IOException("ما تكدر تتابع حسابك")
+        val already = isFollowing(userId)
+        val url = "$base/rest/v1/follows?follower_id=eq.$me&followed_id=eq.$userId"
+        val builder = authedRequest(url).addHeader("Content-Type", "application/json")
+        val request = if (already) builder.delete().build() else builder
+            .post(JSONObject().put("follower_id", me).put("followed_id", userId)
+                .toString().toRequestBody("application/json".toMediaType())).build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("تعذر تحديث المتابعة (${response.code})")
+        }
+        return !already
+    }
+
     fun toggleLike(videoId: String): Boolean = toggleRelation("likes", videoId)
     fun toggleSaved(videoId: String): Boolean = toggleRelation("saved_videos", videoId)
 
