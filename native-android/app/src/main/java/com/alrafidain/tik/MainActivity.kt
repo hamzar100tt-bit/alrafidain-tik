@@ -16,6 +16,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -124,7 +128,7 @@ private fun AlrafidainApp() {
             else -> if (signedIn) ProfileScreen(repository, onSignOut = { repository.signOut(); signedIn = false; selected = 0 }) else GuestGate { showAuth = true }
         }
 
-        Row(
+        if (selected != 4) Row(
             Modifier.align(Alignment.TopCenter)
                 .fillMaxWidth()
                 .statusBarsPadding()
@@ -152,7 +156,7 @@ private fun AlrafidainApp() {
             modifier = Modifier.align(Alignment.BottomCenter)
                 .navigationBarsPadding()
                 .fillMaxWidth(),
-            containerColor = Color.Transparent,
+            containerColor = if (selected == 4) Color.White else Color.Transparent,
             tonalElevation = 0.dp,
             windowInsets = WindowInsets(0)
         ) {
@@ -165,9 +169,9 @@ private fun AlrafidainApp() {
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Brand,
                         selectedTextColor = Brand,
-                        indicatorColor = Color.White.copy(alpha = 0.16f),
-                        unselectedIconColor = Color.White.copy(alpha = 0.82f),
-                        unselectedTextColor = Color.White.copy(alpha = 0.82f)
+                        indicatorColor = if (selected == 4) Color(0xFFFFE7ED) else Color.White.copy(alpha = 0.16f),
+                        unselectedIconColor = if (selected == 4) Muted else Color.White.copy(alpha = 0.82f),
+                        unselectedTextColor = if (selected == 4) Muted else Color.White.copy(alpha = 0.82f)
                     )
                 )
             }
@@ -621,6 +625,198 @@ private fun UploadScreen(repository: SupabaseRepository, onUploaded: () -> Unit)
 
 @Composable
 private fun ProfileScreen(repository: SupabaseRepository, onSignOut: () -> Unit) {
+    var editing by remember { mutableStateOf(false) }
+    if (editing) {
+        ProfileEditScreen(repository, onBack = { editing = false }, onSaved = { editing = false }, onSignOut = onSignOut)
+    } else {
+        ProfileHomeScreen(repository, onEdit = { editing = true }, onSignOut = onSignOut)
+    }
+}
+
+@Composable
+private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit, onSignOut: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var profile by remember { mutableStateOf<org.json.JSONObject?>(null) }
+    var stats by remember { mutableStateOf<TikProfileStats?>(null) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var selectedTab by remember { mutableIntStateOf(4) }
+    var menuOpen by remember { mutableStateOf(false) }
+
+    fun load() {
+        scope.launch {
+            loading = true
+            error = null
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    repository.loadProfile() to repository.loadMyProfileStats()
+                }
+                profile = result.first
+                stats = result.second
+            } catch (e: Exception) {
+                error = e.message ?: "تعذر تحميل الملف الشخصي"
+            } finally {
+                loading = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { load() }
+    val displayName = profile?.optString("display_name")?.takeIf { it.isNotBlank() } ?: "مستخدم الرافدين"
+    val username = profile?.optString("username").orEmpty()
+    val bio = profile?.optString("bio").orEmpty()
+    val avatar = profile?.optString("avatar_url")?.takeIf { it.isNotBlank() }
+
+    Column(Modifier.fillMaxSize().background(Color.White).padding(bottom = 82.dp)) {
+        Row(
+            Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Default.Menu, contentDescription = "القائمة", tint = Ink, modifier = Modifier.size(27.dp))
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(text = { Text("تسجيل الخروج") }, leadingIcon = { Icon(Icons.Default.Logout, null) },
+                            onClick = { menuOpen = false; onSignOut() })
+                    }
+                }
+                IconButton(onClick = { /* friend discovery */ }) {
+                    Icon(Icons.Default.PersonAddAlt, contentDescription = "إضافة أصدقاء", tint = Ink, modifier = Modifier.size(27.dp))
+                }
+            }
+            IconButton(onClick = onEdit) {
+                Icon(Icons.Default.Edit, contentDescription = "تعديل الملف الشخصي", tint = Ink, modifier = Modifier.size(27.dp))
+            }
+        }
+
+        if (loading && profile == null) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Brand)
+            }
+        } else {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                    Text(displayName, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, color = Ink, maxLines = 1)
+                    Text("@\${username.ifBlank { "user" }}", fontSize = 14.sp, color = Muted)
+                    Spacer(Modifier.height(22.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        ProfileStat(stats?.following ?: 0, "أتابعه")
+                        ProfileStat(stats?.followers ?: 0, "متابعين")
+                        ProfileStat(stats?.likes ?: 0, "تسجيلات الإعجاب")
+                    }
+                }
+                if (!avatar.isNullOrBlank()) {
+                    AsyncImage(
+                        model = avatar,
+                        contentDescription = "الصورة الشخصية",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(112.dp).background(Color(0xFFF1F1F3), CircleShape)
+                    )
+                } else {
+                    Icon(Icons.Default.AccountCircle, null, tint = Brand, modifier = Modifier.size(112.dp))
+                }
+            }
+            Text(
+                bio.ifBlank { "أضف نبذة عنك حتى يعرفك الناس" },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 13.dp),
+                fontSize = 15.sp,
+                color = if (bio.isBlank()) Muted else Ink,
+                textAlign = TextAlign.Start
+            )
+
+            Row(
+                Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val tabs = listOf(Icons.Default.FavoriteBorder, Icons.Default.BookmarkBorder, Icons.Default.Repeat, Icons.Default.Lock, Icons.Default.GridView)
+                tabs.forEachIndexed { index, icon ->
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        IconButton(onClick = { selectedTab = index }) {
+                            Icon(icon, contentDescription = null, tint = if (selectedTab == index) Ink else Muted, modifier = Modifier.size(28.dp))
+                        }
+                        Box(Modifier.width(42.dp).height(3.dp).background(if (selectedTab == index) Ink else Color.Transparent, RoundedCornerShape(2.dp)))
+                    }
+                }
+            }
+            HorizontalDivider(color = Color(0xFFECECEC))
+            when {
+                error != null -> Box(Modifier.weight(1f).fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(error!!, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+                        TextButton(onClick = { load() }) { Text("إعادة المحاولة", color = Brand) }
+                    }
+                }
+                selectedTab != 4 -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text(
+                        when (selectedTab) {
+                            0 -> "الإعجابات ستظهر هنا"
+                            1 -> "الفيديوهات المحفوظة ستظهر هنا"
+                            2 -> "إعادات النشر ستظهر هنا"
+                            else -> "المحتوى الخاص يظهر لك وحدك"
+                        },
+                        color = Muted
+                    )
+                }
+                stats?.posts.isNullOrEmpty() -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.VideoLibrary, null, tint = Muted, modifier = Modifier.size(42.dp))
+                        Spacer(Modifier.height(8.dp))
+                        Text("ما نشرت أي فيديو أو صورة لحد الآن", color = Muted)
+                    }
+                }
+                else -> LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentPadding = PaddingValues(bottom = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    items(stats!!.posts.size, key = { index -> stats!!.posts[index].id }) { index ->
+                        val post = stats!!.posts[index]
+                        Box(Modifier.fillMaxWidth().aspectRatio(0.72f).background(Color(0xFF181818))) {
+                            if (post.mediaType == "image") {
+                                AsyncImage(model = post.videoUrl, contentDescription = post.caption,
+                                    contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                            } else {
+                                Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.PlayArrow, null, tint = Color.White, modifier = Modifier.size(36.dp))
+                                    if (post.caption.isNotBlank()) Text(post.caption, color = Color.White, fontSize = 10.sp, maxLines = 2)
+                                }
+                            }
+                            Row(Modifier.align(Alignment.BottomEnd).padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.PlayArrow, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Text("0", color = Color.White, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+            }
+            if (error == null && stats != null) {
+                Text("لقد اطلعت على جميع المنشورات", color = Muted, fontSize = 12.sp,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), textAlign = TextAlign.Center)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileStat(value: Int, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value.toString(), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Ink)
+        Text(label, fontSize = 11.sp, color = Muted, maxLines = 1)
+    }
+}
+
+@Composable
+private fun ProfileEditScreen(repository: SupabaseRepository, onBack: () -> Unit, onSaved: () -> Unit, onSignOut: () -> Unit) {
     val scope = rememberCoroutineScope()
     var profile by remember { mutableStateOf<org.json.JSONObject?>(null) }
     var displayName by remember { mutableStateOf("") }
@@ -676,7 +872,11 @@ private fun ProfileScreen(repository: SupabaseRepository, onSignOut: () -> Unit)
                 CircularProgressIndicator(color = Brand)
             }
         } else {
-            Spacer(Modifier.height(22.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Ink) }
+                Text("تعديل الملف الشخصي", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ink)
+                Spacer(Modifier.size(44.dp))
+            }
             Box(contentAlignment = Alignment.BottomEnd) {
                 if (!avatarUrl.isNullOrBlank()) {
                     AsyncImage(
@@ -722,6 +922,7 @@ private fun ProfileScreen(repository: SupabaseRepository, onSignOut: () -> Unit)
                             withContext(Dispatchers.IO) { repository.updateProfile(displayName, username, bio) }
                             message = "تم حفظ الملف الشخصي"
                             refresh()
+                            onSaved()
                         } catch (e: Exception) {
                             message = e.message ?: "تعذر حفظ التغييرات"
                         } finally { saving = false }
