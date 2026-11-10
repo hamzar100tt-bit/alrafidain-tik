@@ -349,10 +349,12 @@ private fun NativeVideoPlayer(url: String, active: Boolean, replaySignal: Int) {
             prepare()
         }
     }
+    var previousReplaySignal by remember(url) { mutableIntStateOf(replaySignal) }
     LaunchedEffect(active, replaySignal, player) {
-        if (replaySignal > 0) player.seekTo(0)
-        player.playWhenReady = active || replaySignal > 0
-        if (!active && replaySignal == 0) player.pause()
+        if (active && replaySignal != previousReplaySignal) player.seekTo(0)
+        previousReplaySignal = replaySignal
+        player.playWhenReady = active
+        if (!active) player.pause()
     }
     DisposableEffect(player, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
