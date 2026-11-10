@@ -132,7 +132,7 @@ private fun AlrafidainApp() {
         when (selected) {
             0 -> FeedScreen(videos, loading, error, ::refreshFeed, replaySignal, repository, signedIn) { showAuth = true }
             1 -> NativePlaceholder("اكتشف", "قريباً: البحث عن الفيديوهات والحسابات", Icons.Default.Explore)
-            2 -> if (signedIn) UploadScreen(repository, onBack = { selected = 0 }, onUploaded = { refreshFeed(); selected = 0 }) else GuestGate { showAuth = true }
+            2 -> if (signedIn) NativeCameraScreen(repository, onBack = { selected = 0 }, onUploaded = { refreshFeed(); selected = 0 }) else GuestGate { showAuth = true }
             3 -> if (signedIn) NativePlaceholder("الرسائل", "محادثاتك ورسائلك الخاصة", Icons.Default.ChatBubble) else GuestGate { showAuth = true }
             else -> if (signedIn) ProfileScreen(repository, onSignOut = { repository.signOut(); signedIn = false; selected = 0 }) else GuestGate { showAuth = true }
         }
