@@ -164,3 +164,73 @@ alter table public.saved_videos enable row level security;
 drop policy if exists "Users manage own saved videos" on public.saved_videos;
 create policy "Users manage own saved videos" on public.saved_videos
 for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+
+-- ===== الإشعارات: متابعة وإعجاب وتعليق =====
+create table if not exists public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  recipient_id uuid not null references public.profiles(id) on delete cascade,
+  actor_id uuid not null references public.profiles(id) on delete cascade,
+  kind text not null check (kind in ('follow','like','comment')),
+  video_id uuid references public.videos(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  read_at timestamptz,
+  check (recipient_id <> actor_id)
+);
+create index if not exists notifications_recipient_created_idx
+  on public.notifications(recipient_id, created_at desc);
+alter table public.notifications enable row level security;
+drop policy if exists "Users read their notifications" on public.notifications;
+create policy "Users read their notifications" on public.notifications
+  for select to authenticated using (auth.uid() = recipient_id);
+drop policy if exists "Users mark their notifications read" on public.notifications;
+create policy "Users mark their notifications read" on public.notifications
+  for update to authenticated using (auth.uid() = recipient_id)
+  with check (auth.uid() = recipient_id);
+
+create or replace function public.notify_new_follow()
+returns trigger language plpgsql security definer set search_path = public
+as $$
+begin
+  insert into public.notifications(recipient_id, actor_id, kind)
+  values (new.followed_id, new.follower_id, 'follow');
+  return new;
+end;
+$$;
+drop trigger if exists follows_create_notification on public.follows;
+create trigger follows_create_notification after insert on public.follows
+for each row execute function public.notify_new_follow();
+
+create or replace function public.notify_new_like()
+returns trigger language plpgsql security definer set search_path = public
+as $$
+declare owner_id uuid;
+begin
+  select user_id into owner_id from public.videos where id = new.video_id;
+  if owner_id is not null and owner_id <> new.user_id then
+    insert into public.notifications(recipient_id, actor_id, kind, video_id)
+    values (owner_id, new.user_id, 'like', new.video_id);
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists likes_create_notification on public.likes;
+create trigger likes_create_notification after insert on public.likes
+for each row execute function public.notify_new_like();
+
+create or replace function public.notify_new_comment()
+returns trigger language plpgsql security definer set search_path = public
+as $$
+declare owner_id uuid;
+begin
+  select user_id into owner_id from public.videos where id = new.video_id;
+  if owner_id is not null and owner_id <> new.user_id then
+    insert into public.notifications(recipient_id, actor_id, kind, video_id)
+    values (owner_id, new.user_id, 'comment', new.video_id);
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists comments_create_notification on public.comments;
+create trigger comments_create_notification after insert on public.comments
+for each row execute function public.notify_new_comment();
