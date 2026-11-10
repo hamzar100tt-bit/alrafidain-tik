@@ -75,7 +75,8 @@ class SupabaseRepository(private val context: Context) {
                 TikVideo(item.optString("id"), item.optString("caption"), url, item.optString("user_id"),
                     item.optJSONObject("profiles")?.optString("display_name")?.takeIf { it.isNotBlank() }
                         ?: item.optJSONObject("profiles")?.optString("username").orEmpty(),
-                    item.optJSONObject("profiles")?.optString("avatar_url")?.takeIf { it.isNotBlank() },\n                    item.optString("media_type", "video"))
+                    item.optJSONObject("profiles")?.optString("avatar_url")?.takeIf { it.isNotBlank() },
+                    item.optString("media_type", "video"))
             }
         }
     }
@@ -272,7 +273,7 @@ class SupabaseRepository(private val context: Context) {
         }
         val publicUrl = "$base/storage/v1/object/public/videos/$path"
         val row = JSONObject().put("user_id", userId).put("caption", caption)
-            .put("storage_path", path).put("video_url", publicUrl).put("media_type", "video").put("media_type", "image")
+            .put("storage_path", path).put("video_url", publicUrl).put("media_type", "image")
         val insert = Request.Builder().url("$base/rest/v1/videos")
             .addHeader("apikey", key).addHeader("Authorization", "Bearer $token")
             .addHeader("Content-Type", "application/json").addHeader("Prefer", "return=minimal")
@@ -302,7 +303,7 @@ class SupabaseRepository(private val context: Context) {
         }
         val publicUrl = "$base/storage/v1/object/public/videos/$path"
         val row = JSONObject().put("user_id", userId).put("caption", caption)
-            .put("storage_path", path).put("video_url", publicUrl)
+            .put("storage_path", path).put("video_url", publicUrl).put("media_type", "video")
         val insert = Request.Builder().url("$base/rest/v1/videos")
             .addHeader("apikey", key).addHeader("Authorization", "Bearer $token")
             .addHeader("Content-Type", "application/json").addHeader("Prefer", "return=minimal")
