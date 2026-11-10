@@ -1,51 +1,53 @@
 # الرافدين تيك
 
-تطبيق فيديوهات قصيرة باللغة العربية، مبني باستخدام React وVite وSupabase.
+تطبيق فيديوهات قصيرة باللغة العربية، مبني باستخدام React وVite وSupabase وCapacitor.
 
-## ما هو موجود حالياً
-- واجهة عربية متجاوبة.
-- إنشاء حساب وتسجيل الدخول عبر Supabase Auth.
-- تحميل التغذية من قاعدة البيانات.
+## الموجود في المستودع
+- واجهة عربية متجاوبة بتصميم مخصص للهاتف.
+- التسجيل وتسجيل الدخول عبر Supabase Auth.
+- عرض الفيديوهات المنشورة من قاعدة البيانات.
 - رفع فيديوهات MP4 وWebM وMOV إلى Supabase Storage (حتى 100MB).
-- التعليقات والإعجابات.
+- التعليقات والإعجابات والمتابعة والملف الشخصي والرسائل الخاصة.
+- واجهة بث مباشر تعتمد على LiveKit، وتحتاج إعداد خدمة LiveKit قبل التشغيل الفعلي.
 
-## قاعدة البيانات
-تم تجهيز مخطط قاعدة البيانات في `supabase/schema.sql`. تم تنفيذ المخطط على مشروع Supabase المرتبط بالتطبيق.
+## إعداد Supabase لأول مرة
+1. افتح مشروع Supabase الصحيح.
+2. من القائمة الجانبية افتح SQL Editor ثم New query.
+3. افتح الملف `supabase/setup-all.sql` في GitHub، وانسخ محتواه كاملاً.
+4. الصقه في SQL Editor واضغط Run.
+5. من Authentication > Providers تأكد من تفعيل Email.
+6. من Authentication > URL Configuration أضف رابط موقعك إلى Site URL وRedirect URLs عند الحاجة.
+
+الملف `supabase/setup-all.sql` ينشئ جداول الحسابات والفيديوهات والتعليقات والإعجابات والمتابعة والرسائل، ويجهز مخزني الفيديوهات والصور مع سياسات الوصول (RLS). شغّله مرة واحدة بعد إنشاء مشروع Supabase، ويمكن إعادة تشغيله عند الحاجة.
 
 ## بيانات الاتصال
-يستخدم التطبيق رابط المشروع ومفتاح Supabase Publishable (مفتاح عام مخصص للمتصفح) من `src/lib/supabase.js`. لا تضع أبداً Secret أو service_role key في كود المتصفح.
+يقرأ التطبيق رابط Supabase ومفتاح Publishable من `src/lib/supabase.js`، ويمكن تمريرهما كمتغيرات بناء:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
 
-## تشغيل محلي
+مفتاح Publishable/anon مخصص للاستخدام في تطبيق العميل مع سياسات RLS. لا تضع أبداً مفتاح `service_role` أو أي Secret في كود المتصفح أو تطبيق Android.
+
+## التشغيل المحلي
 ```bash
 npm install
 npm run dev
 ```
 
 ## النشر على GitHub Pages
-يوجد workflow في `.github/workflows/deploy.yml` يبني التطبيق وينشره عند كل تحديث على فرع `main`.
-
-1. افتح مستودع GitHub ثم Settings ثم Pages.
+يوجد workflow في `.github/workflows/deploy.yml` للبناء والنشر عند تحديث فرع `main`.
+1. افتح المستودع ثم Settings ثم Pages.
 2. في Build and deployment اختر Source: GitHub Actions.
-3. افتح تبويب Actions وانتظر اكتمال Build and deploy Alrafidain Tik.
-4. رابط الموقع سيكون: https://hamzar100tt-bit.github.io/alrafidain-tik/
-
-## ملاحظات
-- الواجهة تعرض فيديوهات تجريبية إذا لم توجد فيديوهات منشورة بعد.
-- تفعيل تأكيد البريد الإلكتروني يعتمد على إعدادات Auth في Supabase.
-- لم يتم بعد اختبار عملية النشر الحية أو تجربة الحساب والرفع على جهاز المستخدم.
-
+3. افتح Actions وانتظر اكتمال Build and deploy Alrafidain Tik.
+4. رابط الموقع: https://hamzar100tt-bit.github.io/alrafidain-tik/
 
 ## البث المباشر (LiveKit)
-
-تمت إضافة واجهة البث وربطها بدالة آمنة لإصدار رموز LiveKit. يلزم إعداد حساب LiveKit ومشروع Supabase قبل أن يعمل البث الفعلي:
-
-1. أنشئ مشروعاً في LiveKit Cloud وخذ عنوان WebSocket ومفتاح API والسر.
+واجهة البث موجودة، لكن البث الحقيقي لن يعمل قبل إعداد LiveKit:
+1. أنشئ مشروعاً في LiveKit Cloud وخذ WebSocket URL وAPI Key وAPI Secret.
 2. انشر الدالة: `supabase functions deploy livekit-token`.
-3. خزّن المفتاح والسر على Supabase فقط:
-   `supabase secrets set LIVEKIT_API_KEY=... LIVEKIT_API_SECRET=...`
-4. في GitHub افتح Settings ثم Secrets and variables ثم Actions وأضف:
-   - `VITE_LIVEKIT_URL` = عنوان LiveKit الذي يبدأ عادةً بـ `wss://`.
+3. خزّن الأسرار على Supabase فقط: `supabase secrets set LIVEKIT_API_KEY=... LIVEKIT_API_SECRET=...`.
+4. أضف إلى GitHub Actions Secrets:
+   - `VITE_LIVEKIT_URL` = عنوان WebSocket الذي يبدأ عادةً بـ `wss://`.
    - `VITE_LIVEKIT_TOKEN_ENDPOINT` = `https://YOUR_PROJECT_REF.supabase.co/functions/v1/livekit-token`.
-5. أعد تشغيل بناء التطبيق من Actions.
+5. أعد تشغيل workflow للبناء.
 
-الدالة تتحقق من جلسة Supabase وتصدر تصريحاً للمستخدم المسجل فقط. لا تضع `LIVEKIT_API_SECRET` أو مفتاح `service_role` في تطبيق Android أو المتصفح.
+لا تضع `LIVEKIT_API_SECRET` أو مفتاح `service_role` داخل التطبيق أو المستودع.
