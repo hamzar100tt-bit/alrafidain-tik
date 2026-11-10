@@ -576,51 +576,120 @@ private fun UploadScreen(repository: SupabaseRepository, onUploaded: () -> Unit)
     }
 
     Column(
-        Modifier.fillMaxSize().background(Color.Black).padding(horizontal = 20.dp, vertical = 26.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        Modifier.fillMaxSize().background(Color.Black).imePadding()
     ) {
-        Icon(Icons.Default.AddCircle, null, tint = Brand, modifier = Modifier.size(58.dp))
-        Text("إنشاء منشور", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
-        Text("التقط صورة أو فيديو أو اختر من الاستديو", color = Color.LightGray, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(14.dp))
-        Text("فلتر الصورة", color = Color.White, fontWeight = FontWeight.Bold)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            listOf("طبيعي", "دافئ", "أبيض وأسود", "زاهي").forEach { filter ->
-                FilterChip(selected = selectedFilter == filter, onClick = { selectedFilter = filter },
-                    label = { Text(filter, fontSize = 10.sp) },
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Brand, selectedLabelColor = Color.White, labelColor = Color.White))
+        Row(
+            Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("الرافدين تيك", color = Brand, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
+            IconButton(onClick = { /* return to feed using bottom home */ }) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White)
             }
         }
-        Spacer(Modifier.height(14.dp))
-        OutlinedTextField(
-            value = caption, onValueChange = { caption = it },
-            label = { Text("اكتب وصفاً (اختياري)") }, modifier = Modifier.fillMaxWidth(), minLines = 2,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-                focusedBorderColor = Brand, unfocusedBorderColor = Color.Gray,
-                focusedLabelColor = Brand, unfocusedLabelColor = Color.LightGray
+        Column(
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
+                .padding(horizontal = 22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.height(52.dp))
+            Box(
+                Modifier.size(82.dp).background(Brand, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "إنشاء منشور", tint = Color.Black, modifier = Modifier.size(52.dp))
+            }
+            Spacer(Modifier.height(12.dp))
+            Text("إنشاء منشور", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
+            Text("التقط صورة أو فيديو أو اختر من الاستديو", color = Color.LightGray, fontSize = 16.sp,
+                textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
+            Spacer(Modifier.height(26.dp))
+            Text("فلتر الصورة", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("طبيعي", "دافئ", "أبيض وأسود", "زاهي").forEach { filter ->
+                    FilterChip(
+                        selected = selectedFilter == filter,
+                        onClick = { selectedFilter = filter },
+                        label = { Text(filter, fontSize = 11.sp, maxLines = 1) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Brand,
+                            selectedLabelColor = Color.White,
+                            containerColor = Color.Black,
+                            labelColor = Color.White
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = selectedFilter == filter,
+                            borderColor = Color.Gray,
+                            selectedBorderColor = Brand
+                        )
+                    )
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+            OutlinedTextField(
+                value = caption, onValueChange = { caption = it },
+                placeholder = { Text("اكتب وصفاً (اختياري)", color = Color.LightGray) },
+                modifier = Modifier.fillMaxWidth().height(112.dp),
+                minLines = 2,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                    focusedBorderColor = Color.Gray, unfocusedBorderColor = Color.Gray,
+                    focusedContainerColor = Color.Black, unfocusedContainerColor = Color.Black,
+                    cursorColor = Brand
+                )
             )
-        )
-        Spacer(Modifier.height(18.dp))
-        Button(onClick = { cameraPhoto.launch(null) }, enabled = !uploading,
-            modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Brand)) {
-            Icon(Icons.Default.CameraAlt, null); Spacer(Modifier.width(8.dp)); Text("التقاط صورة")
+            Spacer(Modifier.height(24.dp))
+            Button(
+                onClick = { cameraPhoto.launch(null) }, enabled = !uploading,
+                modifier = Modifier.fillMaxWidth().height(58.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Brand),
+                shape = RoundedCornerShape(30.dp)
+            ) {
+                Text("التقاط صورة", fontSize = 18.sp)
+                Spacer(Modifier.width(12.dp))
+                Icon(Icons.Default.CameraAlt, null, modifier = Modifier.size(25.dp))
+            }
+            Spacer(Modifier.height(10.dp))
+            Button(
+                onClick = { cameraVideo.launch(Intent(android.provider.MediaStore.ACTION_VIDEO_CAPTURE)) },
+                enabled = !uploading, modifier = Modifier.fillMaxWidth().height(58.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF29292F)),
+                shape = RoundedCornerShape(30.dp)
+            ) {
+                Text("تصوير فيديو", fontSize = 18.sp)
+                Spacer(Modifier.width(12.dp))
+                Icon(Icons.Default.Videocam, null, modifier = Modifier.size(25.dp))
+            }
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = { photoPicker.launch("image/*") }, enabled = !uploading,
+                modifier = Modifier.fillMaxWidth().height(58.dp),
+                shape = RoundedCornerShape(30.dp),
+                border = BorderStroke(1.dp, Color.Gray)
+            ) {
+                Text("اختيار صورة من الاستديو", color = Brand, fontSize = 17.sp)
+                Spacer(Modifier.width(12.dp))
+                Icon(Icons.Default.Image, null, tint = Brand)
+            }
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = { videoPicker.launch("video/*") }, enabled = !uploading,
+                modifier = Modifier.fillMaxWidth().height(58.dp),
+                shape = RoundedCornerShape(30.dp),
+                border = BorderStroke(1.dp, Color.Gray)
+            ) {
+                Text("اختيار فيديو من الاستديو", color = Brand, fontSize = 17.sp)
+                Spacer(Modifier.width(12.dp))
+                Icon(Icons.Default.VideoLibrary, null, tint = Brand)
+            }
+            if (uploading) CircularProgressIndicator(color = Brand, modifier = Modifier.padding(12.dp))
+            message?.let { Text(it, color = if (it.contains("نجاح") || it.contains("تم")) Brand else Color.White,
+                textAlign = TextAlign.Center, modifier = Modifier.padding(8.dp)) }
+            Spacer(Modifier.height(18.dp))
         }
-        Button(onClick = {
-            cameraVideo.launch(Intent(android.provider.MediaStore.ACTION_VIDEO_CAPTURE))
-        }, enabled = !uploading, modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF29292F))) {
-            Icon(Icons.Default.Videocam, null); Spacer(Modifier.width(8.dp)); Text("تصوير فيديو")
-        }
-        OutlinedButton(onClick = { photoPicker.launch("image/*") }, enabled = !uploading, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Default.Image, null); Spacer(Modifier.width(8.dp)); Text("اختيار صورة من الاستديو")
-        }
-        OutlinedButton(onClick = { videoPicker.launch("video/*") }, enabled = !uploading, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Default.VideoLibrary, null); Spacer(Modifier.width(8.dp)); Text("اختيار فيديو من الاستديو")
-        }
-        if (uploading) CircularProgressIndicator(color = Brand, modifier = Modifier.padding(12.dp))
-        message?.let { Text(it, color = if (it.contains("نجاح")) Brand else Color.White, textAlign = TextAlign.Center) }
     }
 }
 
