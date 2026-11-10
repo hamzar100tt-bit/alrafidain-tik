@@ -275,7 +275,7 @@ function App() {
         {loading ? <p className="search-count">جاري تحميل الفيديوهات…</p> : shownVideos.length === 0 ? <section className="empty-state"><h2>{active === "الملف الشخصي" ? "ملفك الشخصي" : active === "المتابَعون" ? "ماكو فيديوهات من الحسابات اللي تتابعها بعد" : "ماكو نتائج"}</h2><p>{profile ? `@${profile.username} · ${profile.bio || "شارك أول فيديو إلك"}` : "سجّل الدخول أو تابع حسابات حتى تظهر الفيديوهات هنا."}</p>{active === "الملف الشخصي" && <button className="upload-btn" onClick={() => setUploadOpen(true)}>انشر أول فيديو</button>}</section> : <section className="video-stage">
           <button className="arrow prev" onClick={() => go(-1)} aria-label="الفيديو السابق">‹</button>
           <article className="video-card" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-            {video.videoUrl ? <video ref={videoRef} className="video-image" src={video.videoUrl} playsInline loop autoPlay muted={muted} controls/> : <img className="video-image" src={video.image || demoVideos[0].image} alt="معاينة الفيديو"/>}
+            {video.videoUrl ? <video ref={videoRef} className="video-image" src={video.videoUrl} playsInline loop autoPlay muted={muted} preload="auto" onLoadedData={() => videoRef.current?.play().catch(() => {})}/> : <img className="video-image" src={video.image || demoVideos[0].image} alt="معاينة الفيديو"/>}
             <div className="video-shade"/>
             <button className="sound-toggle" onClick={() => setMuted(!muted)} aria-label="الصوت">{muted ? <VolumeX/> : <Volume2/>}</button>
             <div className="video-info">
@@ -288,7 +288,6 @@ function App() {
               <button onClick={() => setSaved(v => ({...v, [video.id]: !v[video.id]}))} className={saved[video.id] ? "is-saved" : ""}><Bookmark fill={saved[video.id] ? "currentColor" : "none"}/><b>حفظ</b></button>
               <button onClick={() => navigator.clipboard?.writeText(video.videoUrl || window.location.href)}><Share2/><b>مشاركة</b></button>
             </div>
-            {!video.videoUrl && <button className="play-indicator" aria-label="معاينة"><Play fill="white"/></button>}
           </article>
           <button className="arrow next" onClick={() => go(1)} aria-label="الفيديو التالي">›</button>
         </section>}
