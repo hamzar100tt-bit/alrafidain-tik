@@ -348,3 +348,68 @@ button:focus-visible{
  .post-body{padding:15px 16px calc(18px + env(safe-area-inset-bottom))}
  .post-picker{min-height:270px}
 }
+
+
+/* High-clarity Arabic typography and responsive display quality */
+:root{
+  font-family:"Cairo","Noto Sans Arabic",Tahoma,Arial,sans-serif!important;
+  font-size:16px;
+  font-synthesis:none;
+  text-rendering:optimizeLegibility;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  font-optical-sizing:auto;
+}
+html{
+  width:100%;
+  min-width:320px;
+  min-height:100%;
+  -webkit-text-size-adjust:100%;
+  text-size-adjust:100%;
+}
+body{
+  font-family:"Cairo","Noto Sans Arabic",Tahoma,Arial,sans-serif!important;
+  font-size:16px;
+  line-height:1.55;
+  letter-spacing:0;
+  font-kerning:normal;
+}
+button,input,textarea,select{
+  font-family:inherit!important;
+  font-size:inherit;
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-weight:600}
+h1,h2,h3,h4,b,strong{font-weight:800}
+p,label,small{overflow-wrap:anywhere}
+.modal h2,.post-header h2,.comments-header h2{font-size:clamp(19px,4.5vw,23px);line-height:1.45}
+.modal input,.modal textarea,.post-caption,.comment-compose input{
+  font-size:16px!important;
+  line-height:1.6;
+}
+.nav-item,.app-bottom-nav button,.video-actions button{font-weight:700}
+.video-info .creator b{font-size:15px!important;line-height:1.5}
+.video-info .creator small{font-size:13px!important;line-height:1.5}
+.video-info p{font-size:15px!important;line-height:1.8!important}
+.video-actions button{font-size:12px!important;line-height:1.4}
+.comment-heading b{font-size:14px!important}
+.comment-content p{font-size:15px!important;line-height:1.8!important}
+.comment-content time{font-size:11px!important}
+.profile-heading h2{font-size:clamp(21px,5vw,28px)}
+.profile-bio{font-size:15px;line-height:1.9}
+.post-picker h3{font-size:21px;line-height:1.5}
+.post-picker p,.post-caption-label{font-size:15px;line-height:1.7}
+.post-gallery-btn,.post-camera-btn,.post-publish-btn{min-height:50px;font-size:15px}
+.follow-btn{font-size:13px}
+@media(max-width:700px){
+  .app-bottom-nav button{font-size:11px!important}
+  .app-bottom-nav button svg{width:23px;height:23px}
+  .video-actions svg{width:30px;height:30px}
+  .modal{font-size:15px}
+  .post-modal{max-height:94dvh!important}
+  .post-body{padding-left:18px;padding-right:18px}
+}
+@media(min-resolution:2dppx){
+  img,video,canvas{image-rendering:auto}
+}
