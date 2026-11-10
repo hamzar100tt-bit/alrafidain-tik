@@ -41,3 +41,11 @@
 
 
 .messages-modal{max-height:85vh;overflow:auto}.direct-message-list{display:flex;flex-direction:column;gap:8px;max-height:42vh;overflow:auto;padding:12px 0}.direct-message-list p{padding:10px 13px;border-radius:14px;max-width:85%;margin:0;overflow-wrap:anywhere}.direct-message-list .my-message{align-self:flex-start;background:#dff5e9;color:#173d2b}.direct-message-list .their-message{align-self:flex-end;background:#f0f0f0;color:#222}
+
+
+/* Keep form submit buttons visible on narrow phones; the header login button may be hidden. */
+@media(max-width:380px){
+  .modal .modal-submit{display:flex!important;width:100%;justify-content:center}
+  .modal{max-height:calc(100dvh - 24px);overflow-y:auto}
+  .modal-backdrop{align-items:center;overflow-y:auto}
+}
