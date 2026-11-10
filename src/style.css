@@ -413,3 +413,101 @@ p,label,small{overflow-wrap:anywhere}
 @media(min-resolution:2dppx){
   img,video,canvas{image-rendering:auto}
 }
+
+
+/* LIGHT THEME: white surfaces with clear dark Arabic text */
+:root{
+  color-scheme:light;
+  --app-bg:#f7f7f8;
+  --surface:#ffffff;
+  --surface-soft:#f0f1f3;
+  --surface-raised:#ffffff;
+  --text-main:#17171b;
+  --text-muted:#686873;
+  --line:#e2e3e7;
+  --accent:#ff3157;
+}
+html,body,.app-shell{background:var(--app-bg)!important;color:var(--text-main)!important}
+.topbar{background:#fff!important;border-bottom:1px solid var(--line)!important}
+.brand{color:#17171b!important}
+.search{background:#f1f2f4!important;border-color:#e0e1e5!important;color:#555!important}
+.search input{color:#17171b!important}
+.upload-btn{background:#f2f2f4!important;color:#222!important;border-color:#dedee3!important}
+.layout{color:var(--text-main)}
+.nav-item{color:#666!important}
+.nav-item:hover,.nav-item.selected{background:#ffe9ee!important;color:#e92750!important}
+.side-note{border-color:#e3e3e7!important;color:#333!important}
+.side-note p,.side-note small{color:#777!important}
+.feed-heading h1,.feed-heading{color:#17171b!important}
+.tab{color:#777!important}
+.tab.active{color:#222!important;border-color:#ff3157!important}
+.right-panel h3{color:#222!important}
+.suggestion b{color:#222!important}
+.suggestion small{color:#777!important}
+.community-card{background:linear-gradient(145deg,#fff0f3,#fff)!important;border:1px solid #f0dce2}
+.community-card b{color:#222!important}
+.community-card p{color:#666!important}
+.feed-footer{color:#777!important}
+.app-bottom-nav{background:rgba(255,255,255,.97)!important;border-top:1px solid #e3e3e7!important}
+.app-bottom-nav button{color:#777!important}
+.app-bottom-nav button.active{color:#17171b!important}
+.profile-page{background:#fff!important;color:#17171b!important;border-color:#e4e4e8!important}
+.profile-cover{background:#f1f1f4!important}
+.profile-main{color:#17171b!important}
+.profile-heading h2,.profile-bio{color:#222!important}
+.profile-heading p,.profile-page .profile-stats span{color:#777!important}
+.profile-page .profile-stats b{color:#17171b!important}
+.profile-page .profile-stats,.profile-content-tabs{border-color:#e5e5e9!important}
+.profile-edit-btn{background:#f1f1f4!important;border-color:#dddde3!important;color:#222!important}
+.profile-empty{color:#777!important}
+.profile-empty b{color:#222!important}
+.profile-video-grid button{background:#eee!important}
+.profile-video-grid .profile-video-placeholder{background:#eee!important;color:#888!important}
+.modal-backdrop{background:rgba(20,20,25,.42)!important}
+.modal,.post-modal,.comments-modal{background:#fff!important;color:#17171b!important;border-color:#e0e0e5!important}
+.modal h2,.post-header h2,.comments-header h2{color:#17171b!important}
+.modal-close,.post-close{color:#444!important}
+.modal input,.modal textarea,.post-caption,.comments-modal .comment-compose input,.comments-compose input{
+  background:#f4f4f6!important;color:#17171b!important;border-color:#dedee4!important;
+}
+.modal input::placeholder,.modal textarea::placeholder,.post-caption::placeholder{color:#85858e!important}
+.switch-auth{color:#e92750!important}
+.comment-item{border-color:#ededf0!important}
+.comment-heading b,.comment-content p{color:#222!important}
+.comment-heading small,.comment-content time{color:#85858e!important}
+.comments-header,.comments-modal .comment-compose{background:#fff!important;border-color:#e7e7eb!important}
+.comments-modal .comment-list>p{color:#777!important}
+.comment-avatar{background:#eee!important;color:#444!important}
+.post-header{border-color:#e7e7eb!important}
+.post-picker{background:#f7f7f9!important;border-color:#d5d5dc!important}
+.post-picker h3{color:#222!important}
+.post-picker p,.post-picker small{color:#777!important}
+.post-camera-btn{background:#f0f0f3!important;color:#222!important;border-color:#dddde3!important}
+.post-preview-wrap{background:#111!important}
+.post-file-meta{color:#555!important}
+.post-caption{background:#f6f6f8!important}
+.post-caption-footer{color:#777!important}
+.upload-dropzone{background:#f6f6f8!important;color:#e92750!important;border-color:#ccc!important}
+.upload-dropzone b{color:#222!important}
+.upload-dropzone span,.upload-dropzone small{color:#777!important}
+.upload-preview{background:#f4f4f6!important;color:#666!important}
+.avatar-upload-control{border-color:#ddd!important;color:#333!important}
+.live-description,.live-room-name{color:#555!important}
+.live-controls button{background:#f1f1f4!important;color:#222!important;border-color:#ddd!important}
+.live-setup-note{color:#777!important}
+.live-mode-choice button{background:#f3f3f5!important;color:#555!important;border-color:#ddd!important}
+.live-mode-choice button.selected{background:#ffe9ee!important;color:#c91f45!important;border-color:#ff6680!important}
+.search-count{color:#777!important}
+.profile-stats{color:#777!important}
+@media(max-width:700px){
+  body,.app-shell{background:#fff!important}
+  .main-content{background:#fff!important}
+  .app-bottom-nav{background:rgba(255,255,255,.98)!important}
+  .app-bottom-nav button{color:#777!important}
+  .app-bottom-nav button.active{color:#17171b!important}
+  .profile-view>.profile-page{background:#fff!important}
+  .video-info .creator b,.video-info .creator small,.video-info p,.sound-line{color:#fff!important}
+  .video-info{background:linear-gradient(110deg,rgba(0,0,0,.78),rgba(0,0,0,.48))!important}
+}
+/* Keep the actual video canvas black/video-backed; only app chrome turns white. */
+.video-card{background:#111!important}
