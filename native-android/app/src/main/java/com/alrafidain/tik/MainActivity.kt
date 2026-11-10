@@ -137,7 +137,7 @@ private fun AlrafidainApp() {
             else -> if (signedIn) ProfileScreen(repository, onSignOut = { repository.signOut(); signedIn = false; selected = 0 }) else GuestGate { showAuth = true }
         }
 
-        if (selected != 0 && selected != 4) Row(
+        if (selected != 0 && selected != 2 && selected != 4) Row(
             Modifier.align(Alignment.TopCenter)
                 .fillMaxWidth()
                 .statusBarsPadding()
@@ -161,28 +161,30 @@ private fun AlrafidainApp() {
             )
         }
 
-        NavigationBar(
-            modifier = Modifier.align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .fillMaxWidth(),
-            containerColor = if (selected == 4) Color.White else Color.Transparent,
-            tonalElevation = 0.dp,
-            windowInsets = WindowInsets(0)
-        ) {
-            labels.forEachIndexed { index, label ->
-                NavigationBarItem(
-                    selected = selected == index,
-                    onClick = { selected = index },
-                    icon = { Icon(icons[index], contentDescription = label) },
-                    label = { Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Brand,
-                        selectedTextColor = Brand,
-                        indicatorColor = if (selected == 4) Color(0xFFFFE7ED) else Color.White.copy(alpha = 0.16f),
-                        unselectedIconColor = if (selected == 4) Muted else Color.White.copy(alpha = 0.82f),
-                        unselectedTextColor = if (selected == 4) Muted else Color.White.copy(alpha = 0.82f)
+        if (selected != 2) {
+            NavigationBar(
+                modifier = Modifier.align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .fillMaxWidth(),
+                containerColor = if (selected == 4) Color.White else Color.Transparent,
+                tonalElevation = 0.dp,
+                windowInsets = WindowInsets(0)
+            ) {
+                labels.forEachIndexed { index, label ->
+                    NavigationBarItem(
+                        selected = selected == index,
+                        onClick = { selected = index },
+                        icon = { Icon(icons[index], contentDescription = label) },
+                        label = { Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Brand,
+                            selectedTextColor = Brand,
+                            indicatorColor = if (selected == 4) Color(0xFFFFE7ED) else Color.White.copy(alpha = 0.16f),
+                            unselectedIconColor = if (selected == 4) Muted else Color.White.copy(alpha = 0.82f),
+                            unselectedTextColor = if (selected == 4) Muted else Color.White.copy(alpha = 0.82f)
+                        )
                     )
-                )
+                }
             }
         }
     }
