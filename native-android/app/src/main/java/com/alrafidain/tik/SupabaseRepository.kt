@@ -13,6 +13,7 @@ import java.util.UUID
 
 data class TikVideo(val id: String, val caption: String, val videoUrl: String, val userId: String, val creatorName: String = "", val creatorAvatar: String? = null, val mediaType: String = "video")
 data class TikComment(val body: String, val displayName: String, val username: String, val avatarUrl: String?)
+data class TikProfileStats(val posts: List<TikVideo>, val following: Int, val followers: Int, val likes: Int)
 
 class SupabaseRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences("alrafidain_session", Context.MODE_PRIVATE)
@@ -102,6 +103,51 @@ class SupabaseRepository(private val context: Context) {
         }
     }
 
+
+
+    private fun fetchAuthedRows(path: String): JSONArray {
+        val request = authedRequest("$base/rest/v1/$path").get().build()
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IOException("تعذر تحميل بيانات الحساب (\${response.code})")
+            return JSONArray(body)
+        }
+    }
+
+    private fun parseVideoRows(rows: JSONArray): List<TikVideo> {
+        return (0 until rows.length()).map { index ->
+            val item = rows.getJSONObject(index)
+            val stored = item.optString("video_url")
+            val path = item.optString("storage_path")
+            val encodedPath = path.split("/").joinToString("/") { java.net.URLEncoder.encode(it, "UTF-8") }
+            val url = if (stored.isNotBlank()) stored else "$base/storage/v1/object/public/videos/$encodedPath"
+            val creator = item.optJSONObject("profiles")
+            TikVideo(
+                item.optString("id"),
+                item.optString("caption"),
+                url,
+                item.optString("user_id"),
+                creator?.optString("display_name")?.takeIf { it.isNotBlank() }
+                    ?: creator?.optString("username").orEmpty(),
+                creator?.optString("avatar_url")?.takeIf { it.isNotBlank() },
+                item.optString("media_type", "video")
+            )
+        }
+    }
+
+    fun loadMyProfileStats(): TikProfileStats {
+        val userId = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
+        val fields = "id,caption,video_url,storage_path,user_id,media_type,profiles!videos_user_id_fkey(display_name,username,avatar_url)"
+        val videoRows = fetchAuthedRows("videos?user_id=eq.$userId&select=$fields&order=created_at.desc&limit=100")
+        val posts = parseVideoRows(videoRows)
+        val following = fetchAuthedRows("follows?follower_id=eq.$userId&select=followed_id").length()
+        val followers = fetchAuthedRows("follows?followed_id=eq.$userId&select=follower_id").length()
+        val likes = if (posts.isEmpty()) 0 else {
+            val ids = posts.joinToString(",") { it.id }
+            fetchAuthedRows("likes?video_id=in.($ids)&select=video_id&limit=1000").length()
+        }
+        return TikProfileStats(posts, following, followers, likes)
+    }
 
     fun updateProfile(displayName: String, username: String, bio: String) {
         val userId = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
