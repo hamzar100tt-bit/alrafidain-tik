@@ -14,6 +14,7 @@ import java.util.UUID
 data class TikVideo(val id: String, val caption: String, val videoUrl: String, val userId: String, val creatorName: String = "", val creatorAvatar: String? = null, val mediaType: String = "video")
 data class TikComment(val body: String, val displayName: String, val username: String, val avatarUrl: String?)
 data class TikProfileStats(val posts: List<TikVideo>, val following: Int, val followers: Int, val likes: Int)
+data class TikNotification(val id: String, val actorName: String, val actorUsername: String, val kind: String, val createdAt: String, val videoId: String?)
 
 class SupabaseRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences("alrafidain_session", Context.MODE_PRIVATE)
@@ -330,6 +331,32 @@ class SupabaseRepository(private val context: Context) {
         val q = java.net.URLEncoder.encode("%$term%", "UTF-8")
         val rows = publicRows("videos?select=id,caption,video_url,storage_path,user_id,media_type,profiles!videos_user_id_fkey(display_name,username,avatar_url)&caption=ilike.$q&order=created_at.desc&limit=30")
         return parseVideoRows(rows)
+    }
+
+    fun loadNotifications(): List<TikNotification> {
+        val me = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
+        val rows = fetchAuthedRows("notifications?recipient_id=eq.$me&select=id,actor_id,kind,created_at,video_id,profiles!notifications_actor_id_fkey(display_name,username)&order=created_at.desc&limit=100")
+        return (0 until rows.length()).map { i ->
+            val row = rows.getJSONObject(i)
+            val actor = row.optJSONObject("profiles")
+            TikNotification(row.optString("id"),
+                actor?.optString("display_name")?.takeIf { it.isNotBlank() } ?: "مستخدم",
+                actor?.optString("username").orEmpty(),
+                row.optString("kind"), row.optString("created_at"),
+                row.optString("video_id").takeIf { it.isNotBlank() })
+        }
+    }
+
+    fun markNotificationsRead() {
+        val me = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
+        val request = authedRequest("$base/rest/v1/notifications?recipient_id=eq.$me&read_at=is.null")
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Prefer", "return=minimal")
+            .patch(JSONObject().put("read_at", java.time.Instant.now().toString()).toString()
+                .toRequestBody("application/json".toMediaType())).build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("تعذر تحديث الإشعارات")
+        }
     }
 
     fun loadInbox(): List<InboxConversation> {
