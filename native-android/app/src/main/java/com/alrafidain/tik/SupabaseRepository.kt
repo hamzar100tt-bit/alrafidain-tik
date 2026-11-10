@@ -76,6 +76,82 @@ class SupabaseRepository(private val context: Context) {
         }
     }
 
+
+    private fun authedRequest(url: String): Request.Builder {
+        val token = accessToken ?: throw IOException("سجّل الدخول أولاً")
+        return Request.Builder().url(url).addHeader("apikey", key)
+            .addHeader("Authorization", "Bearer $token")
+    }
+
+    fun currentUserId(): String? = prefs.getString("user_id", null)
+
+    fun loadProfile(): JSONObject {
+        val userId = currentUserId() ?: throw IOException("تعذر تحديد الحساب")
+        val request = authedRequest("$base/rest/v1/profiles?id=eq.$userId&select=username,display_name,bio,avatar_url")
+            .get().build()
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IOException("تعذر تحميل الملف الشخصي")
+            val rows = JSONArray(body)
+            return if (rows.length() > 0) rows.getJSONObject(0) else JSONObject()
+        }
+    }
+
+    fun isLiked(videoId: String): Boolean = exists("likes", videoId)
+    fun isSaved(videoId: String): Boolean = exists("saved_videos", videoId)
+
+    private fun exists(table: String, videoId: String): Boolean {
+        val userId = currentUserId() ?: return false
+        val request = authedRequest("$base/rest/v1/$table?user_id=eq.$userId&video_id=eq.$videoId&select=video_id")
+            .get().build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return false
+            return JSONArray(response.body?.string().orEmpty()).length() > 0
+        }
+    }
+
+    fun toggleLike(videoId: String): Boolean = toggleRelation("likes", videoId)
+    fun toggleSaved(videoId: String): Boolean = toggleRelation("saved_videos", videoId)
+
+    private fun toggleRelation(table: String, videoId: String): Boolean {
+        val userId = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
+        val already = exists(table, videoId)
+        val builder = authedRequest("$base/rest/v1/$table?user_id=eq.$userId&video_id=eq.$videoId")
+            .addHeader("Content-Type", "application/json")
+        val request = if (already) builder.delete().build() else builder
+            .post(JSONObject().put("user_id", userId).put("video_id", videoId)
+                .toString().toRequestBody("application/json".toMediaType())).build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("تعذر تحديث التفاعل (${response.code})")
+        }
+        return !already
+    }
+
+    fun loadComments(videoId: String): List<Pair<String, String>> {
+        val request = authedRequest("$base/rest/v1/comments?video_id=eq.$videoId&select=body,user_id&order=created_at.desc&limit=100")
+            .get().build()
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IOException("تعذر تحميل التعليقات")
+            val rows = JSONArray(body)
+            return (0 until rows.length()).map { i ->
+                val row = rows.getJSONObject(i)
+                row.optString("user_id").take(8) to row.optString("body")
+            }
+        }
+    }
+
+    fun addComment(videoId: String, body: String) {
+        val userId = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
+        val payload = JSONObject().put("video_id", videoId).put("user_id", userId).put("body", body)
+        val request = authedRequest("$base/rest/v1/comments")
+            .addHeader("Content-Type", "application/json").addHeader("Prefer", "return=minimal")
+            .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("تعذر إضافة التعليق (${response.code})")
+        }
+    }
+
     fun uploadVideo(uri: Uri, caption: String): String {
         val token = accessToken ?: throw IOException("سجّل الدخول أولاً")
         val userId = prefs.getString("user_id", null) ?: throw IOException("تعذر تحديد الحساب الحالي")
