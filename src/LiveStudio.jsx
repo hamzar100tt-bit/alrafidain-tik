@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Room, RoomEvent } from "livekit-client";
+import { Room, RoomEvent, createLocalTracks } from "livekit-client";
 import { Radio, Video, VideoOff, Mic, MicOff, PhoneOff, Eye } from "lucide-react";
 import { supabase } from "./lib/supabase.js";
 
@@ -68,7 +68,7 @@ export default function LiveStudio({ user, onClose }) {
       await room.connect(serverUrl, payload.token);
 
       if (mode === "host") {
-        const tracks = await room.localParticipant.createTracks({ audio: true, video: true });
+        const tracks = await createLocalTracks({ audio: true, video: true });
         for (const track of tracks) await room.localParticipant.publishTrack(track);
         const cameraTrack = tracks.find(track => track.kind === "video");
         if (cameraTrack && videoRef.current) cameraTrack.attach(videoRef.current);
@@ -94,6 +94,15 @@ export default function LiveStudio({ user, onClose }) {
     roomRef.current?.disconnect();
     clearMedia();
   }, []);
+
+  useEffect(() => {
+    if (status !== "live" || mode !== "viewer" || !videoRef.current || !roomRef.current) return;
+    for (const participant of roomRef.current.remoteParticipants.values()) {
+      for (const publication of participant.trackPublications.values()) {
+        if (publication.track?.kind === "video") publication.track.attach(videoRef.current);
+      }
+    }
+  }, [status, mode]);
 
   const toggleCamera = async () => {
     const next = !cameraOn;
