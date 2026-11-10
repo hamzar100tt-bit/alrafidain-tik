@@ -274,7 +274,9 @@ private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, activ
         if (signedIn) withContext(Dispatchers.IO) { liked = repository.isLiked(video.id); saved = repository.isSaved(video.id) }
     }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        NativeVideoPlayer(video.videoUrl, active)
+        if (video.mediaType == "image") {
+            AsyncImage(model = video.videoUrl, contentDescription = video.caption, modifier = Modifier.fillMaxSize())
+        } else NativeVideoPlayer(video.videoUrl, active)
         Column(
             Modifier.align(Alignment.CenterEnd).padding(end = 10.dp, bottom = 18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -506,60 +508,98 @@ private fun CommentDialog(videoId: String, repository: SupabaseRepository, signe
 @Composable
 private fun UploadScreen(repository: SupabaseRepository, onUploaded: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var caption by remember { mutableStateOf("") }
     var uploading by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        if (uri != null) {
+
+    fun upload(uri: Uri, isPhoto: Boolean) {
+        scope.launch {
+            uploading = true
+            message = if (isPhoto) "جاري رفع الصورة..." else "جاري رفع الفيديو..."
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    if (isPhoto) repository.uploadPhoto(uri, caption.trim())
+                    else repository.uploadVideo(uri, caption.trim())
+                }
+                message = result
+                onUploaded()
+            } catch (e: Exception) {
+                message = e.message ?: "تعذر النشر"
+            } finally { uploading = false }
+        }
+    }
+
+    val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) upload(uri, false)
+    }
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) upload(uri, true)
+    }
+    val cameraPhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+        if (bitmap != null) {
             scope.launch {
                 uploading = true
-                message = "جاري رفع الفيديو..."
                 try {
-                    val result = withContext(Dispatchers.IO) { repository.uploadVideo(uri, caption.trim()) }
-                    message = result
-                    onUploaded()
+                    val values = android.content.ContentValues().apply {
+                        put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, "Alrafidain_" + System.currentTimeMillis() + ".jpg")
+                        put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                    }
+                    val uri = context.contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                        ?: throw java.io.IOException("تعذر إنشاء ملف الصورة")
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, out)
+                    } ?: throw java.io.IOException("تعذر حفظ الصورة")
+                    upload(uri, true)
                 } catch (e: Exception) {
-                    message = e.message ?: "تعذر رفع الفيديو"
-                } finally { uploading = false }
+                    message = e.message ?: "تعذر التقاط الصورة"
+                    uploading = false
+                }
             }
         }
     }
+    val cameraVideo = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val uri = result.data?.data
+        if (result.resultCode == android.app.Activity.RESULT_OK && uri != null) upload(uri, false)
+    }
+
     Column(
-        Modifier.fillMaxSize().padding(22.dp),
+        Modifier.fillMaxSize().background(Color.Black).padding(horizontal = 20.dp, vertical = 26.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(Icons.Default.CloudUpload, null, tint = Brand, modifier = Modifier.size(62.dp))
-        Spacer(Modifier.height(16.dp))
-        Text("انشر فيديو جديد", fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
-        Spacer(Modifier.height(8.dp))
-        Text("اختر فيديو من جهازك حتى يظهر في صفحة الرئيسية", color = Muted, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(20.dp))
+        Icon(Icons.Default.AddCircle, null, tint = Brand, modifier = Modifier.size(58.dp))
+        Text("إنشاء منشور", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+        Text("التقط صورة أو فيديو أو اختر من الاستديو", color = Color.LightGray, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(18.dp))
         OutlinedTextField(
             value = caption, onValueChange = { caption = it },
-            label = { Text("اكتب وصف الفيديو (اختياري)") },
-            modifier = Modifier.fillMaxWidth(), minLines = 2
+            label = { Text("اكتب وصفاً (اختياري)") }, modifier = Modifier.fillMaxWidth(), minLines = 2,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                focusedBorderColor = Brand, unfocusedBorderColor = Color.Gray,
+                focusedLabelColor = Brand, unfocusedLabelColor = Color.LightGray
+            )
         )
-        Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = { picker.launch("video/*") },
-            enabled = !uploading,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Brand)
-        ) {
-            if (uploading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-            else {
-                Icon(Icons.Default.VideoLibrary, null)
-                Spacer(Modifier.width(8.dp))
-                Text("اختيار فيديو ورفعه")
-            }
+        Spacer(Modifier.height(18.dp))
+        Button(onClick = { cameraPhoto.launch(null) }, enabled = !uploading,
+            modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Brand)) {
+            Icon(Icons.Default.CameraAlt, null); Spacer(Modifier.width(8.dp)); Text("التقاط صورة")
         }
-        if (message != null) {
-            Spacer(Modifier.height(14.dp))
-            Text(message!!, color = if (message!!.contains("نجاح")) Brand else Muted, textAlign = TextAlign.Center)
+        Button(onClick = {
+            cameraVideo.launch(Intent(android.provider.MediaStore.ACTION_VIDEO_CAPTURE))
+        }, enabled = !uploading, modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF29292F))) {
+            Icon(Icons.Default.Videocam, null); Spacer(Modifier.width(8.dp)); Text("تصوير فيديو")
         }
-        Spacer(Modifier.height(12.dp))
-        Text("الحد الأعلى لحجم الفيديو 100 ميغابايت", color = Muted, fontSize = 12.sp)
+        OutlinedButton(onClick = { photoPicker.launch("image/*") }, enabled = !uploading, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.Image, null); Spacer(Modifier.width(8.dp)); Text("اختيار صورة من الاستديو")
+        }
+        OutlinedButton(onClick = { videoPicker.launch("video/*") }, enabled = !uploading, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.VideoLibrary, null); Spacer(Modifier.width(8.dp)); Text("اختيار فيديو من الاستديو")
+        }
+        if (uploading) CircularProgressIndicator(color = Brand, modifier = Modifier.padding(12.dp))
+        message?.let { Text(it, color = if (it.contains("نجاح")) Brand else Color.White, textAlign = TextAlign.Center) }
     }
 }
 
