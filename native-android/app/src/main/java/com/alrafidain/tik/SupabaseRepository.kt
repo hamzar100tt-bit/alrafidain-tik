@@ -11,7 +11,7 @@ import org.json.JSONObject
 import java.io.IOException
 import java.util.UUID
 
-data class TikVideo(val id: String, val caption: String, val videoUrl: String, val userId: String, val creatorName: String = "", val creatorAvatar: String? = null)
+data class TikVideo(val id: String, val caption: String, val videoUrl: String, val userId: String, val creatorName: String = "", val creatorAvatar: String? = null, val mediaType: String = "video")
 data class TikComment(val body: String, val displayName: String, val username: String, val avatarUrl: String?)
 
 class SupabaseRepository(private val context: Context) {
@@ -60,7 +60,7 @@ class SupabaseRepository(private val context: Context) {
     fun loadVideos(): List<TikVideo> {
         val token = accessToken ?: key
         val request = Request.Builder()
-            .url("$base/rest/v1/videos?select=id,caption,video_url,storage_path,user_id,profiles!videos_user_id_fkey(display_name,username,avatar_url)&order=created_at.desc&limit=30")
+            .url("$base/rest/v1/videos?select=id,caption,video_url,storage_path,user_id,media_type,profiles!videos_user_id_fkey(display_name,username,avatar_url)&order=created_at.desc&limit=30")
             .addHeader("apikey", key).addHeader("Authorization", "Bearer $token").get().build()
         client.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
@@ -75,7 +75,7 @@ class SupabaseRepository(private val context: Context) {
                 TikVideo(item.optString("id"), item.optString("caption"), url, item.optString("user_id"),
                     item.optJSONObject("profiles")?.optString("display_name")?.takeIf { it.isNotBlank() }
                         ?: item.optJSONObject("profiles")?.optString("username").orEmpty(),
-                    item.optJSONObject("profiles")?.optString("avatar_url")?.takeIf { it.isNotBlank() })
+                    item.optJSONObject("profiles")?.optString("avatar_url")?.takeIf { it.isNotBlank() },\n                    item.optString("media_type", "video"))
             }
         }
     }
@@ -214,6 +214,36 @@ class SupabaseRepository(private val context: Context) {
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IOException("تعذر إضافة التعليق (${response.code})")
         }
+    }
+
+    fun uploadPhoto(uri: Uri, caption: String): String {
+        val token = accessToken ?: throw IOException("سجّل الدخول أولاً")
+        val userId = currentUserId() ?: throw IOException("تعذر تحديد الحساب الحالي")
+        val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+        if (!mime.startsWith("image/")) throw IOException("الملف المحدد ليس صورة")
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: throw IOException("تعذر قراءة الصورة")
+        if (bytes.isEmpty()) throw IOException("الصورة فارغة")
+        if (bytes.size > 15 * 1024 * 1024) throw IOException("حجم الصورة أكبر من 15 ميغابايت")
+        val ext = when (mime.substringAfter("/")) { "png" -> "png"; "webp" -> "webp"; else -> "jpg" }
+        val path = "$userId/${UUID.randomUUID()}.$ext"
+        val upload = Request.Builder().url("$base/storage/v1/object/videos/$path")
+            .addHeader("apikey", key).addHeader("Authorization", "Bearer $token")
+            .addHeader("Content-Type", mime).put(bytes.toRequestBody(mime.toMediaType())).build()
+        client.newCall(upload).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("فشل رفع الصورة (${response.code})")
+        }
+        val publicUrl = "$base/storage/v1/object/public/videos/$path"
+        val row = JSONObject().put("user_id", userId).put("caption", caption)
+            .put("storage_path", path).put("video_url", publicUrl).put("media_type", "video").put("media_type", "image")
+        val insert = Request.Builder().url("$base/rest/v1/videos")
+            .addHeader("apikey", key).addHeader("Authorization", "Bearer $token")
+            .addHeader("Content-Type", "application/json").addHeader("Prefer", "return=minimal")
+            .post(row.toString().toRequestBody("application/json".toMediaType())).build()
+        client.newCall(insert).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("تم رفع الصورة لكن تعذر نشرها (${response.code})")
+        }
+        return "تم نشر الصورة بنجاح"
     }
 
     fun uploadVideo(uri: Uri, caption: String): String {
