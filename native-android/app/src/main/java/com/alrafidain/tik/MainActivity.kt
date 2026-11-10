@@ -49,7 +49,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = android.graphics.Color.TRANSPARENT
-        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.BLACK
         window.decorView.systemUiVisibility =
             android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
             android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
@@ -74,6 +74,7 @@ private fun AlrafidainApp() {
     val context = LocalContext.current
     val repository = remember { SupabaseRepository(context.applicationContext) }
     var signedIn by remember { mutableStateOf(repository.hasSession()) }
+    var showAuth by remember { mutableStateOf(false) }
     var selected by remember { mutableIntStateOf(0) }
     var videos by remember { mutableStateOf<List<TikVideo>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
@@ -90,17 +91,18 @@ private fun AlrafidainApp() {
         }
     }
 
-    LaunchedEffect(signedIn) { refreshFeed() }
+    LaunchedEffect(Unit) { refreshFeed() }
 
-    if (!signedIn) {
+    if (showAuth) {
         AuthScreen(
+            onContinueGuest = { showAuth = false },
             onAuth = { email, password, create ->
                 scope.launch {
                     loading = true
                     error = null
                     try {
                         val message = withContext(Dispatchers.IO) { repository.authenticate(email, password, create) }
-                        if (repository.hasSession()) signedIn = true else error = message
+                        if (repository.hasSession()) { signedIn = true; showAuth = false; selected = 0; refreshFeed() } else error = message
                     } catch (e: Exception) { error = e.message ?: "حدث خطأ" }
                     finally { loading = false }
                 }
@@ -115,11 +117,11 @@ private fun AlrafidainApp() {
     val icons = listOf(Icons.Default.Home, Icons.Default.Explore, Icons.Default.AddCircle, Icons.Default.ChatBubble, Icons.Default.Person)
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         when (selected) {
-            0 -> FeedScreen(videos, loading, error, ::refreshFeed, repository)
+            0 -> FeedScreen(videos, loading, error, ::refreshFeed, repository, signedIn) { showAuth = true }
             1 -> NativePlaceholder("اكتشف", "قريباً: البحث عن الفيديوهات والحسابات", Icons.Default.Explore)
-            2 -> UploadScreen(repository, onUploaded = { refreshFeed(); selected = 0 })
-            3 -> NativePlaceholder("الرسائل", "محادثاتك ورسائلك الخاصة", Icons.Default.ChatBubble)
-            else -> ProfileScreen(repository, onSignOut = { repository.signOut(); signedIn = false })
+            2 -> if (signedIn) UploadScreen(repository, onUploaded = { refreshFeed(); selected = 0 }) else GuestGate { showAuth = true }
+            3 -> if (signedIn) NativePlaceholder("الرسائل", "محادثاتك ورسائلك الخاصة", Icons.Default.ChatBubble) else GuestGate { showAuth = true }
+            else -> if (signedIn) ProfileScreen(repository, onSignOut = { repository.signOut(); signedIn = false; selected = 0 }) else GuestGate { showAuth = true }
         }
 
         Row(
@@ -175,6 +177,7 @@ private fun AlrafidainApp() {
 
 @Composable
 private fun AuthScreen(
+    onContinueGuest: () -> Unit,
     onAuth: (String, String, Boolean) -> Unit,
     loading: Boolean,
     error: String?
@@ -215,16 +218,23 @@ private fun AuthScreen(
         TextButton(onClick = { createAccount = !createAccount }) {
             Text(if (createAccount) "عندك حساب؟ سجّل الدخول" else "ما عندك حساب؟ أنشئ حساب جديد", color = Brand)
         }
+        TextButton(onClick = onContinueGuest) { Text("متابعة بدون حساب", color = Muted) }
+    }
+}
+
+@Composable
+private fun GuestGate(onLogin: () -> Unit) {
+    Column(Modifier.fillMaxSize().background(Canvas).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Icon(Icons.Default.PersonOutline, null, tint = Brand, modifier = Modifier.size(64.dp))
+        Text("أنشئ حساب حتى تستخدم هذه الميزة", color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Button(onClick = onLogin, colors = ButtonDefaults.buttonColors(containerColor = Brand)) { Text("تسجيل الدخول أو إنشاء حساب") }
     }
 }
 
 @Composable
 private fun FeedScreen(
-    videos: List<TikVideo>,
-    loading: Boolean,
-    error: String?,
-    onRefresh: () -> Unit,
-    repository: SupabaseRepository
+    videos: List<TikVideo>, loading: Boolean, error: String?, onRefresh: () -> Unit,
+    repository: SupabaseRepository, signedIn: Boolean, onLogin: () -> Unit
 ) {
     when {
         loading && videos.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -245,25 +255,23 @@ private fun FeedScreen(
                 modifier = Modifier.fillMaxSize(),
                 key = { index -> videos[index].id }
             ) { page ->
-                VideoFeedPage(video = videos[page], repository = repository, active = pagerState.currentPage == page)
+                VideoFeedPage(video = videos[page], repository = repository, active = pagerState.currentPage == page, signedIn = signedIn, onLogin = onLogin)
             }
         }
     }
 }
 
 @Composable
-private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, active: Boolean) {
+private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, active: Boolean, signedIn: Boolean, onLogin: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var liked by remember(video.id) { mutableStateOf(false) }
     var saved by remember(video.id) { mutableStateOf(false) }
     var commentsOpen by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
-    LaunchedEffect(video.id) {
-        withContext(Dispatchers.IO) {
-            liked = repository.isLiked(video.id)
-            saved = repository.isSaved(video.id)
-        }
+    var actionError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(video.id, signedIn) {
+        if (signedIn) withContext(Dispatchers.IO) { liked = repository.isLiked(video.id); saved = repository.isSaved(video.id) }
     }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         NativeVideoPlayer(video.videoUrl, active)
@@ -274,9 +282,10 @@ private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, activ
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 IconButton(enabled = !busy, onClick = {
-                    scope.launch {
+                    if (!signedIn) onLogin() else scope.launch {
                         busy = true
                         try { liked = withContext(Dispatchers.IO) { repository.toggleLike(video.id) } }
+                        catch (e: Exception) { actionError = e.message ?: "تعذر تسجيل الإعجاب" }
                         finally { busy = false }
                     }
                 }) {
@@ -305,9 +314,10 @@ private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, activ
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 IconButton(enabled = !busy, onClick = {
-                    scope.launch {
+                    if (!signedIn) onLogin() else scope.launch {
                         busy = true
-                        try { saved = withContext(Dispatchers.IO) { repository.toggleSaved(video.id) } }
+                        try { saved = withContext(Dispatchers.IO) { repository.toggleSaved(video.id) }; actionError = if (saved) "تم حفظ الفيديو" else "تم إلغاء الحفظ" }
+                        catch (e: Exception) { actionError = e.message ?: "تعذر حفظ الفيديو" }
                         finally { busy = false }
                     }
                 }) {
@@ -317,12 +327,13 @@ private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, activ
                 Text("حفظ", color = Color.White, fontSize = 11.sp)
             }
         }
-        if (video.caption.isNotBlank()) {
-            Text(video.caption, color = Color.White, fontSize = 15.sp,
-                modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, end = 84.dp, bottom = 20.dp))
+        Column(Modifier.align(Alignment.BottomStart).padding(start = 16.dp, end = 84.dp, bottom = 22.dp)) {
+            Text(video.creatorName.ifBlank { "مستخدم" }, color = Color.White, fontWeight = FontWeight.Bold)
+            if (video.caption.isNotBlank()) Text(video.caption, color = Color.White, fontSize = 15.sp)
+            actionError?.let { Text(it, color = Color.White, fontSize = 11.sp) }
         }
     }
-    if (commentsOpen) CommentDialog(video.id, repository, onDismiss = { commentsOpen = false })
+    if (commentsOpen) CommentDialog(video.id, repository, signedIn, onLogin, onDismiss = { commentsOpen = false })
 }
 
 @Composable
@@ -362,10 +373,10 @@ private fun NativeVideoPlayer(url: String, active: Boolean) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CommentDialog(videoId: String, repository: SupabaseRepository, onDismiss: () -> Unit) {
+private fun CommentDialog(videoId: String, repository: SupabaseRepository, signedIn: Boolean, onLogin: () -> Unit, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var comments by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var comments by remember { mutableStateOf<List<TikComment>>(emptyList()) }
     var text by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -435,16 +446,13 @@ private fun CommentDialog(videoId: String, repository: SupabaseRepository, onDis
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(comments) { item ->
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.Top,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Icon(Icons.Default.AccountCircle, null, tint = Color(0xFFB8B8BE), modifier = Modifier.size(36.dp))
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            if (!item.avatarUrl.isNullOrBlank()) AsyncImage(model = item.avatarUrl, contentDescription = null, modifier = Modifier.size(38.dp).background(Color(0xFFE9E9ED), RoundedCornerShape(50)))
+                            else Icon(Icons.Default.AccountCircle, null, tint = Muted, modifier = Modifier.size(38.dp))
                             Column(Modifier.weight(1f)) {
-                                Text("مستخدم", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Muted)
-                                Spacer(Modifier.height(3.dp))
-                                Text(item.second, fontSize = 14.sp, color = Ink)
+                                Text(item.displayName, fontSize = 13.sp, color = Muted, fontWeight = FontWeight.SemiBold)
+                                if (item.username.isNotBlank()) Text("@${item.username}", fontSize = 11.sp, color = Muted)
+                                Text(item.body, fontSize = 14.sp, color = Ink)
                             }
                         }
                     }
@@ -470,6 +478,7 @@ private fun CommentDialog(videoId: String, repository: SupabaseRepository, onDis
                 IconButton(
                     enabled = text.isNotBlank() && !sending,
                     onClick = {
+                        if (!signedIn) { onLogin(); return@IconButton }
                         val comment = text.trim()
                         scope.launch {
                             sending = true
