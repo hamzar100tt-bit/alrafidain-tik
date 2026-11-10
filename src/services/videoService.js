@@ -1,38 +1,43 @@
 import { supabase, isSupabaseConfigured } from "../lib/supabase.js";
 
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
-const VIDEO_TYPES_BY_EXTENSION = {
-  mp4: "video/mp4",
-  webm: "video/webm",
-  mov: "video/quicktime"
-};
+const VIDEO_TYPES_BY_EXTENSION = { mp4: "video/mp4", webm: "video/webm", mov: "video/quicktime" };
 
 function requireSupabase() {
   if (!isSupabaseConfigured || !supabase) throw new Error("أضف مفاتيح Supabase أولاً.");
 }
 
+// profiles.id and videos.user_id both reference auth.users, so PostgREST
+// cannot infer a direct videos -> profiles relationship. Fetch profiles separately.
+async function attachProfiles(rows) {
+  const items = rows || [];
+  if (!items.length) return [];
+  const ids = [...new Set(items.map(row => row.user_id).filter(Boolean))];
+  if (!ids.length) return items.map(row => ({ ...row, profiles: null }));
+  const { data: profiles, error } = await supabase
+    .from("profiles").select("id, username, display_name, avatar_url").in("id", ids);
+  if (error) throw error;
+  const byId = new Map((profiles || []).map(profile => [profile.id, profile]));
+  return items.map(row => ({ ...row, profiles: byId.get(row.user_id) || null }));
+}
+
 export async function signUp({ email, password, username }) {
   requireSupabase();
-  const { data, error } = await supabase.auth.signUp({
-    email, password, options: { data: { username } }
-  });
+  const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { username } } });
   if (error) throw error;
   return data;
 }
-
 export async function signIn({ email, password }) {
   requireSupabase();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
   return data;
 }
-
 export async function signOut() {
   requireSupabase();
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
 }
-
 export async function publishVideo({ file, caption, userId }) {
   requireSupabase();
   if (!file) throw new Error("اختار فيديو من جهازك أولاً.");
@@ -59,33 +64,35 @@ export async function publishVideo({ file, caption, userId }) {
   }
   return data;
 }
-
 export async function getFeed() {
   requireSupabase();
   const { data, error } = await supabase.from("videos")
-    .select("id, user_id, caption, video_url, created_at, profiles(username, display_name, avatar_url)")
+    .select("id, user_id, caption, video_url, created_at")
     .order("created_at", { ascending: false }).limit(30);
   if (error) throw error;
-  return data ?? [];
+  return attachProfiles(data);
 }
-
 export async function addComment({ videoId, userId, body }) {
   requireSupabase();
-  const { data, error } = await supabase.from("comments")
-    .insert({ video_id: videoId, user_id: userId, body }).select().single();
+  const { data, error } = await supabase.from("comments").insert({ video_id: videoId, user_id: userId, body }).select().single();
   if (error) throw error;
   return data;
 }
-
 export async function getComments(videoId) {
   requireSupabase();
   const { data, error } = await supabase.from("comments")
-    .select("id, body, created_at, profiles(username, display_name)")
-    .eq("video_id", videoId).order("created_at", { ascending: true }).limit(100);
+    .select("id, user_id, body, created_at").eq("video_id", videoId)
+    .order("created_at", { ascending: true }).limit(100);
   if (error) throw error;
-  return data ?? [];
+  const rows = data || [];
+  const ids = [...new Set(rows.map(row => row.user_id).filter(Boolean))];
+  if (!ids.length) return rows.map(row => ({ ...row, profiles: null }));
+  const { data: profiles, error: profileError } = await supabase.from("profiles")
+    .select("id, username, display_name").in("id", ids);
+  if (profileError) throw profileError;
+  const byId = new Map((profiles || []).map(profile => [profile.id, profile]));
+  return rows.map(row => ({ ...row, profiles: byId.get(row.user_id) || null }));
 }
-
 export async function toggleLike({ videoId, userId, liked }) {
   requireSupabase();
   const request = liked
@@ -94,8 +101,6 @@ export async function toggleLike({ videoId, userId, liked }) {
   const { error } = await request;
   if (error) throw error;
 }
-
-
 export async function toggleFollow({ followerId, followedId, following }) {
   requireSupabase();
   if (followerId === followedId) throw new Error("ما تكدر تتابع حسابك.");
@@ -105,59 +110,50 @@ export async function toggleFollow({ followerId, followedId, following }) {
   const { error } = await request;
   if (error) throw error;
 }
-
 export async function getFollowingFeed(userId) {
   requireSupabase();
-  const { data: relations, error: relationError } = await supabase
-    .from("follows").select("followed_id").eq("follower_id", userId);
+  const { data: relations, error: relationError } = await supabase.from("follows")
+    .select("followed_id").eq("follower_id", userId);
   if (relationError) throw relationError;
   const ids = (relations || []).map(item => item.followed_id);
   if (!ids.length) return [];
   const { data, error } = await supabase.from("videos")
-    .select("id, caption, video_url, created_at, user_id, profiles(username, display_name, avatar_url)")
-    .in("user_id", ids).order("created_at", { ascending: false }).limit(50);
+    .select("id, caption, video_url, created_at, user_id").in("user_id", ids)
+    .order("created_at", { ascending: false }).limit(50);
   if (error) throw error;
-  return data ?? [];
+  return attachProfiles(data);
 }
-
 export async function getMyVideos(userId) {
   requireSupabase();
   const { data, error } = await supabase.from("videos")
-    .select("id, user_id, caption, video_url, created_at, profiles(username, display_name, avatar_url)")
-    .eq("user_id", userId).order("created_at", { ascending: false }).limit(50);
+    .select("id, user_id, caption, video_url, created_at").eq("user_id", userId)
+    .order("created_at", { ascending: false }).limit(50);
   if (error) throw error;
-  return data ?? [];
+  return attachProfiles(data);
 }
-
 export async function getProfile(userId) {
   requireSupabase();
   const { data, error } = await supabase.from("profiles")
-    .select("id, username, display_name, bio, avatar_url")
-    .eq("id", userId).single();
+    .select("id, username, display_name, bio, avatar_url").eq("id", userId).single();
   if (error) throw error;
   return data;
 }
-
 export async function getFollowState(followerId, followedIds) {
   requireSupabase();
   if (!followedIds.length) return [];
-  const { data, error } = await supabase.from("follows")
-    .select("followed_id").eq("follower_id", followerId).in("followed_id", followedIds);
+  const { data, error } = await supabase.from("follows").select("followed_id")
+    .eq("follower_id", followerId).in("followed_id", followedIds);
   if (error) throw error;
   return (data || []).map(item => item.followed_id);
 }
-
-
 export async function getLikedVideoIds(userId, videoIds) {
   requireSupabase();
   if (!videoIds.length) return [];
-  const { data, error } = await supabase.from("likes")
-    .select("video_id").eq("user_id", userId).in("video_id", videoIds);
+  const { data, error } = await supabase.from("likes").select("video_id")
+    .eq("user_id", userId).in("video_id", videoIds);
   if (error) throw error;
   return (data || []).map(item => item.video_id);
 }
-
-
 export async function getProfileStats(userId) {
   requireSupabase();
   const [videos, followers, following] = await Promise.all([
@@ -169,8 +165,6 @@ export async function getProfileStats(userId) {
   if (failed) throw failed.error;
   return { videos: videos.count || 0, followers: followers.count || 0, following: following.count || 0 };
 }
-
-
 export async function findProfileByUsername(username) {
   requireSupabase();
   const clean = username.trim().replace(/^@/, "");
@@ -181,16 +175,15 @@ export async function findProfileByUsername(username) {
   if (!data) throw new Error("ما لكيت هذا الحساب.");
   return data;
 }
-
 export async function getDirectMessages(userId, otherId) {
   requireSupabase();
-  const { data, error } = await supabase.from("messages").select("id, sender_id, receiver_id, body, created_at")
+  const { data, error } = await supabase.from("messages")
+    .select("id, sender_id, receiver_id, body, created_at")
     .or(`and(sender_id.eq.${userId},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${userId})`)
     .order("created_at", { ascending: true }).limit(200);
   if (error) throw error;
   return data || [];
 }
-
 export async function sendDirectMessage({ senderId, receiverId, body }) {
   requireSupabase();
   const clean = body.trim();
@@ -200,8 +193,6 @@ export async function sendDirectMessage({ senderId, receiverId, body }) {
   if (error) throw error;
   return data;
 }
-
-
 export async function updateProfile({ userId, username, displayName, bio }) {
   requireSupabase();
   const cleanUsername = username.trim().replace(/^@/, "").toLowerCase();
@@ -209,9 +200,7 @@ export async function updateProfile({ userId, username, displayName, bio }) {
     throw new Error("اسم المستخدم لازم يكون 3-24 حرفاً إنكليزياً أو أرقاماً أو _ أو نقطة.");
   }
   const { data, error } = await supabase.from("profiles").update({
-    username: cleanUsername,
-    display_name: displayName.trim().slice(0, 60),
-    bio: bio.trim().slice(0, 160)
+    username: cleanUsername, display_name: displayName.trim().slice(0, 60), bio: bio.trim().slice(0, 160)
   }).eq("id", userId).select("id, username, display_name, bio, avatar_url").single();
   if (error) {
     if (error.code === "23505") throw new Error("اسم المستخدم مستخدم من شخص ثاني.");
@@ -219,16 +208,13 @@ export async function updateProfile({ userId, username, displayName, bio }) {
   }
   return data;
 }
-
 export async function uploadProfileAvatar({ file, userId }) {
   requireSupabase();
   if (!file || !file.type.startsWith("image/")) throw new Error("اختار صورة صالحة.");
   if (file.size > 5 * 1024 * 1024) throw new Error("حجم الصورة لازم أقل من 5 ميغابايت.");
   const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
   const path = `${userId}/${crypto.randomUUID()}.${ext}`;
-  const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, {
-    contentType: file.type, upsert: true
-  });
+  const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { contentType: file.type, upsert: false });
   if (uploadError) throw uploadError;
   const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
   const { data, error } = await supabase.from("profiles").update({ avatar_url: urlData.publicUrl })
