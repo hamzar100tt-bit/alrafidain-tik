@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Room, RoomEvent, createLocalTracks } from "livekit-client";
 import { Radio, Video, VideoOff, Mic, MicOff, PhoneOff } from "lucide-react";
+import { supabase } from "./lib/supabase.js";
 
 export default function LiveStudio({ user, onClose }) {
   const [roomName, setRoomName] = useState("");
@@ -22,9 +23,15 @@ export default function LiveStudio({ user, onClose }) {
     if (!roomName.trim()) return setMessage("اكتب اسم غرفة البث.");
     setStatus("connecting"); setMessage("");
     try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) throw new Error("انتهت جلسة الدخول. سجّل الدخول مرة ثانية.");
       const response = await fetch(tokenEndpoint, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ room: roomName.trim(), identity: user.id, name: user.user_metadata?.username || user.email })
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + sessionData.session.access_token
+        },
+        body: JSON.stringify({ room: roomName.trim() })
       });
       if (!response.ok) throw new Error("تعذر الحصول على تصريح البث من الخادم.");
       const payload = await response.json();
