@@ -365,7 +365,7 @@ fun NativeCameraScreen(
                                 TextButton(onClick = { if (soundPlaying) { soundPlayer?.pause(); soundPlaying = false } else { soundPlayer?.start(); soundPlaying = true } }) { Text(if (soundPlaying) "إيقاف" else "استماع", color = CameraBrand) }
                                 TextButton(onClick = { soundPlayer?.release(); soundPlayer = null; chosenSound = null; soundName = ""; soundPlaying = false }) { Text("إزالة", color = Color.White) }
                             }
-                            Text("معاينة الصوت فقط حالياً؛ دمجه داخل ملف الفيديو يحتاج معالجة قبل النشر", color = Color.White, fontSize = 10.sp)
+                            Text("سيُضاف الصوت المختار إلى الفيديو عند تجهيزه للنشر", color = Color.White, fontSize = 10.sp)
                         }
                         if (busy) CircularProgressIndicator(color = CameraBrand, modifier = Modifier.padding(8.dp))
                         if (status.isNotBlank()) Text(status, color = Color.White, fontSize = 12.sp)
