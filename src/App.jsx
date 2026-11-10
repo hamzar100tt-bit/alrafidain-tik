@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Home, Compass, Users, PlusSquare, UserRound, Search, Heart, MessageCircle, Bookmark, Share2, Volume2, VolumeX, Play, Menu, X, LogOut, Send, Video, LoaderCircle } from "lucide-react";
 import { supabase } from "./lib/supabase.js";
+import LiveStudio from "./LiveStudio.jsx";
 import { signIn, signUp, signOut, publishVideo, getFeed, addComment, getComments, toggleLike, toggleFollow, getFollowingFeed, getMyVideos, getProfile, getFollowState, getLikedVideoIds, getProfileStats, findProfileByUsername, getDirectMessages, sendDirectMessage, updateProfile, uploadProfileAvatar } from "./services/videoService.js";
 
 const demoVideos = [
@@ -45,6 +46,7 @@ function App() {
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [profileUsername, setProfileUsername] = useState("");
+  const [liveOpen, setLiveOpen] = useState(false);
   const profileAvatarRef = useRef(null);
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
   const videoRef = useRef(null);
@@ -222,7 +224,7 @@ function App() {
       <button className="icon-btn mobile-only" onClick={() => setMobileMenu(!mobileMenu)} aria-label="القائمة">{mobileMenu ? <X/> : <Menu/>}</button>
       <a className="brand" href="#"><span className="brand-mark">ر</span><span>الرافدين <b>تيك</b></span></a>
       <label className="search"><Search size={18}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="ابحث عن فيديوهات أو حسابات"/></label>
-      <button className="upload-btn" onClick={() => { if (user) { setError(""); setUploadOpen(true); } else openAuth(); }}><PlusSquare size={18}/> رفع فيديو</button><button className="login-btn" onClick={openMessages}><MessageCircle size={16}/> رسائل</button>
+      <button className="upload-btn" onClick={() => { if (user) { setError(""); setUploadOpen(true); } else openAuth(); }}><PlusSquare size={18}/> رفع فيديو</button><button className="login-btn" onClick={() => user ? setLiveOpen(true) : openAuth()}><Radio size={16}/> بث مباشر</button><button className="login-btn" onClick={openMessages}><MessageCircle size={16}/> رسائل</button>
       {user ? <button className="login-btn" onClick={async () => { await signOut(); setUser(null); }}> <LogOut size={16}/> خروج</button> : <button className="login-btn" onClick={openAuth}>تسجيل الدخول</button>}
     </header>
     <div className="layout">
@@ -261,8 +263,9 @@ function App() {
       <aside className="right-panel"><h3>حسابات مقترحة</h3><div className="community-card"><span>🇮🇶</span><b>صوتك يوصل</b><p>انشر إبداعك وخلي العالم يشوف جمال العراق.</p></div></aside>
     </div>
 
-    <nav className="app-bottom-nav"><button className={active === "الرئيسية" ? "active" : ""} onClick={() => setActive("الرئيسية")}><Home/><span>الرئيسية</span></button><button className={active === "اكتشف" ? "active" : ""} onClick={() => setActive("اكتشف")}><Compass/><span>اكتشف</span></button><button className="nav-create" onClick={() => user ? setUploadOpen(true) : openAuth()}><PlusSquare/><span>نشر</span></button><button className={active === "المتابَعون" ? "active" : ""} onClick={() => setActive("المتابَعون")}><Users/><span>أتابع</span></button><button className={active === "الملف الشخصي" ? "active" : ""} onClick={() => user ? setActive("الملف الشخصي") : openAuth()}><UserRound/><span>حسابي</span></button></nav>
+    <nav className="app-bottom-nav"><button className={active === "الرئيسية" ? "active" : ""} onClick={() => setActive("الرئيسية")}><Home/><span>الرئيسية</span></button><button className={active === "اكتشف" ? "active" : ""} onClick={() => setActive("اكتشف")}><Compass/><span>اكتشف</span></button><button className="nav-create" onClick={() => user ? setUploadOpen(true) : openAuth()}><PlusSquare/><span>نشر</span></button><button onClick={() => user ? setLiveOpen(true) : openAuth()}><Radio/><span>بث</span></button><button className={active === "المتابَعون" ? "active" : ""} onClick={() => setActive("المتابَعون")}><Users/><span>أتابع</span></button><button className={active === "الملف الشخصي" ? "active" : ""} onClick={() => user ? setActive("الملف الشخصي") : openAuth()}><UserRound/><span>حسابي</span></button></nav>
 
+    {liveOpen && <LiveStudio user={user} onClose={() => setLiveOpen(false)}/>}
     {authOpen && <div className="modal-backdrop" onClick={() => setAuthOpen(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setAuthOpen(false)}><X/></button><h2>{authMode === "signup" ? "إنشاء حساب جديد" : "تسجيل الدخول"}</h2><form onSubmit={handleAuth}>
       {authMode === "signup" && <input required minLength="3" maxLength="24" value={username} onChange={e => setUsername(e.target.value)} placeholder="اسم المستخدم"/>}
       <input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="البريد الإلكتروني"/>
