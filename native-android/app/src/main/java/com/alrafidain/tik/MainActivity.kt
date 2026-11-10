@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.material.icons.Icons
@@ -640,7 +641,7 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
     var stats by remember { mutableStateOf<TikProfileStats?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
-    var selectedTab by remember { mutableIntStateOf(4) }
+    var selectedTab by remember { mutableIntStateOf(0) }
     var menuOpen by remember { mutableStateOf(false) }
 
     fun load() {
@@ -673,6 +674,9 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            IconButton(onClick = onEdit) {
+                Icon(Icons.Default.Edit, contentDescription = "تعديل الملف الشخصي", tint = Ink, modifier = Modifier.size(27.dp))
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box {
                     IconButton(onClick = { menuOpen = true }) {
@@ -686,9 +690,6 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                 IconButton(onClick = { /* friend discovery */ }) {
                     Icon(Icons.Default.PersonAddAlt, contentDescription = "إضافة أصدقاء", tint = Ink, modifier = Modifier.size(27.dp))
                 }
-            }
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "تعديل الملف الشخصي", tint = Ink, modifier = Modifier.size(27.dp))
             }
         }
 
@@ -704,7 +705,7 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
             ) {
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
                     Text(displayName, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, color = Ink, maxLines = 1)
-                    Text("@\${username.ifBlank { "user" }}", fontSize = 14.sp, color = Muted)
+                    Text("@${username.ifBlank { "user" }}", fontSize = 14.sp, color = Muted)
                     Spacer(Modifier.height(22.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         ProfileStat(stats?.following ?: 0, "أتابعه")
@@ -717,7 +718,7 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                         model = avatar,
                         contentDescription = "الصورة الشخصية",
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(112.dp).background(Color(0xFFF1F1F3), CircleShape)
+                        modifier = Modifier.size(112.dp).clip(CircleShape).background(Color(0xFFF1F1F3))
                     )
                 } else {
                     Icon(Icons.Default.AccountCircle, null, tint = Brand, modifier = Modifier.size(112.dp))
@@ -736,7 +737,7 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val tabs = listOf(Icons.Default.FavoriteBorder, Icons.Default.BookmarkBorder, Icons.Default.Repeat, Icons.Default.Lock, Icons.Default.GridView)
+                val tabs = listOf(Icons.Default.GridView, Icons.Default.Lock, Icons.Default.Repeat, Icons.Default.BookmarkBorder, Icons.Default.FavoriteBorder)
                 tabs.forEachIndexed { index, icon ->
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         IconButton(onClick = { selectedTab = index }) {
@@ -754,13 +755,13 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                         TextButton(onClick = { load() }) { Text("إعادة المحاولة", color = Brand) }
                     }
                 }
-                selectedTab != 4 -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                selectedTab != 0 -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(
                         when (selectedTab) {
-                            0 -> "الإعجابات ستظهر هنا"
-                            1 -> "الفيديوهات المحفوظة ستظهر هنا"
+                            1 -> "المحتوى الخاص يظهر لك وحدك"
                             2 -> "إعادات النشر ستظهر هنا"
-                            else -> "المحتوى الخاص يظهر لك وحدك"
+                            3 -> "الفيديوهات المحفوظة ستظهر هنا"
+                            else -> "الإعجابات ستظهر هنا"
                         },
                         color = Muted
                     )
