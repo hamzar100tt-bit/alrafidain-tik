@@ -136,7 +136,7 @@ private fun AlrafidainApp() {
             else -> if (signedIn) ProfileScreen(repository, onSignOut = { repository.signOut(); signedIn = false; selected = 0 }) else GuestGate { showAuth = true }
         }
 
-        if (selected != 4) Row(
+        if (selected != 0 && selected != 4) Row(
             Modifier.align(Alignment.TopCenter)
                 .fillMaxWidth()
                 .statusBarsPadding()
