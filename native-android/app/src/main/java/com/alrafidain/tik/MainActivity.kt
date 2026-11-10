@@ -47,9 +47,12 @@ private val Canvas = Color(0xFFF7F7F8)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = android.graphics.Color.WHITE
-        window.navigationBarColor = android.graphics.Color.WHITE
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
         window.decorView.systemUiVisibility =
+            android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+            android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+            android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
             android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or
             android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         setContent { NativeTheme { AlrafidainApp() } }
@@ -109,40 +112,61 @@ private fun AlrafidainApp() {
 
     val labels = listOf("الرئيسية", "اكتشف", "نشر", "الرسائل", "حسابي")
     val icons = listOf(Icons.Default.Home, Icons.Default.Explore, Icons.Default.AddCircle, Icons.Default.ChatBubble, Icons.Default.Person)
-    Scaffold(
-        containerColor = Canvas,
-        bottomBar = {
-            NavigationBar(containerColor = Color.White, tonalElevation = 4.dp) {
-                labels.forEachIndexed { index, label ->
-                    NavigationBarItem(
-                        selected = selected == index,
-                        onClick = { selected = index },
-                        icon = { Icon(icons[index], contentDescription = label) },
-                        label = { Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold) },
-                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Brand, selectedTextColor = Brand,
-                            indicatorColor = Color(0xFFFFE8ED), unselectedIconColor = Muted, unselectedTextColor = Muted)
-                    )
-                }
-            }
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        when (selected) {
+            0 -> FeedScreen(videos, loading, error, ::refreshFeed, repository)
+            1 -> NativePlaceholder("اكتشف", "قريباً: البحث عن الفيديوهات والحسابات", Icons.Default.Explore)
+            2 -> UploadScreen(repository, onUploaded = { refreshFeed(); selected = 0 })
+            3 -> NativePlaceholder("الرسائل", "محادثاتك ورسائلك الخاصة", Icons.Default.ChatBubble)
+            else -> ProfileScreen(repository, onSignOut = { repository.signOut(); signedIn = false })
         }
-    ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).background(Canvas)) {
-            Row(
-                Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 18.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("الرافدين تيك", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Brand)
-                if (selected == 0) IconButton(onClick = { refreshFeed() }) {
-                    Icon(Icons.Default.Refresh, contentDescription = "تحديث الفيديوهات", tint = Ink)
-                } else IconButton(onClick = { }) { Icon(Icons.Default.NotificationsNone, contentDescription = "الإشعارات", tint = Ink) }
+
+        Row(
+            Modifier.align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .background(Color.Transparent)
+                .padding(horizontal = 18.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            IconButton(onClick = { if (selected == 0) refreshFeed() }) {
+                Icon(
+                    if (selected == 0) Icons.Default.Refresh else Icons.Default.ArrowBack,
+                    contentDescription = "تحديث",
+                    tint = if (selected == 0) Color.White else Ink
+                )
             }
-            when (selected) {
-                0 -> FeedScreen(videos, loading, error, ::refreshFeed, repository)
-                1 -> NativePlaceholder("اكتشف", "قريباً: البحث عن الفيديوهات والحسابات", Icons.Default.Explore)
-                2 -> UploadScreen(repository, onUploaded = { refreshFeed(); selected = 0 })
-                3 -> NativePlaceholder("الرسائل", "محادثاتك ورسائلك الخاصة", Icons.Default.ChatBubble)
-                else -> ProfileScreen(repository, onSignOut = { repository.signOut(); signedIn = false })
+            Text(
+                "الرافدين تيك",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = if (selected == 0) Color.White else Brand
+            )
+        }
+
+        NavigationBar(
+            modifier = Modifier.align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .fillMaxWidth(),
+            containerColor = Color.Transparent,
+            tonalElevation = 0.dp,
+            windowInsets = WindowInsets(0)
+        ) {
+            labels.forEachIndexed { index, label ->
+                NavigationBarItem(
+                    selected = selected == index,
+                    onClick = { selected = index },
+                    icon = { Icon(icons[index], contentDescription = label) },
+                    label = { Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Brand,
+                        selectedTextColor = Brand,
+                        indicatorColor = Color.White.copy(alpha = 0.16f),
+                        unselectedIconColor = Color.White.copy(alpha = 0.82f),
+                        unselectedTextColor = Color.White.copy(alpha = 0.82f)
+                    )
+                )
             }
         }
     }
