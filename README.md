@@ -33,3 +33,19 @@ npm run dev
 - الواجهة تعرض فيديوهات تجريبية إذا لم توجد فيديوهات منشورة بعد.
 - تفعيل تأكيد البريد الإلكتروني يعتمد على إعدادات Auth في Supabase.
 - لم يتم بعد اختبار عملية النشر الحية أو تجربة الحساب والرفع على جهاز المستخدم.
+
+
+## البث المباشر (LiveKit)
+
+تمت إضافة واجهة البث وربطها بدالة آمنة لإصدار رموز LiveKit. يلزم إعداد حساب LiveKit ومشروع Supabase قبل أن يعمل البث الفعلي:
+
+1. أنشئ مشروعاً في LiveKit Cloud وخذ عنوان WebSocket ومفتاح API والسر.
+2. انشر الدالة: `supabase functions deploy livekit-token`.
+3. خزّن المفتاح والسر على Supabase فقط:
+   `supabase secrets set LIVEKIT_API_KEY=... LIVEKIT_API_SECRET=...`
+4. في GitHub افتح Settings ثم Secrets and variables ثم Actions وأضف:
+   - `VITE_LIVEKIT_URL` = عنوان LiveKit الذي يبدأ عادةً بـ `wss://`.
+   - `VITE_LIVEKIT_TOKEN_ENDPOINT` = `https://YOUR_PROJECT_REF.supabase.co/functions/v1/livekit-token`.
+5. أعد تشغيل بناء التطبيق من Actions.
+
+الدالة تتحقق من جلسة Supabase وتصدر تصريحاً للمستخدم المسجل فقط. لا تضع `LIVEKIT_API_SECRET` أو مفتاح `service_role` في تطبيق Android أو المتصفح.
