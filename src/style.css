@@ -255,3 +255,30 @@
     margin:0!important;
   }
 }
+
+
+/* Remove Android/Chromium blue tap flash and default focus block on app controls. */
+button, a, [role="button"]{
+  -webkit-tap-highlight-color:transparent!important;
+  tap-highlight-color:transparent!important;
+}
+button:focus,button:active,button:focus:active{
+  outline:none!important;
+  box-shadow:none!important;
+}
+button:focus-visible{
+  outline:2px solid #ff6680!important;
+  outline-offset:3px;
+}
+.video-actions button,
+.comments-modal .comment-send,
+.comments-modal .modal-close{
+  -webkit-appearance:none;
+  appearance:none;
+  -webkit-tap-highlight-color:transparent!important;
+  background-clip:padding-box;
+}
+.comments-modal .comment-send{
+  border-radius:50%!important;
+  overflow:hidden;
+}
