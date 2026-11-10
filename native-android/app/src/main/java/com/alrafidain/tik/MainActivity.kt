@@ -141,6 +141,14 @@ private fun AlrafidainApp() {
             else -> if (signedIn) ProfileScreen(repository, onSignOut = { repository.signOut(); signedIn = false; selected = 0 }) else GuestGate { showAuth = true }
         }
 
+        if (selected == 0) {
+            IconButton(
+                onClick = { showNotifications = true },
+                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 10.dp, top = 6.dp)
+            ) {
+                Icon(Icons.Default.Notifications, contentDescription = "الإشعارات", tint = Color.White, modifier = Modifier.size(27.dp))
+            }
+        }
         if (selected != 0 && selected != 2 && selected != 4) Row(
             Modifier.align(Alignment.TopCenter)
                 .fillMaxWidth()
