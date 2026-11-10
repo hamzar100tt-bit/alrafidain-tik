@@ -306,9 +306,11 @@ fun NativeCameraScreen(
                                     try {
                                         provider.unbindAll()
                                         val selector = CameraSelector.Builder().requireLensFacing(lens).build()
-                                        val view = (context as? android.app.Activity)?.window?.decorView
-                                        val previewView = findPreviewView(view)
-                                        if (previewView != null) preview.setSurfaceProvider(previewView.surfaceProvider)
+                                        val previewView = previewViewState
+                                        if (previewView != null) {
+                                            applyCameraFilter(previewView, filter)
+                                            preview.setSurfaceProvider(previewView.surfaceProvider)
+                                        }
                                         if (capture != null && video != null) provider.bindToLifecycle(lifecycleOwner, selector, preview, capture, video)
                                     } catch (e: Exception) { status = e.message ?: "تعذر تبديل الكاميرا" }
                                 }
@@ -378,18 +380,6 @@ fun NativeCameraScreen(
         }
     }
 }
-
-private fun findPreviewView(view: android.view.View?): PreviewView? {
-    if (view is PreviewView) return view
-    if (view is android.view.ViewGroup) {
-        for (index in 0 until view.childCount) {
-            val found = findPreviewView(view.getChildAt(index))
-            if (found != null) return found
-        }
-    }
-    return null
-}
-
 
 private fun filterSwatch(name: String): Color = when (name) {
     "ناعم" -> Color(0xFFE8B8A8)
