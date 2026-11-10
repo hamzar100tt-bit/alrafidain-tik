@@ -191,3 +191,42 @@ export async function sendDirectMessage({ senderId, receiverId, body }) {
   if (error) throw error;
   return data;
 }
+
+
+export async function updateProfile({ userId, username, displayName, bio }) {
+  requireSupabase();
+  const cleanUsername = username.trim().replace(/^@/, "").toLowerCase();
+  if (!/^[a-z0-9_.]{3,24}$/.test(cleanUsername)) {
+    throw new Error("اسم المستخدم لازم يكون 3-24 حرفاً إنكليزياً أو أرقاماً أو _ أو نقطة.");
+  }
+  const { data, error } = await supabase.from("profiles").update({
+    username: cleanUsername,
+    display_name: displayName.trim().slice(0, 60),
+    bio: bio.trim().slice(0, 160)
+  }).eq("id", userId).select("id, username, display_name, bio, avatar_url").single();
+  if (error) {
+    if (error.code === "23505") throw new Error("اسم المستخدم مستخدم من شخص ثاني.");
+    throw error;
+  }
+  return data;
+}
+
+export async function uploadProfileAvatar({ file, userId }) {
+  requireSupabase();
+  if (!file || !file.type.startsWith("image/")) throw new Error("اختار صورة صالحة.");
+  if (file.size > 5 * 1024 * 1024) throw new Error("حجم الصورة لازم أقل من 5 ميغابايت.");
+  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const path = `${userId}/${crypto.randomUUID()}.${ext}`;
+  const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, {
+    contentType: file.type, upsert: true
+  });
+  if (uploadError) throw uploadError;
+  const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+  const { data, error } = await supabase.from("profiles").update({ avatar_url: urlData.publicUrl })
+    .eq("id", userId).select("id, username, display_name, bio, avatar_url").single();
+  if (error) {
+    await supabase.storage.from("avatars").remove([path]);
+    throw error;
+  }
+  return data;
+}
