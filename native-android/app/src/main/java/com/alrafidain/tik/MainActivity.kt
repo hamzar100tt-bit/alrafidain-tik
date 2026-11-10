@@ -1158,6 +1158,23 @@ private fun DiscoverScreen(repository: SupabaseRepository) {
                             Text(profile.displayName, color = Ink, fontWeight = FontWeight.Bold)
                             Text("@${profile.username}", color = Muted, fontSize = 12.sp)
                         }
+                        var following by remember(profile.id) { mutableStateOf(false) }
+                        var followBusy by remember(profile.id) { mutableStateOf(false) }
+                        LaunchedEffect(profile.id) {
+                            following = withContext(Dispatchers.IO) { runCatching { repository.isFollowing(profile.id) }.getOrDefault(false) }
+                        }
+                        OutlinedButton(
+                            enabled = !followBusy && repository.currentUserId() != profile.id,
+                            onClick = {
+                                scope.launch {
+                                    followBusy = true
+                                    try { following = withContext(Dispatchers.IO) { repository.toggleFollow(profile.id) } }
+                                    catch (_: Exception) { message = "تعذر تحديث المتابعة" }
+                                    finally { followBusy = false }
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) { Text(if (following) "تتابعه" else "متابعة", color = if (following) Muted else Brand, fontSize = 12.sp) }
                     }
                     HorizontalDivider(color = Color(0xFFEFEFEF))
                 }
