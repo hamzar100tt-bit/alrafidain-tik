@@ -97,6 +97,58 @@ class SupabaseRepository(private val context: Context) {
         }
     }
 
+
+    fun updateProfile(displayName: String, username: String, bio: String) {
+        val userId = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
+        if (displayName.isBlank()) throw IOException("اكتب اسم العرض")
+        if (!username.matches(Regex("[A-Za-z0-9_]{3,24}"))) {
+            throw IOException("اسم المستخدم يجب أن يكون 3-24 حرفاً إنجليزياً أو رقماً أو _")
+        }
+        val payload = JSONObject().put("display_name", displayName.trim())
+            .put("username", username.trim()).put("bio", bio.trim())
+        val request = authedRequest("$base/rest/v1/profiles?id=eq.$userId")
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Prefer", "return=minimal")
+            .patch(payload.toString().toRequestBody("application/json".toMediaType())).build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                val body = response.body?.string().orEmpty()
+                throw IOException(if (response.code == 409) "اسم المستخدم مستخدم من شخص آخر" else "تعذر حفظ الملف الشخصي: ${response.code} $body")
+            }
+        }
+    }
+
+    fun uploadAvatar(uri: Uri): String {
+        val userId = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
+        val token = accessToken ?: throw IOException("سجّل الدخول أولاً")
+        val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+        if (!mime.startsWith("image/")) throw IOException("اختَر صورة")
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: throw IOException("تعذرت قراءة الصورة")
+        if (bytes.size > 5 * 1024 * 1024) throw IOException("حجم الصورة أكبر من 5 ميغابايت")
+        val extension = when (mime.substringAfter("/", "jpeg")) {
+            "png" -> "png"; "webp" -> "webp"; else -> "jpg"
+        }
+        val path = "$userId/avatar.$extension"
+        val upload = Request.Builder().url("$base/storage/v1/object/avatars/$path")
+            .addHeader("apikey", key).addHeader("Authorization", "Bearer $token")
+            .addHeader("Content-Type", mime).addHeader("x-upsert", "true")
+            .put(bytes.toRequestBody(mime.toMediaType())).build()
+        client.newCall(upload).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("فشل رفع الصورة (${response.code})")
+        }
+        val publicUrl = "$base/storage/v1/object/public/avatars/$path?v=${System.currentTimeMillis()}"
+        val update = authedRequest("$base/rest/v1/profiles?id=eq.$userId")
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Prefer", "return=minimal")
+            .patch(JSONObject().put("avatar_url", publicUrl).toString()
+                .toRequestBody("application/json".toMediaType())).build()
+        client.newCall(update).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("تم رفع الصورة لكن تعذر ربطها بالحساب")
+        }
+        return publicUrl
+    }
+
     fun isLiked(videoId: String): Boolean = exists("likes", videoId)
     fun isSaved(videoId: String): Boolean = exists("saved_videos", videoId)
 
