@@ -3,10 +3,7 @@ package com.alrafidain.tik
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
-import android.graphics.Paint
-import android.view.View
+import android.media.MediaPlayer
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -37,10 +34,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
@@ -80,6 +80,29 @@ fun NativeCameraScreen(
     var activeRecording by remember { mutableStateOf<Recording?>(null) }
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     var previewViewState by remember { mutableStateOf<PreviewView?>(null) }
+    var chosenSound by remember { mutableStateOf<android.net.Uri?>(null) }
+    var soundName by remember { mutableStateOf("") }
+    var soundPlaying by remember { mutableStateOf(false) }
+    var soundPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+
+    val soundPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            try {
+                soundPlayer?.release()
+                chosenSound = uri
+                soundName = "صوت مختار"
+                val cursor = context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+                cursor?.use { if (it.moveToFirst()) soundName = it.getString(0) ?: "صوت مختار" }
+                val player = MediaPlayer()
+                player.setDataSource(context, uri)
+                player.setOnPreparedListener { it.start(); soundPlaying = true }
+                player.setOnCompletionListener { soundPlaying = false; it.seekTo(0) }
+                player.prepareAsync()
+                soundPlayer = player
+                status = "تم اختيار الصوت: $soundName"
+            } catch (e: Exception) { status = e.message ?: "تعذر فتح ملف الصوت" }
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -115,21 +138,22 @@ fun NativeCameraScreen(
     }
 
     DisposableEffect(Unit) {
-        onDispose { activeRecording?.stop(); cameraProvider?.unbindAll() }
+        onDispose { activeRecording?.stop(); cameraProvider?.unbindAll(); soundPlayer?.release() }
     }
 
     Column(Modifier.fillMaxSize().background(Color.Black)) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (hasPermission) {
                 AndroidView(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().graphicsLayer {
+                        colorFilter = cameraComposeFilter(filter)
+                    },
                     factory = { ctx ->
                         val previewView = PreviewView(ctx).apply {
                             scaleType = PreviewView.ScaleType.FILL_CENTER
                             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
                         }
                         previewViewState = previewView
-                        applyCameraFilter(previewView, filter)
                         val future = ProcessCameraProvider.getInstance(ctx)
                         future.addListener({
                             val provider = future.get()
@@ -155,7 +179,7 @@ fun NativeCameraScreen(
                         }, executor)
                         previewView
                     },
-                    update = { view -> applyCameraFilter(view, filter) }
+                    update = { }
                 )
                 // Camera preview is edge-to-edge, with TikTok-style capture controls.
                 Column(
@@ -165,8 +189,10 @@ fun NativeCameraScreen(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = onBack) { Icon(Icons.Default.Close, "إغلاق", tint = Color.White) }
-                        Text("إضافة صوت  ♪", color = Color.White, modifier = Modifier
-                            .background(Color(0x88000000), RoundedCornerShape(30.dp)).padding(horizontal = 20.dp, vertical = 12.dp))
+                        TextButton(onClick = { soundPicker.launch("audio/*") }) {
+                            Text(if (soundName.isBlank()) "♫ إضافة صوت" else "♫ ${soundName.take(18)}", color = Color.White, modifier = Modifier
+                                .background(Color(0xAA222222), RoundedCornerShape(30.dp)).padding(horizontal = 18.dp, vertical = 10.dp))
+                        }
                         IconButton(onClick = {
                             flash = !flash
                             imageCapture?.flashMode = if (flash) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF
@@ -329,6 +355,14 @@ fun NativeCameraScreen(
                                 cursorColor = CameraBrand
                             )
                         )
+                        if (chosenSound != null) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("الصوت المختار: ${soundName.take(24)}", color = Color.White, fontSize = 11.sp)
+                                TextButton(onClick = { if (soundPlaying) { soundPlayer?.pause(); soundPlaying = false } else { soundPlayer?.start(); soundPlaying = true } }) { Text(if (soundPlaying) "إيقاف" else "استماع", color = CameraBrand) }
+                                TextButton(onClick = { soundPlayer?.release(); soundPlayer = null; chosenSound = null; soundName = ""; soundPlaying = false }) { Text("إزالة", color = Color.White) }
+                            }
+                            Text("معاينة الصوت فقط حالياً؛ دمجه داخل ملف الفيديو يحتاج معالجة قبل النشر", color = Color.White, fontSize = 10.sp)
+                        }
                         if (busy) CircularProgressIndicator(color = CameraBrand, modifier = Modifier.padding(8.dp))
                         if (status.isNotBlank()) Text(status, color = Color.White, fontSize = 12.sp)
                     }
@@ -371,53 +405,19 @@ private fun filterSwatch(name: String): Color = when (name) {
     else -> Color(0xFF8B9A83)
 }
 
-private fun applyCameraFilter(view: PreviewView, name: String) {
-    val matrix = when (name) {
-        "أبيض وأسود", "رمادي" -> ColorMatrix().apply { setSaturation(0f) }
-        "دافئ" -> ColorMatrix(floatArrayOf(
-            1.18f, 0f, 0f, 0f, 18f, 0f, 1.02f, 0f, 0f, 5f,
-            0f, 0f, 0.82f, 0f, 0f, 0f, 0f, 0f, 1f, 0f
-        ))
-        "ذهبي" -> ColorMatrix(floatArrayOf(
-            1.22f, 0f, 0f, 0f, 22f, 0f, 1.08f, 0f, 0f, 10f,
-            0f, 0f, 0.70f, 0f, 0f, 0f, 0f, 0f, 1f, 0f
-        ))
-        "بارد" -> ColorMatrix(floatArrayOf(
-            0.90f, 0f, 0f, 0f, 0f, 0f, 1.02f, 0f, 0f, 0f,
-            0f, 0f, 1.22f, 0f, 18f, 0f, 0f, 0f, 1f, 0f
-        ))
-        "زاهي" -> ColorMatrix(floatArrayOf(
-            1.28f, -0.10f, -0.10f, 0f, 4f, -0.08f, 1.20f, -0.08f, 0f, 4f,
-            -0.08f, -0.08f, 1.28f, 0f, 4f, 0f, 0f, 0f, 1f, 0f
-        ))
-        "سينما" -> ColorMatrix(floatArrayOf(
-            1.12f, 0f, 0f, 0f, -8f, 0f, 1.05f, 0f, 0f, -5f,
-            0f, 0f, 0.92f, 0f, 5f, 0f, 0f, 0f, 1f, 0f
-        ))
-        "وردي" -> ColorMatrix(floatArrayOf(
-            1.12f, 0f, 0f, 0f, 10f, 0f, 0.94f, 0f, 0f, 0f,
-            0f, 0f, 1.02f, 0f, 8f, 0f, 0f, 0f, 1f, 0f
-        ))
-        "قديم" -> ColorMatrix(floatArrayOf(
-            0.92f, 0.12f, 0.04f, 0f, 12f, 0.08f, 0.90f, 0.02f, 0f, 7f,
-            0.04f, 0.08f, 0.72f, 0f, 0f, 0f, 0f, 0f, 1f, 0f
-        ))
-        "ليلي" -> ColorMatrix(floatArrayOf(
-            0.78f, 0f, 0.08f, 0f, 0f, 0f, 0.86f, 0.04f, 0f, 0f,
-            0.08f, 0.04f, 1.16f, 0f, 12f, 0f, 0f, 0f, 1f, 0f
-        ))
-        "ناعم" -> ColorMatrix(floatArrayOf(
-            1.06f, 0f, 0f, 0f, 8f, 0f, 1.02f, 0f, 0f, 5f,
-            0f, 0f, 1.00f, 0f, 5f, 0f, 0f, 0f, 1f, 0f
-        ))
+private fun cameraComposeFilter(name: String): ColorFilter? {
+    val values = when (name) {
+        "أبيض وأسود", "رمادي" -> floatArrayOf(.213f,.715f,.072f,0f,0f, .213f,.715f,.072f,0f,0f, .213f,.715f,.072f,0f,0f, 0f,0f,0f,1f,0f)
+        "دافئ" -> floatArrayOf(1.18f,0f,0f,0f,18f, 0f,1.02f,0f,0f,5f, 0f,0f,.82f,0f,0f, 0f,0f,0f,1f,0f)
+        "ذهبي" -> floatArrayOf(1.22f,0f,0f,0f,22f, 0f,1.08f,0f,0f,10f, 0f,0f,.70f,0f,0f, 0f,0f,0f,1f,0f)
+        "بارد" -> floatArrayOf(.90f,0f,0f,0f,0f, 0f,1.02f,0f,0f,0f, 0f,0f,1.22f,0f,18f, 0f,0f,0f,1f,0f)
+        "زاهي" -> floatArrayOf(1.28f,-.10f,-.10f,0f,4f, -.08f,1.20f,-.08f,0f,4f, -.08f,-.08f,1.28f,0f,4f, 0f,0f,0f,1f,0f)
+        "سينما" -> floatArrayOf(1.12f,0f,0f,0f,-8f, 0f,1.05f,0f,0f,-5f, 0f,0f,.92f,0f,5f, 0f,0f,0f,1f,0f)
+        "وردي" -> floatArrayOf(1.12f,0f,0f,0f,10f, 0f,.94f,0f,0f,0f, 0f,0f,1.02f,0f,8f, 0f,0f,0f,1f,0f)
+        "قديم" -> floatArrayOf(.92f,.12f,.04f,0f,12f, .08f,.90f,.02f,0f,7f, .04f,.08f,.72f,0f,0f, 0f,0f,0f,1f,0f)
+        "ليلي" -> floatArrayOf(.78f,0f,.08f,0f,0f, 0f,.86f,.04f,0f,0f, .08f,.04f,1.16f,0f,12f, 0f,0f,0f,1f,0f)
+        "ناعم" -> floatArrayOf(1.06f,0f,0f,0f,8f, 0f,1.02f,0f,0f,5f, 0f,0f,1f,0f,5f, 0f,0f,0f,1f,0f)
         else -> null
     }
-    if (matrix == null) {
-        view.setLayerType(View.LAYER_TYPE_NONE, null)
-    } else {
-        view.setLayerType(
-            View.LAYER_TYPE_HARDWARE,
-            Paint().apply { colorFilter = ColorMatrixColorFilter(matrix) }
-        )
-    }
+    return values?.let { ColorFilter.colorMatrix(ColorMatrix(it)) }
 }
