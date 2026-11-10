@@ -39,6 +39,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -187,17 +189,19 @@ fun NativeCameraScreen(
                     Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 18.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = onBack) { Icon(Icons.Default.Close, "إغلاق", tint = Color.White) }
-                        TextButton(onClick = { soundPicker.launch("audio/*") }) {
-                            Text(if (soundName.isBlank()) "♫ إضافة صوت" else "♫ ${soundName.take(18)}", color = Color.White, modifier = Modifier
-                                .background(Color(0xAA222222), RoundedCornerShape(30.dp)).padding(horizontal = 18.dp, vertical = 10.dp))
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = onBack) { Icon(Icons.Default.Close, "إغلاق", tint = Color.White) }
+                            TextButton(onClick = { soundPicker.launch("audio/*") }) {
+                                Text(if (soundName.isBlank()) "♫ إضافة صوت" else "♫ ${soundName.take(18)}", color = Color.White, modifier = Modifier
+                                    .background(Color(0xAA222222), RoundedCornerShape(30.dp)).padding(horizontal = 18.dp, vertical = 10.dp))
+                            }
+                            IconButton(onClick = {
+                                flash = !flash
+                                imageCapture?.flashMode = if (flash) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF
+                            }) { Icon(if (flash) Icons.Default.FlashOn else Icons.Default.FlashOff, "الفلاش", tint = Color.White) }
                         }
-                        IconButton(onClick = {
-                            flash = !flash
-                            imageCapture?.flashMode = if (flash) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF
-                        }) { Icon(if (flash) Icons.Default.FlashOn else Icons.Default.FlashOff, "الفلاش", tint = Color.White) }
                     }
                     Column(
                         Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
@@ -337,7 +341,10 @@ fun NativeCameraScreen(
                                         ),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text("Aa", color = Color.White, fontSize = 16.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                                        Box(Modifier.size(22.dp).background(Color.White.copy(alpha = 0.28f), CircleShape),
+                                            contentAlignment = Alignment.Center) {
+                                            Box(Modifier.size(9.dp).background(Color.White, CircleShape))
+                                        }
                                     }
                                     TextButton(
                                         onClick = { filter = item },
