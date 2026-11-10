@@ -29,6 +29,7 @@ function App() {
   const [username, setUsername] = useState("");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [file, setFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState("");
   const [caption, setCaption] = useState("");
   const [messagesOpen, setMessagesOpen] = useState(false);
   const [messageUsername, setMessageUsername] = useState("");
@@ -43,6 +44,7 @@ function App() {
   const [profileEditOpen, setProfileEditOpen] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
+  useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
   const videoRef = useRef(null);
   const fileRef = useRef(null);
   const touchStartY = useRef(0);
@@ -215,8 +217,8 @@ function App() {
         <div className="side-links">{nav.map(({label, icon: Icon}) => <button key={label} className={`nav-item ${active === label ? "selected" : ""}`} onClick={() => {setActive(label); setMobileMenu(false); if(label === "رفع فيديو") user ? setUploadOpen(true) : openAuth();}}><Icon size={21}/><span>{label}</span></button>)}</div>
         <div className="side-note"><b>مجتمع الرافدين</b><p>اكتشف صناع المحتوى العراقيين وشارك لحظاتك مع الجميع.</p><small>© 2026 الرافدين تيك</small></div>
       </aside>
-      <main className="main-content">
-        <div className="feed-heading"><div><span className="eyebrow">اكتشف الجديد</span><h1>{active === "الرئيسية" ? "لك" : active}</h1></div><div className="feed-tabs"><button className={`tab ${active !== "المتابَعون" ? "active" : ""}`} onClick={() => setActive("الرئيسية")}>لك</button><button className={`tab ${active === "المتابَعون" ? "active" : ""}`} onClick={() => setActive("المتابَعون")}>أتابع</button></div></div>
+      <main className={`main-content ${active === "الملف الشخصي" ? "profile-view" : ""}`}>
+        {active !== "الملف الشخصي" && <><div className="feed-heading"><div><span className="eyebrow">اكتشف الجديد</span><h1>{active === "الرئيسية" ? "لك" : active}</h1></div><div className="feed-tabs"><button className={`tab ${active !== "المتابَعون" ? "active" : ""}`} onClick={() => setActive("الرئيسية")}>لك</button><button className={`tab ${active === "المتابَعون" ? "active" : ""}`} onClick={() => setActive("المتابَعون")}>أتابع</button></div></div>
         {query && <p className="search-count">نتائج البحث: {filtered.length}</p>}
         {error && <p className="search-count" role="status">{error}</p>}
         {loading ? <p className="search-count">جاري تحميل الفيديوهات…</p> : shownVideos.length === 0 ? <section className="empty-state"><h2>{active === "الملف الشخصي" ? "ملفك الشخصي" : active === "المتابَعون" ? "ماكو فيديوهات من الحسابات اللي تتابعها بعد" : "ماكو نتائج"}</h2><p>{profile ? `@${profile.username} · ${profile.bio || "شارك أول فيديو إلك"}` : "سجّل الدخول أو تابع حسابات حتى تظهر الفيديوهات هنا."}</p>{active === "الملف الشخصي" && <button className="upload-btn" onClick={() => setUploadOpen(true)}>انشر أول فيديو</button>}</section> : <section className="video-stage">
@@ -240,7 +242,8 @@ function App() {
           <button className="arrow next" onClick={() => go(1)} aria-label="الفيديو التالي">›</button>
         </section>}
         <div className="feed-footer"><span><i/> {videos.length ? `فيديو ${Math.min(index + 1, videos.length)} من ${videos.length}` : "معاينات تجريبية"}</span><div className="dots">{shownVideos.map((v,i) => <button key={v.id} onClick={() => setIndex(i)} className={i === index ? "dot active-dot" : "dot"} aria-label={`فيديو ${i+1}`}/>)}</div></div>
-        <div className="mobile-actions"><button onClick={() => go(-1)}>الفيديو السابق</button><button onClick={() => go(1)}>الفيديو التالي</button></div>
+        <div className="mobile-actions"><button onClick={() => go(-1)}>الفيديو السابق</button><button onClick={() => go(1)}>الفيديو التالي</button></div></>}
+        {active === "الملف الشخصي" && <section className="profile-page"><div className="profile-cover"><span>الرافدين تيك</span></div><div className="profile-main"><div className="profile-avatar">{profile?.avatar_url ? <img src={profile.avatar_url} alt="صورة الحساب"/> : "🇮🇶"}</div><div className="profile-heading"><div><h2>{profile?.display_name || profile?.username || "حسابي"}</h2><p>@{profile?.username || user?.email?.split("@")[0] || "user"}</p></div><button className="profile-edit-btn" onClick={() => setProfileEditOpen(true)}>تعديل الملف الشخصي</button></div><p className="profile-bio">{profile?.bio || "أهلاً بيك بحسابي على الرافدين تيك 🇮🇶"}</p><div className="profile-stats"><span><b>{profileStats.videos}</b> فيديو</span><span><b>{profileStats.followers}</b> متابع</span><span><b>{profileStats.following}</b> يتابع</span></div><div className="profile-content-tabs"><b>▦ فيديوهاتي</b><span>المفضلة</span></div>{videos.length ? <div className="profile-video-grid">{videos.map((v,i)=><button key={v.id} onClick={()=>{setActive("الرئيسية");setIndex(i)}}><video src={v.videoUrl} muted playsInline/><span>▶</span></button>)}</div> : <div className="profile-empty"><Video size={34}/><b>ما نشرت أي فيديو بعد</b><span>شارك أول فيديو وخلي الناس تشوف محتواك</span><button className="upload-btn" onClick={()=>setUploadOpen(true)}>＋ نشر أول فيديو</button></div>}</div></section>}
       </main>
       <aside className="right-panel"><h3>حسابات مقترحة</h3><div className="community-card"><span>🇮🇶</span><b>صوتك يوصل</b><p>انشر إبداعك وخلي العالم يشوف جمال العراق.</p></div></aside>
     </div>
@@ -257,13 +260,13 @@ function App() {
     {messagesOpen && <div className="modal-backdrop" onClick={() => setMessagesOpen(false)}><section className="modal messages-modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setMessagesOpen(false)}><X/></button><h2>الرسائل الخاصة</h2><form onSubmit={findMessagePeer}><input value={messageUsername} onChange={e => setMessageUsername(e.target.value)} placeholder="اكتب اسم المستخدم" required/><button className="login-btn modal-submit" disabled={busy}>{busy ? "انتظر..." : "فتح المحادثة"}</button></form>{messagePeer && <><h3>محادثة مع @{messagePeer.username}</h3><div className="comment-list direct-message-list">{directMessages.map(m => <p key={m.id} className={m.sender_id === user.id ? "my-message" : "their-message"}>{m.body}</p>)}{!directMessages.length && <p>ابدأ المحادثة برسالة ترحيب.</p>}</div><form onSubmit={submitDirectMessage}><textarea value={directText} onChange={e => setDirectText(e.target.value)} maxLength="2000" placeholder="اكتب رسالتك…"/><button className="login-btn modal-submit" disabled={busy || !directText.trim()}><Send size={16}/> إرسال</button></form></>}</section></div>}
 
     {uploadOpen && <div className="modal-backdrop" onClick={() => setUploadOpen(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setUploadOpen(false)}><X/></button><h2><Video size={20}/> نشر فيديو</h2><form onSubmit={handleUpload}>
-      <input ref={fileRef} required type="file" accept="video/mp4,video/webm,video/quicktime" onChange={e => setFile(e.target.files?.[0] || null)}/>
+      <label className="upload-dropzone" onClick={() => fileRef.current?.click()}><Video size={34}/><b>اختار فيديو من جهازك</b><span>MP4 أو MOV أو WebM · حتى 100 ميغابايت</span><small>{file ? file.name : "اضغط هنا لاختيار الفيديو"}</small></label><input ref={fileRef} className="hidden-file-input" required type="file" accept="video/mp4,video/webm,video/quicktime" onChange={e => { const selected=e.target.files?.[0] || null; setFile(selected); setPreviewUrl(selected ? URL.createObjectURL(selected) : ""); }}/>{previewUrl && <div className="upload-preview"><video src={previewUrl} controls playsInline/><span>معاينة قبل النشر</span></div> }
       <textarea required maxLength="2200" value={caption} onChange={e => setCaption(e.target.value)} placeholder="اكتب وصف الفيديو…"/>
       <button className="login-btn modal-submit" disabled={busy || !file}>{busy ? "جاري الرفع..." : "نشر الفيديو"}</button>
     </form></section></div>}
 
     {profileEditOpen && <div className="modal-backdrop" onClick={() => setProfileEditOpen(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setProfileEditOpen(false)}><X/></button><h2>تعديل الملف الشخصي</h2><form onSubmit={saveProfile}><input maxLength="60" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="الاسم الظاهر"/><textarea maxLength="160" value={bio} onChange={e => setBio(e.target.value)} placeholder="نبذة عنك"/><button className="login-btn modal-submit" disabled={busy}>{busy ? "حفظ..." : "حفظ التغييرات"}</button></form></section></div>}
-    {active === "الملف الشخصي" && user && <div className="profile-tools"><h2>@{profile?.username || "حسابي"}</h2><p>{profile?.bio || "أضف نبذة تعريفية عنك"}</p><div className="profile-stats"><span><b>{profileStats.videos}</b> فيديو</span><span><b>{profileStats.followers}</b> متابع</span><span><b>{profileStats.following}</b> يتابع</span></div><button className="login-btn" onClick={() => setProfileEditOpen(true)}>تعديل الملف الشخصي</button></div>}
+    
     {commentsFor && <div className="modal-backdrop" onClick={() => setCommentsFor(null)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setCommentsFor(null)}><X/></button><h2>التعليقات</h2><div className="comment-list">{comments.map(c => <p key={c.id}><b>@{c.profiles?.username || "مستخدم"}</b> {c.body}</p>)}{!comments.length && <p>لا توجد تعليقات بعد.</p>}</div><form onSubmit={sendComment}><input value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="اكتب تعليقاً…"/><button className="login-btn modal-submit" disabled={!commentText.trim()}><Send size={16}/> إرسال</button></form></section></div>}
   </div>;
 }
