@@ -121,3 +121,7 @@
 .live-controls .live-stop{background:#c51e43;border-color:#c51e43}
 .live-controls svg{width:17px;height:17px}
 @media(max-width:700px){.app-bottom-nav button{flex:1}.live-modal{max-height:88dvh}}
+
+.live-mode-choice{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 10px}
+.live-mode-choice button{display:flex;align-items:center;justify-content:center;gap:8px;padding:11px;border-radius:9px;border:1px solid #41414a;background:#25252d;color:#ccc}
+.live-mode-choice button.selected{border-color:#ff4769;background:#3a2029;color:#fff}
