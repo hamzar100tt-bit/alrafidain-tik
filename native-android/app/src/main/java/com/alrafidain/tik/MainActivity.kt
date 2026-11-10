@@ -88,6 +88,7 @@ private fun AlrafidainApp() {
     val repository = remember { SupabaseRepository(context.applicationContext) }
     var signedIn by remember { mutableStateOf(repository.hasSession()) }
     var showAuth by remember { mutableStateOf(false) }
+    var showNotifications by remember { mutableStateOf(false) }
     var selected by remember { mutableIntStateOf(0) }
     var replaySignal by remember { mutableIntStateOf(0) }
     var videos by remember { mutableStateOf<List<TikVideo>>(emptyList()) }
@@ -130,7 +131,9 @@ private fun AlrafidainApp() {
     val labels = listOf("الرئيسية", "اكتشف", "نشر", "الرسائل", "حسابي")
     val icons = listOf(Icons.Default.Home, Icons.Default.Explore, Icons.Default.AddCircle, Icons.Default.ChatBubble, Icons.Default.Person)
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        when (selected) {
+        if (showNotifications) {
+            NotificationsScreen(repository, onBack = { showNotifications = false })
+        } else when (selected) {
             0 -> FeedScreen(videos, loading, error, ::refreshFeed, replaySignal, repository, signedIn) { showAuth = true }
             1 -> DiscoverScreen(repository)
             2 -> if (signedIn) NativeCameraScreen(repository, onBack = { selected = 0 }, onUploaded = { refreshFeed(); selected = 0 }) else GuestGate { showAuth = true }
@@ -147,12 +150,8 @@ private fun AlrafidainApp() {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            IconButton(onClick = { if (selected == 0) { if (videos.isEmpty()) refreshFeed() else replaySignal++ } }) {
-                Icon(
-                    if (selected == 0) Icons.Default.Refresh else Icons.Default.ArrowBack,
-                    contentDescription = "تحديث",
-                    tint = if (selected == 0) Color.White else Ink
-                )
+            IconButton(onClick = { showNotifications = true }) {
+                Icon(Icons.Default.Notifications, contentDescription = "الإشعارات", tint = if (selected == 0) Color.White else Ink)
             }
             Text(
                 "الرافدين تيك",
@@ -1101,6 +1100,44 @@ private fun ProfileEditScreen(repository: SupabaseRepository, onBack: () -> Unit
 }
 
 
+@Composable
+private fun NotificationsScreen(repository: SupabaseRepository, onBack: () -> Unit) {
+    var items by remember { mutableStateOf<List<TikNotification>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        try {
+            items = withContext(Dispatchers.IO) { repository.loadNotifications() }
+            withContext(Dispatchers.IO) { repository.markNotificationsRead() }
+        } catch (e: Exception) { error = e.message ?: "تعذر تحميل الإشعارات" }
+        finally { loading = false }
+    }
+    Column(Modifier.fillMaxSize().background(Color.White).statusBarsPadding().padding(bottom = 82.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "رجوع", tint = Ink) }
+            Text("الإشعارات", color = Ink, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+        }
+        when {
+            loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Brand) }
+            error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(error!!, color = Muted) }
+            items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("ما عندك إشعارات حالياً", color = Muted) }
+            else -> LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+                items(items, key = { it.id }) { item ->
+                    val action = when (item.kind) { "follow" -> "بدأ بمتابعتك"; "like" -> "أعجب بالفيديو الخاص بك"; "comment" -> "علّق على الفيديو الخاص بك"; else -> "تفاعل مع حسابك" }
+                    Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(when (item.kind) { "follow" -> Icons.Default.PersonAdd; "like" -> Icons.Default.Favorite; "comment" -> Icons.Default.ChatBubble; else -> Icons.Default.Notifications }, null, tint = Brand, modifier = Modifier.size(34.dp))
+                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                            Text(item.actorName, color = Ink, fontWeight = FontWeight.Bold)
+                            Text("@${item.actorUsername} $action", color = Muted, fontSize = 13.sp)
+                            Text(item.createdAt.replace("T", " ").take(16), color = Muted, fontSize = 10.sp)
+                        }
+                    }
+                    HorizontalDivider(color = Color(0xFFEFEFEF))
+                }
+            }
+        }
+    }
+}
 @Composable
 private fun DiscoverScreen(repository: SupabaseRepository) {
     var query by remember { mutableStateOf("") }
