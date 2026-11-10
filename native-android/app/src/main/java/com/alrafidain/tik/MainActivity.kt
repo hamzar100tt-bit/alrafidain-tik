@@ -142,7 +142,7 @@ private fun AlrafidainApp() {
                 1 -> NativePlaceholder("اكتشف", "قريباً: البحث عن الفيديوهات والحسابات", Icons.Default.Explore)
                 2 -> UploadScreen(repository, onUploaded = { refreshFeed(); selected = 0 })
                 3 -> NativePlaceholder("الرسائل", "محادثاتك ورسائلك الخاصة", Icons.Default.ChatBubble)
-                else -> ProfileScreen(onSignOut = { repository.signOut(); signedIn = false })
+                else -> ProfileScreen(repository, onSignOut = { repository.signOut(); signedIn = false })
             }
         }
     }
