@@ -12,6 +12,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.verticalScroll
@@ -131,9 +132,9 @@ private fun AlrafidainApp() {
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         when (selected) {
             0 -> FeedScreen(videos, loading, error, ::refreshFeed, replaySignal, repository, signedIn) { showAuth = true }
-            1 -> NativePlaceholder("اكتشف", "قريباً: البحث عن الفيديوهات والحسابات", Icons.Default.Explore)
+            1 -> DiscoverScreen(repository)
             2 -> if (signedIn) NativeCameraScreen(repository, onBack = { selected = 0 }, onUploaded = { refreshFeed(); selected = 0 }) else GuestGate { showAuth = true }
-            3 -> if (signedIn) NativePlaceholder("الرسائل", "محادثاتك ورسائلك الخاصة", Icons.Default.ChatBubble) else GuestGate { showAuth = true }
+            3 -> if (signedIn) MessagesScreen(repository) else GuestGate { showAuth = true }
             else -> if (signedIn) ProfileScreen(repository, onSignOut = { repository.signOut(); signedIn = false; selected = 0 }) else GuestGate { showAuth = true }
         }
 
@@ -1095,6 +1096,197 @@ private fun ProfileEditScreen(repository: SupabaseRepository, onBack: () -> Unit
             OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
                 Text("تسجيل الخروج", color = Brand)
             }
+        }
+    }
+}
+
+
+@Composable
+private fun DiscoverScreen(repository: SupabaseRepository) {
+    var query by remember { mutableStateOf("") }
+    var profiles by remember { mutableStateOf<List<SupabaseRepository.DiscoverProfile>>(emptyList()) }
+    var videos by remember { mutableStateOf<List<TikVideo>>(emptyList()) }
+    var loading by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf("ابحث عن حساب أو فيديو") }
+    val scope = rememberCoroutineScope()
+    Column(Modifier.fillMaxSize().background(Color.White).statusBarsPadding().padding(top = 56.dp, bottom = 86.dp).padding(horizontal = 16.dp)) {
+        OutlinedTextField(
+            value = query, onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            placeholder = { Text("بحث عن حسابات وفيديوهات") },
+            leadingIcon = { Icon(Icons.Default.Search, null) },
+            trailingIcon = {
+                if (query.isNotBlank()) IconButton(onClick = { query = ""; profiles = emptyList(); videos = emptyList(); message = "ابحث عن حساب أو فيديو" }) {
+                    Icon(Icons.Default.Close, "مسح")
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
+        Spacer(Modifier.height(10.dp))
+        Button(
+            onClick = {
+                if (query.trim().isNotEmpty()) scope.launch {
+                    loading = true
+                    message = ""
+                    try {
+                        val result = withContext(Dispatchers.IO) {
+                            Pair(repository.searchProfiles(query.trim()), repository.searchVideos(query.trim()))
+                        }
+                        profiles = result.first
+                        videos = result.second
+                        if (profiles.isEmpty() && videos.isEmpty()) message = "ما لقينا نتائج"
+                    } catch (e: Exception) { message = e.message ?: "تعذر البحث" }
+                    finally { loading = false }
+                }
+            },
+            enabled = query.isNotBlank() && !loading,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = Brand)
+        ) { if (loading) CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp) else Text("بحث") }
+
+        if (message.isNotBlank()) Text(message, color = Muted, modifier = Modifier.padding(vertical = 12.dp))
+        if (profiles.isNotEmpty()) {
+            Text("الحسابات", color = Ink, fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.padding(vertical = 8.dp))
+            LazyColumn(Modifier.weight(1f, fill = false)) {
+                items(profiles, key = { it.id }) { profile ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (!profile.avatarUrl.isNullOrBlank()) AsyncImage(model = profile.avatarUrl, contentDescription = null,
+                            contentScale = ContentScale.Crop, modifier = Modifier.size(48.dp).clip(CircleShape))
+                        else Icon(Icons.Default.AccountCircle, null, tint = Brand, modifier = Modifier.size(48.dp))
+                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                            Text(profile.displayName, color = Ink, fontWeight = FontWeight.Bold)
+                            Text("@${profile.username}", color = Muted, fontSize = 12.sp)
+                        }
+                    }
+                    HorizontalDivider(color = Color(0xFFEFEFEF))
+                }
+            }
+        }
+        if (videos.isNotEmpty()) {
+            Text("الفيديوهات", color = Ink, fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.padding(vertical = 10.dp))
+            LazyColumn(Modifier.weight(1f)) {
+                items(videos, key = { it.id }) { video ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(width = 62.dp, height = 82.dp).background(Color.Black, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                            Icon(if (video.mediaType == "image") Icons.Default.Image else Icons.Default.PlayArrow, null, tint = Color.White)
+                        }
+                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                            Text(video.caption.ifBlank { "منشور بدون وصف" }, color = Ink, maxLines = 2)
+                            Text(video.creatorName, color = Muted, fontSize = 12.sp)
+                        }
+                    }
+                    HorizontalDivider(color = Color(0xFFEFEFEF))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MessagesScreen(repository: SupabaseRepository) {
+    var conversations by remember { mutableStateOf<List<SupabaseRepository.InboxConversation>>(emptyList()) }
+    var selectedChat by remember { mutableStateOf<SupabaseRepository.InboxConversation?>(null) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    fun refresh() {
+        scope.launch {
+            loading = true
+            try { conversations = withContext(Dispatchers.IO) { repository.loadInbox() }; error = null }
+            catch (e: Exception) { error = e.message ?: "تعذر تحميل الرسائل" }
+            finally { loading = false }
+        }
+    }
+    LaunchedEffect(Unit) { refresh() }
+
+    if (selectedChat != null) {
+        DirectChatScreen(repository, selectedChat!!, onBack = { selectedChat = null; refresh() })
+        return
+    }
+    Column(Modifier.fillMaxSize().background(Color.White).statusBarsPadding().padding(top = 56.dp, bottom = 86.dp).padding(horizontal = 16.dp)) {
+        Text("الرسائل", color = Ink, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(vertical = 14.dp))
+        when {
+            loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Brand) }
+            error != null -> Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Text(error!!, color = Muted)
+                TextButton(onClick = { refresh() }) { Text("إعادة المحاولة", color = Brand) }
+            }
+            conversations.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("ما عندك محادثات حالياً", color = Muted)
+            }
+            else -> LazyColumn {
+                items(conversations, key = { it.userId }) { chat ->
+                    Row(Modifier.fillMaxWidth().clickable { selectedChat = chat }.padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        if (!chat.avatarUrl.isNullOrBlank()) AsyncImage(model = chat.avatarUrl, contentDescription = null,
+                            contentScale = ContentScale.Crop, modifier = Modifier.size(52.dp).clip(CircleShape))
+                        else Icon(Icons.Default.AccountCircle, null, tint = Brand, modifier = Modifier.size(52.dp))
+                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                            Text(chat.displayName, color = Ink, fontWeight = FontWeight.Bold)
+                            Text(chat.lastMessage, color = Muted, maxLines = 1, fontSize = 13.sp)
+                        }
+                    }
+                    HorizontalDivider(color = Color(0xFFEFEFEF))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DirectChatScreen(repository: SupabaseRepository, chat: SupabaseRepository.InboxConversation, onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val me = repository.currentUserId()
+    var messages by remember(chat.userId) { mutableStateOf<List<SupabaseRepository.DirectMessage>>(emptyList()) }
+    var draft by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(true) }
+    var sending by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    fun refresh() {
+        scope.launch {
+            try { messages = withContext(Dispatchers.IO) { repository.loadConversation(chat.userId) }; error = null }
+            catch (e: Exception) { error = e.message ?: "تعذر تحميل المحادثة" }
+            finally { loading = false }
+        }
+    }
+    LaunchedEffect(chat.userId) { refresh() }
+
+    Column(Modifier.fillMaxSize().background(Color(0xFFF7F7F8)).statusBarsPadding()) {
+        Row(Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "رجوع", tint = Ink) }
+            Text(chat.displayName, color = Ink, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        }
+        if (loading) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Brand) }
+        else LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(12.dp), reverseLayout = false) {
+            items(messages, key = { it.id }) { item ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = if (item.senderId == me) Arrangement.End else Arrangement.Start) {
+                    Text(item.body, color = if (item.senderId == me) Color.White else Ink,
+                        modifier = Modifier.padding(vertical = 4.dp).background(
+                            if (item.senderId == me) Brand else Color.White, RoundedCornerShape(16.dp)
+                        ).padding(horizontal = 14.dp, vertical = 10.dp))
+                }
+            }
+        }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 12.dp)) }
+        Row(Modifier.fillMaxWidth().background(Color.White).imePadding().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(value = draft, onValueChange = { draft = it }, modifier = Modifier.weight(1f),
+                placeholder = { Text("اكتب رسالة...") }, maxLines = 4)
+            IconButton(enabled = draft.isNotBlank() && !sending, onClick = {
+                val text = draft.trim()
+                scope.launch {
+                    sending = true
+                    try {
+                        withContext(Dispatchers.IO) { repository.sendMessage(chat.userId, text) }
+                        draft = ""
+                        refresh()
+                    } catch (e: Exception) { error = e.message ?: "تعذر إرسال الرسالة" }
+                    finally { sending = false }
+                }
+            }) { Icon(Icons.Default.Send, "إرسال", tint = Brand) }
         }
     }
 }
