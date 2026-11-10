@@ -310,11 +310,29 @@ function App() {
 
     {messagesOpen && <div className="modal-backdrop" onClick={() => setMessagesOpen(false)}><section className="modal messages-modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setMessagesOpen(false)}><X/></button><h2>الرسائل الخاصة</h2><form onSubmit={findMessagePeer}><input value={messageUsername} onChange={e => setMessageUsername(e.target.value)} placeholder="اكتب اسم المستخدم" required/><button className="login-btn modal-submit" disabled={busy}>{busy ? "انتظر..." : "فتح المحادثة"}</button></form>{messagePeer && <><h3>محادثة مع @{messagePeer.username}</h3><div className="comment-list direct-message-list">{directMessages.map(m => <p key={m.id} className={m.sender_id === user.id ? "my-message" : "their-message"}>{m.body}</p>)}{!directMessages.length && <p>ابدأ المحادثة برسالة ترحيب.</p>}</div><form onSubmit={submitDirectMessage}><textarea value={directText} onChange={e => setDirectText(e.target.value)} maxLength="2000" placeholder="اكتب رسالتك…"/><button className="login-btn modal-submit" disabled={busy || !directText.trim()}><Send size={16}/> إرسال</button></form></>}</section></div>}
 
-    {uploadOpen && <div className="modal-backdrop" onClick={() => setUploadOpen(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setUploadOpen(false)}><X/></button><h2><Video size={20}/> نشر فيديو</h2><form onSubmit={handleUpload}>
-      <div className="upload-choice"><button type="button" className="upload-dropzone" onClick={() => fileRef.current?.click()}><Video size={32}/><b>اختيار فيديو من الجهاز</b><span>MP4 أو MOV أو WebM · حتى 100 ميغابايت</span></button><button type="button" className="upload-dropzone camera-choice" onClick={() => cameraFileRef.current?.click()}><Video size={32}/><b>تصوير فيديو بالكاميرا</b><span>افتح كاميرا الهاتف لتسجيل فيديو جديد</span></button></div><input ref={fileRef} className="hidden-file-input" type="file" accept="video/mp4,video/webm,video/quicktime" onChange={e => { const selected=e.target.files?.[0] || null; setFile(selected); setPreviewUrl(selected ? URL.createObjectURL(selected) : ""); }}/><input ref={cameraFileRef} className="hidden-file-input" type="file" accept="video/*" capture="environment" onChange={e => { const selected=e.target.files?.[0] || null; setFile(selected); setPreviewUrl(selected ? URL.createObjectURL(selected) : ""); }}/>{file && <p className="selected-video-name">الفيديو المختار: {file.name}</p>}{previewUrl && <div className="upload-preview"><video src={previewUrl} controls playsInline/><span>معاينة قبل النشر</span></div>}{error && <p className="auth-error" role="alert">{error}</p>}
-      <textarea required maxLength="2200" value={caption} onChange={e => setCaption(e.target.value)} placeholder="اكتب وصف الفيديو…"/>
-      <button className="login-btn modal-submit" disabled={busy || !file}>{busy ? "جاري الرفع..." : "نشر الفيديو"}</button>
-    </form></section></div>}
+    {uploadOpen && <div className="modal-backdrop post-backdrop" onClick={() => setUploadOpen(false)}><section className="modal post-modal" onClick={e => e.stopPropagation()}>
+      <header className="post-header"><button type="button" className="post-close" onClick={() => setUploadOpen(false)}><X size={24}/></button><h2>منشور جديد</h2><button type="button" className="post-next" disabled={!file} onClick={() => document.getElementById("post-caption")?.focus()}>التالي</button></header>
+      <div className="post-body">
+        {!file ? <div className="post-picker">
+          <div className="post-picker-icon"><Video size={42}/></div>
+          <h3>اختَر فيديو للنشر</h3>
+          <p>اختار فيديو من استديو هاتفك أو صوّر فيديو جديد</p>
+          <button type="button" className="post-gallery-btn" onClick={() => fileRef.current?.click()}><Video size={20}/> اختيار من المعرض</button>
+          <button type="button" className="post-camera-btn" onClick={() => cameraFileRef.current?.click()}><Camera size={20}/> تصوير بالكاميرا</button>
+          <small>MP4 · MOV · WebM — الحد الأقصى 100 ميغابايت</small>
+        </div> : <div className="post-selected">
+          <div className="post-preview-wrap"><video src={previewUrl} controls playsInline/><button type="button" className="post-change-video" onClick={() => fileRef.current?.click()}>تغيير الفيديو</button></div>
+          <div className="post-file-meta"><Video size={18}/><span>{file.name}</span><button type="button" onClick={() => {setFile(null);setPreviewUrl("");}}>إزالة</button></div>
+        </div>}
+        <input ref={fileRef} className="hidden-file-input" type="file" accept="video/*" onChange={e => { const selected=e.target.files?.[0] || null; setFile(selected); setPreviewUrl(selected ? URL.createObjectURL(selected) : ""); e.target.value=""; }}/>
+        <input ref={cameraFileRef} className="hidden-file-input" type="file" accept="video/*" capture="environment" onChange={e => { const selected=e.target.files?.[0] || null; setFile(selected); setPreviewUrl(selected ? URL.createObjectURL(selected) : ""); e.target.value=""; }}/>
+        <label className="post-caption-label" htmlFor="post-caption">اكتب وصف الفيديو</label>
+        <textarea id="post-caption" className="post-caption" maxLength="2200" value={caption} onChange={e => setCaption(e.target.value)} placeholder="شنو تحب تشارك ويه الناس؟ ..."/>
+        <div className="post-caption-footer"><span>{caption.length}/2200</span><span>يمكنك إضافة وصف وهاشتاگ</span></div>
+        {error && <p className="auth-error" role="alert">{error}</p>}
+        <button className="post-publish-btn" disabled={busy || !file} onClick={handleUpload}>{busy ? "جاري رفع الفيديو..." : "نشر الفيديو"}</button>
+      </div>
+    </section></div>}
 
     {profileEditOpen && <div className="modal-backdrop" onClick={() => setProfileEditOpen(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setProfileEditOpen(false)}><X/></button><h2>تعديل الملف الشخصي</h2><form onSubmit={saveProfile}><label className="avatar-upload-control">صورة الحساب<input ref={profileAvatarRef} type="file" accept="image/*" onChange={handleAvatarChange}/></label><input required minLength="3" maxLength="24" value={profileUsername} onChange={e => setProfileUsername(e.target.value)} placeholder="اسم المستخدم (إنكليزي)"/><input maxLength="60" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="الاسم الظاهر"/><textarea maxLength="160" value={bio} onChange={e => setBio(e.target.value)} placeholder="نبذة عنك"/><button className="login-btn modal-submit" disabled={busy}>{busy ? "حفظ..." : "حفظ التغييرات"}</button></form></section></div>}
     
