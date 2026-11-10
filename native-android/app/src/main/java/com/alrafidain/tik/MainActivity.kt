@@ -359,49 +359,138 @@ private fun NativeVideoPlayer(url: String, active: Boolean) {
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CommentDialog(videoId: String, repository: SupabaseRepository, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var comments by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     var text by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
+    var sending by remember { mutableStateOf(false) }
+
     fun reload() {
         scope.launch {
             loading = true
-            try { comments = withContext(Dispatchers.IO) { repository.loadComments(videoId) }; error = null }
-            catch (e: Exception) { error = e.message }
-            finally { loading = false }
+            try {
+                comments = withContext(Dispatchers.IO) { repository.loadComments(videoId) }
+                error = null
+            } catch (e: Exception) {
+                error = e.message ?: "تعذر تحميل التعليقات"
+            } finally {
+                loading = false
+            }
         }
     }
+
     LaunchedEffect(videoId) { reload() }
-    AlertDialog(
+
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text("التعليقات") },
-        text = {
-            Column(Modifier.fillMaxWidth()) {
-                if (loading) CircularProgressIndicator(color = Brand)
-                comments.forEach { item ->
-                    Text(item.second, color = Ink, modifier = Modifier.padding(vertical = 5.dp))
-                }
-                if (error != null) Text(error!!, color = MaterialTheme.colorScheme.error)
-                OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text("اكتب تعليقك") },
-                    modifier = Modifier.fillMaxWidth())
+        sheetState = sheetState,
+        containerColor = Color.White,
+        contentColor = Ink,
+        dragHandle = {
+            Box(
+                Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(Modifier.width(38.dp).height(4.dp).background(Color.LightGray, RoundedCornerShape(4.dp)))
             }
-        },
-        confirmButton = {
-            TextButton(enabled = text.isNotBlank(), onClick = {
-                scope.launch {
-                    try {
-                        withContext(Dispatchers.IO) { repository.addComment(videoId, text.trim()) }
-                        text = ""
-                        reload()
-                    } catch (e: Exception) { error = e.message }
+        }
+    ) {
+        Column(
+            Modifier.fillMaxWidth().fillMaxHeight(0.82f)
+                .imePadding()
+                .navigationBarsPadding()
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("التعليقات  ·  ${comments.size}", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "إغلاق")
                 }
-            }) { Text("إرسال", color = Brand) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("إغلاق") } }
-    )
+            }
+            HorizontalDivider(color = Color(0xFFEDEDED))
+            when {
+                loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Brand)
+                }
+                comments.isEmpty() -> Box(Modifier.weight(1f).fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.ChatBubbleOutline, null, tint = Muted, modifier = Modifier.size(42.dp))
+                        Spacer(Modifier.height(10.dp))
+                        Text("ماكو تعليقات لحد الآن", color = Muted)
+                        Text("كن أول واحد يعلّق", color = Muted, fontSize = 12.sp)
+                    }
+                }
+                else -> LazyColumn(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(comments) { item ->
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.Top,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(Icons.Default.AccountCircle, null, tint = Color(0xFFB8B8BE), modifier = Modifier.size(36.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("مستخدم", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Muted)
+                                Spacer(Modifier.height(3.dp))
+                                Text(item.second, fontSize = 14.sp, color = Ink)
+                            }
+                        }
+                    }
+                }
+            }
+            if (error != null) {
+                Text(error!!, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 18.dp))
+            }
+            HorizontalDivider(color = Color(0xFFEDEDED))
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    placeholder = { Text("أضف تعليقاً...") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp),
+                    maxLines = 3
+                )
+                IconButton(
+                    enabled = text.isNotBlank() && !sending,
+                    onClick = {
+                        val comment = text.trim()
+                        scope.launch {
+                            sending = true
+                            try {
+                                withContext(Dispatchers.IO) { repository.addComment(videoId, comment) }
+                                text = ""
+                                reload()
+                            } catch (e: Exception) {
+                                error = e.message ?: "تعذر إرسال التعليق"
+                            } finally {
+                                sending = false
+                            }
+                        }
+                    }
+                ) {
+                    if (sending) CircularProgressIndicator(color = Brand, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                    else Icon(Icons.Default.Send, contentDescription = "إرسال التعليق",
+                        tint = if (text.isNotBlank()) Brand else Muted)
+                }
+            }
+        }
+    }
 }
 
 @Composable
