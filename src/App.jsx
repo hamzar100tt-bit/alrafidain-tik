@@ -10,6 +10,42 @@ const demoVideos = [
   { id: "demo-3", user: "travel.iraq", name: "سياحة العراق", caption: "أماكن لازم تزورها بالعراق ✨", image: "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=900&q=85", avatar: "🏞️", demo: true }
 ];
 
+function VideoThumbnail({ src, alt = "معاينة الفيديو" }) {
+  const [thumbnail, setThumbnail] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    const video = document.createElement("video");
+    video.crossOrigin = "anonymous";
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    const capture = () => {
+      if (cancelled || !video.videoWidth || !video.videoHeight) return;
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+        const image = canvas.toDataURL("image/jpeg", 0.78);
+        if (!cancelled) setThumbnail(image);
+      } catch { /* keep the neutral placeholder if the browser blocks canvas capture */ }
+    };
+    video.addEventListener("loadeddata", () => {
+      if (video.duration && Number.isFinite(video.duration)) {
+        try { video.currentTime = Math.min(0.25, video.duration / 3); } catch { capture(); }
+      } else capture();
+    });
+    video.addEventListener("seeked", capture, { once: true });
+    video.addEventListener("error", () => { if (!cancelled) setThumbnail(""); });
+    video.src = src;
+    video.load();
+    return () => { cancelled = true; video.removeAttribute("src"); video.load(); };
+  }, [src]);
+  return thumbnail
+    ? <img className="profile-video-thumb" src={thumbnail} alt={alt}/>
+    : <div className="profile-video-placeholder" aria-label="تحميل معاينة الفيديو"><Play fill="currentColor"/></div>;
+}
+
 function App() {
   const [active, setActive] = useState("الرئيسية");
   const [liked, setLiked] = useState({});
@@ -258,7 +294,7 @@ function App() {
         </section>}
         <div className="feed-footer"><span><i/> {videos.length ? `فيديو ${Math.min(index + 1, videos.length)} من ${videos.length}` : "معاينات تجريبية"}</span><div className="dots">{shownVideos.map((v,i) => <button key={v.id} onClick={() => setIndex(i)} className={i === index ? "dot active-dot" : "dot"} aria-label={`فيديو ${i+1}`}/>)}</div></div>
         <div className="mobile-actions"><button onClick={() => go(-1)}>الفيديو السابق</button><button onClick={() => go(1)}>الفيديو التالي</button></div></>}
-        {active === "الملف الشخصي" && <section className="profile-page"><div className="profile-cover"><span>الرافدين تيك</span></div><div className="profile-main"><div className="profile-avatar">{profile?.avatar_url ? <img src={profile.avatar_url} alt="صورة الحساب"/> : "🇮🇶"}</div><div className="profile-heading"><div><h2>{profile?.display_name || profile?.username || "حسابي"}</h2><p>@{profile?.username || user?.email?.split("@")[0] || "user"}</p></div><button className="profile-edit-btn" onClick={() => setProfileEditOpen(true)}>تعديل الملف الشخصي</button></div><p className="profile-bio">{profile?.bio || "أهلاً بيك بحسابي على الرافدين تيك 🇮🇶"}</p><div className="profile-stats"><span><b>{profileStats.videos}</b> فيديو</span><span><b>{profileStats.followers}</b> متابع</span><span><b>{profileStats.following}</b> يتابع</span></div><div className="profile-content-tabs"><b>▦ فيديوهاتي</b><span>المفضلة</span></div>{videos.length ? <div className="profile-video-grid">{videos.map((v,i)=><button key={v.id} onClick={()=>{setActive("الرئيسية");setIndex(i)}}><video src={v.videoUrl} muted playsInline/><span>▶</span></button>)}</div> : <div className="profile-empty"><Video size={34}/><b>ما نشرت أي فيديو بعد</b><span>شارك أول فيديو وخلي الناس تشوف محتواك</span><button className="upload-btn" onClick={()=>setUploadOpen(true)}>＋ نشر أول فيديو</button></div>}</div></section>}
+        {active === "الملف الشخصي" && <section className="profile-page"><div className="profile-cover"><span>الرافدين تيك</span></div><div className="profile-main"><div className="profile-avatar">{profile?.avatar_url ? <img src={profile.avatar_url} alt="صورة الحساب"/> : "🇮🇶"}</div><div className="profile-heading"><div><h2>{profile?.display_name || profile?.username || "حسابي"}</h2><p>@{profile?.username || user?.email?.split("@")[0] || "user"}</p></div><button className="profile-edit-btn" onClick={() => setProfileEditOpen(true)}>تعديل الملف الشخصي</button></div><p className="profile-bio">{profile?.bio || "أهلاً بيك بحسابي على الرافدين تيك 🇮🇶"}</p><div className="profile-stats"><span><b>{profileStats.videos}</b> فيديو</span><span><b>{profileStats.followers}</b> متابع</span><span><b>{profileStats.following}</b> يتابع</span></div><div className="profile-content-tabs"><b>▦ فيديوهاتي</b><span>المفضلة</span></div>{videos.length ? <div className="profile-video-grid">{videos.map((v,i)=><button key={v.id} onClick={()=>{setActive("الرئيسية");setIndex(i)}}><VideoThumbnail src={v.videoUrl} alt={`معاينة فيديو ${i + 1}`}/><span>▶</span></button>)}</div> : <div className="profile-empty"><Video size={34}/><b>ما نشرت أي فيديو بعد</b><span>شارك أول فيديو وخلي الناس تشوف محتواك</span><button className="upload-btn" onClick={()=>setUploadOpen(true)}>＋ نشر أول فيديو</button></div>}</div></section>}
       </main>
       <aside className="right-panel"><h3>حسابات مقترحة</h3><div className="community-card"><span>🇮🇶</span><b>صوتك يوصل</b><p>انشر إبداعك وخلي العالم يشوف جمال العراق.</p></div></aside>
     </div>
@@ -283,7 +319,7 @@ function App() {
 
     {profileEditOpen && <div className="modal-backdrop" onClick={() => setProfileEditOpen(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setProfileEditOpen(false)}><X/></button><h2>تعديل الملف الشخصي</h2><form onSubmit={saveProfile}><label className="avatar-upload-control">صورة الحساب<input ref={profileAvatarRef} type="file" accept="image/*" onChange={handleAvatarChange}/></label><input required minLength="3" maxLength="24" value={profileUsername} onChange={e => setProfileUsername(e.target.value)} placeholder="اسم المستخدم (إنكليزي)"/><input maxLength="60" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="الاسم الظاهر"/><textarea maxLength="160" value={bio} onChange={e => setBio(e.target.value)} placeholder="نبذة عنك"/><button className="login-btn modal-submit" disabled={busy}>{busy ? "حفظ..." : "حفظ التغييرات"}</button></form></section></div>}
     
-    {commentsFor && <div className="modal-backdrop" onClick={() => setCommentsFor(null)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setCommentsFor(null)}><X/></button><h2>التعليقات</h2><div className="comment-list">{comments.map(c => <p key={c.id}><b>@{c.profiles?.username || "مستخدم"}</b> {c.body}</p>)}{!comments.length && <p>لا توجد تعليقات بعد.</p>}</div><form onSubmit={sendComment}><input value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="اكتب تعليقاً…"/><button className="login-btn modal-submit" disabled={!commentText.trim()}><Send size={16}/> إرسال</button></form></section></div>}
+    {commentsFor && <div className="modal-backdrop" onClick={() => setCommentsFor(null)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setCommentsFor(null)}><X/></button><h2>التعليقات</h2><div className="comment-list">{comments.map(c => <article className="comment-item" key={c.id}><span className="comment-avatar">{c.profiles?.avatar_url ? <img src={c.profiles.avatar_url} alt=""/> : "🇮🇶"}</span><div className="comment-content"><div className="comment-heading"><b>{c.profiles?.display_name || c.profiles?.username || "مستخدم"}</b><small>@{c.profiles?.username || "user"}</small></div><p>{c.body}</p><time>{c.created_at ? new Date(c.created_at).toLocaleString("ar-IQ") : ""}</time></div></article>)}{!comments.length && <p>لا توجد تعليقات بعد.</p>}</div><form onSubmit={sendComment}><input value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="اكتب تعليقاً…"/><button className="login-btn modal-submit" disabled={!commentText.trim()}><Send size={16}/> إرسال</button></form></section></div>}
   </div>;
 }
 
