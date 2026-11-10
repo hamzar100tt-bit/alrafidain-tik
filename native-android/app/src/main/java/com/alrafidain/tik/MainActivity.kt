@@ -512,6 +512,7 @@ private fun UploadScreen(repository: SupabaseRepository, onUploaded: () -> Unit)
     var caption by remember { mutableStateOf("") }
     var uploading by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
+    var selectedFilter by remember { mutableStateOf("طبيعي") }
 
     fun upload(uri: Uri, isPhoto: Boolean) {
         scope.launch {
@@ -519,7 +520,7 @@ private fun UploadScreen(repository: SupabaseRepository, onUploaded: () -> Unit)
             message = if (isPhoto) "جاري رفع الصورة..." else "جاري رفع الفيديو..."
             try {
                 val result = withContext(Dispatchers.IO) {
-                    if (isPhoto) repository.uploadPhoto(uri, caption.trim())
+                    if (isPhoto) repository.uploadPhoto(uri, caption.trim(), selectedFilter)
                     else repository.uploadVideo(uri, caption.trim())
                 }
                 message = result
@@ -571,7 +572,16 @@ private fun UploadScreen(repository: SupabaseRepository, onUploaded: () -> Unit)
         Icon(Icons.Default.AddCircle, null, tint = Brand, modifier = Modifier.size(58.dp))
         Text("إنشاء منشور", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
         Text("التقط صورة أو فيديو أو اختر من الاستديو", color = Color.LightGray, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(14.dp))
+        Text("فلتر الصورة", color = Color.White, fontWeight = FontWeight.Bold)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            listOf("طبيعي", "دافئ", "أبيض وأسود", "زاهي").forEach { filter ->
+                FilterChip(selected = selectedFilter == filter, onClick = { selectedFilter = filter },
+                    label = { Text(filter, fontSize = 10.sp) },
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Brand, selectedLabelColor = Color.White, labelColor = Color.White))
+            }
+        }
+        Spacer(Modifier.height(14.dp))
         OutlinedTextField(
             value = caption, onValueChange = { caption = it },
             label = { Text("اكتب وصفاً (اختياري)") }, modifier = Modifier.fillMaxWidth(), minLines = 2,
