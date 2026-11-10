@@ -151,3 +151,16 @@ using (auth.uid() = sender_id or auth.uid() = receiver_id);
 drop policy if exists "Users send messages as themselves" on public.messages;
 create policy "Users send messages as themselves" on public.messages for insert to authenticated
 with check (auth.uid() = sender_id);
+
+
+-- ===== الفيديوهات المحفوظة =====
+create table if not exists public.saved_videos (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  video_id uuid not null references public.videos(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, video_id)
+);
+alter table public.saved_videos enable row level security;
+drop policy if exists "Users manage own saved videos" on public.saved_videos;
+create policy "Users manage own saved videos" on public.saved_videos
+for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
