@@ -1,7 +1,10 @@
 package com.alrafidain.tik
 
 import android.os.Bundle
+import android.net.Uri
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -132,7 +135,7 @@ private fun AlrafidainApp() {
             when (selected) {
                 0 -> FeedScreen(videos, loading, error, ::refreshFeed)
                 1 -> NativePlaceholder("اكتشف", "قريباً: البحث عن الفيديوهات والحسابات", Icons.Default.Explore)
-                2 -> NativePlaceholder("نشر فيديو", "رفع الفيديو من الاستديو قيد الإكمال", Icons.Default.VideoLibrary)
+                2 -> UploadScreen(repository, onUploaded = { refreshFeed(); selected = 0 })
                 3 -> NativePlaceholder("الرسائل", "محادثاتك ورسائلك الخاصة", Icons.Default.ChatBubble)
                 else -> ProfileScreen(onSignOut = { repository.signOut(); signedIn = false })
             }
