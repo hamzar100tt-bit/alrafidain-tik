@@ -243,6 +243,66 @@ private fun NativeVideoPlayer(url: String) {
 }
 
 @Composable
+private fun UploadScreen(repository: SupabaseRepository, onUploaded: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var caption by remember { mutableStateOf("") }
+    var uploading by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                uploading = true
+                message = "جاري رفع الفيديو..."
+                try {
+                    val result = withContext(Dispatchers.IO) { repository.uploadVideo(uri, caption.trim()) }
+                    message = result
+                    onUploaded()
+                } catch (e: Exception) {
+                    message = e.message ?: "تعذر رفع الفيديو"
+                } finally { uploading = false }
+            }
+        }
+    }
+    Column(
+        Modifier.fillMaxSize().padding(22.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(Icons.Default.CloudUpload, null, tint = Brand, modifier = Modifier.size(62.dp))
+        Spacer(Modifier.height(16.dp))
+        Text("انشر فيديو جديد", fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
+        Spacer(Modifier.height(8.dp))
+        Text("اختر فيديو من جهازك حتى يظهر في صفحة الرئيسية", color = Muted, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(20.dp))
+        OutlinedTextField(
+            value = caption, onValueChange = { caption = it },
+            label = { Text("اكتب وصف الفيديو (اختياري)") },
+            modifier = Modifier.fillMaxWidth(), minLines = 2
+        )
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = { picker.launch("video/*") },
+            enabled = !uploading,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Brand)
+        ) {
+            if (uploading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+            else {
+                Icon(Icons.Default.VideoLibrary, null)
+                Spacer(Modifier.width(8.dp))
+                Text("اختيار فيديو ورفعه")
+            }
+        }
+        if (message != null) {
+            Spacer(Modifier.height(14.dp))
+            Text(message!!, color = if (message!!.contains("نجاح")) Brand else Muted, textAlign = TextAlign.Center)
+        }
+        Spacer(Modifier.height(12.dp))
+        Text("الحد الأعلى لحجم الفيديو 100 ميغابايت", color = Muted, fontSize = 12.sp)
+    }
+}
+
+@Composable
 private fun ProfileScreen(onSignOut: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center) {
