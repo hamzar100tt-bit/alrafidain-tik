@@ -75,6 +75,7 @@ private fun AlrafidainApp() {
     var signedIn by remember { mutableStateOf(repository.hasSession()) }
     var showAuth by remember { mutableStateOf(false) }
     var selected by remember { mutableIntStateOf(0) }
+    var replaySignal by remember { mutableIntStateOf(0) }
     var videos by remember { mutableStateOf<List<TikVideo>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -116,7 +117,7 @@ private fun AlrafidainApp() {
     val icons = listOf(Icons.Default.Home, Icons.Default.Explore, Icons.Default.AddCircle, Icons.Default.ChatBubble, Icons.Default.Person)
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         when (selected) {
-            0 -> FeedScreen(videos, loading, error, ::refreshFeed, repository, signedIn) { showAuth = true }
+            0 -> FeedScreen(videos, loading, error, ::refreshFeed, replaySignal, repository, signedIn) { showAuth = true }
             1 -> NativePlaceholder("اكتشف", "قريباً: البحث عن الفيديوهات والحسابات", Icons.Default.Explore)
             2 -> if (signedIn) UploadScreen(repository, onUploaded = { refreshFeed(); selected = 0 }) else GuestGate { showAuth = true }
             3 -> if (signedIn) NativePlaceholder("الرسائل", "محادثاتك ورسائلك الخاصة", Icons.Default.ChatBubble) else GuestGate { showAuth = true }
@@ -132,7 +133,7 @@ private fun AlrafidainApp() {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            IconButton(onClick = { if (selected == 0) refreshFeed() }) {
+            IconButton(onClick = { if (selected == 0) { if (videos.isEmpty()) refreshFeed() else replaySignal++ } }) {
                 Icon(
                     if (selected == 0) Icons.Default.Refresh else Icons.Default.ArrowBack,
                     contentDescription = "تحديث",
@@ -232,7 +233,7 @@ private fun GuestGate(onLogin: () -> Unit) {
 
 @Composable
 private fun FeedScreen(
-    videos: List<TikVideo>, loading: Boolean, error: String?, onRefresh: () -> Unit,
+    videos: List<TikVideo>, loading: Boolean, error: String?, onRefresh: () -> Unit, replaySignal: Int,
     repository: SupabaseRepository, signedIn: Boolean, onLogin: () -> Unit
 ) {
     when {
@@ -254,14 +255,14 @@ private fun FeedScreen(
                 modifier = Modifier.fillMaxSize(),
                 key = { index -> videos[index].id }
             ) { page ->
-                VideoFeedPage(video = videos[page], repository = repository, active = pagerState.currentPage == page, signedIn = signedIn, onLogin = onLogin)
+                VideoFeedPage(video = videos[page], repository = repository, active = pagerState.currentPage == page, replaySignal = replaySignal, signedIn = signedIn, onLogin = onLogin)
             }
         }
     }
 }
 
 @Composable
-private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, active: Boolean, signedIn: Boolean, onLogin: () -> Unit) {
+private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, active: Boolean, replaySignal: Int, signedIn: Boolean, onLogin: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var liked by remember(video.id) { mutableStateOf(false) }
@@ -275,7 +276,7 @@ private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, activ
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (video.mediaType == "image") {
             AsyncImage(model = video.videoUrl, contentDescription = video.caption, modifier = Modifier.fillMaxSize())
-        } else NativeVideoPlayer(video.videoUrl, active)
+        } else NativeVideoPlayer(video.videoUrl, active, replaySignal)
         Column(
             Modifier.align(Alignment.CenterEnd).padding(end = 10.dp, bottom = 18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -338,7 +339,7 @@ private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, activ
 }
 
 @Composable
-private fun NativeVideoPlayer(url: String, active: Boolean) {
+private fun NativeVideoPlayer(url: String, active: Boolean, replaySignal: Int) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val player = remember(url) {
@@ -348,7 +349,11 @@ private fun NativeVideoPlayer(url: String, active: Boolean) {
             prepare()
         }
     }
-    LaunchedEffect(active, player) { player.playWhenReady = active; if (!active) player.pause() }
+    LaunchedEffect(active, replaySignal, player) {
+        if (replaySignal > 0) player.seekTo(0)
+        player.playWhenReady = active || replaySignal > 0
+        if (!active && replaySignal == 0) player.pause()
+    }
     DisposableEffect(player, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_PAUSE) player.pause()
