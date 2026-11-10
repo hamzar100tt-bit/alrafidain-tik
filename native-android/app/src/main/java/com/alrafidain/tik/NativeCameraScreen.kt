@@ -1,5 +1,7 @@
 package com.alrafidain.tik
 
+private val CameraCameraBrand = Color(0xFFFF3157)
+
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
@@ -175,7 +177,7 @@ fun NativeCameraScreen(
                                 Icon(Icons.Default.PhotoLibrary, "المعرض", tint = Color.White, modifier = Modifier.size(28.dp))
                             }
                             Box(Modifier.size(82.dp).background(Color.White, CircleShape).padding(5.dp)
-                                .background(if (recording) Brand else Color.Black, CircleShape)) {
+                                .background(if (recording) CameraBrand else Color.Black, CircleShape)) {
                                 IconButton(
                                     modifier = Modifier.fillMaxSize(),
                                     enabled = !busy,
@@ -250,7 +252,7 @@ fun NativeCameraScreen(
                                     }
                                 ) {
                                     Icon(if (recording) Icons.Default.Stop else if (mode == "صورة") Icons.Default.CameraAlt else Icons.Default.FiberManualRecord,
-                                        "التقاط", tint = if (recording) Color.White else Brand, modifier = Modifier.size(42.dp))
+                                        "التقاط", tint = if (recording) Color.White else CameraBrand, modifier = Modifier.size(42.dp))
                                 }
                             }
                             IconButton(onClick = { galleryVideo.launch("video/*") }) {
@@ -276,7 +278,7 @@ fun NativeCameraScreen(
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                             listOf("طبيعي", "دافئ", "أبيض وأسود", "زاهي").forEach { item ->
                                 TextButton(onClick = { filter = item }) {
-                                    Text(if (filter == item) "● $item" else item, color = if (filter == item) Brand else Color.White, fontSize = 11.sp)
+                                    Text(if (filter == item) "● $item" else item, color = if (filter == item) CameraBrand else Color.White, fontSize = 11.sp)
                                 }
                             }
                         }
@@ -286,11 +288,11 @@ fun NativeCameraScreen(
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-                                focusedBorderColor = Brand, unfocusedBorderColor = Color.White,
-                                cursorColor = Brand
+                                focusedBorderColor = CameraBrand, unfocusedBorderColor = Color.White,
+                                cursorColor = CameraBrand
                             )
                         )
-                        if (busy) CircularProgressIndicator(color = Brand, modifier = Modifier.padding(8.dp))
+                        if (busy) CircularProgressIndicator(color = CameraBrand, modifier = Modifier.padding(8.dp))
                         if (status.isNotBlank()) Text(status, color = Color.White, fontSize = 12.sp)
                     }
                 }
