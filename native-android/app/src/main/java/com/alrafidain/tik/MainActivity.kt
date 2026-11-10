@@ -143,7 +143,7 @@ private fun AlrafidainApp() {
 
         if (selected == 0) {
             IconButton(
-                onClick = { showNotifications = true },
+                onClick = { if (signedIn) showNotifications = true else showAuth = true },
                 modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 10.dp, top = 6.dp)
             ) {
                 Icon(Icons.Default.Notifications, contentDescription = "الإشعارات", tint = Color.White, modifier = Modifier.size(27.dp))
@@ -158,7 +158,7 @@ private fun AlrafidainApp() {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            IconButton(onClick = { showNotifications = true }) {
+            IconButton(onClick = { if (signedIn) showNotifications = true else showAuth = true }) {
                 Icon(Icons.Default.Notifications, contentDescription = "الإشعارات", tint = if (selected == 0) Color.White else Ink)
             }
             Text(
