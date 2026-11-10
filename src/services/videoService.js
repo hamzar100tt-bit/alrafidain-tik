@@ -82,13 +82,13 @@ export async function getComments(videoId) {
   requireSupabase();
   const { data, error } = await supabase.from("comments")
     .select("id, user_id, body, created_at").eq("video_id", videoId)
-    .order("created_at", { ascending: true }).limit(100);
+    .order("created_at", { ascending: false }).limit(100);
   if (error) throw error;
   const rows = data || [];
   const ids = [...new Set(rows.map(row => row.user_id).filter(Boolean))];
   if (!ids.length) return rows.map(row => ({ ...row, profiles: null }));
   const { data: profiles, error: profileError } = await supabase.from("profiles")
-    .select("id, username, display_name").in("id", ids);
+    .select("id, username, display_name, avatar_url").in("id", ids);
   if (profileError) throw profileError;
   const byId = new Map((profiles || []).map(profile => [profile.id, profile]));
   return rows.map(row => ({ ...row, profiles: byId.get(row.user_id) || null }));
