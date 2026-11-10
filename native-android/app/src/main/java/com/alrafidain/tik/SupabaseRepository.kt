@@ -135,6 +135,21 @@ class SupabaseRepository(private val context: Context) {
         }
     }
 
+
+    fun loadSavedVideos(): List<TikVideo> = loadRelatedVideos("saved_videos")
+    fun loadLikedVideos(): List<TikVideo> = loadRelatedVideos("likes")
+
+    private fun loadRelatedVideos(table: String): List<TikVideo> {
+        val userId = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
+        val relations = fetchAuthedRows("$table?user_id=eq.$userId&select=video_id&order=created_at.desc&limit=100")
+        if (relations.length() == 0) return emptyList()
+        val ids = (0 until relations.length()).map { relations.getJSONObject(it).optString("video_id") }
+        val fields = "id,caption,video_url,storage_path,user_id,media_type,profiles!videos_user_id_fkey(display_name,username,avatar_url)"
+        val rows = fetchAuthedRows("videos?id=in.(${ids.joinToString(",")})&select=$fields&limit=100")
+        val byId = (0 until rows.length()).associateBy { rows.getJSONObject(it).optString("id") }
+        return ids.mapNotNull { id -> byId[id]?.let { parseVideoRows(JSONArray().put(it))[0] } }
+    }
+
     fun loadMyProfileStats(): TikProfileStats {
         val userId = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
         val fields = "id,caption,video_url,storage_path,user_id,media_type,profiles!videos_user_id_fkey(display_name,username,avatar_url)"
