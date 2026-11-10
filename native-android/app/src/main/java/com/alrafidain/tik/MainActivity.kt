@@ -54,8 +54,7 @@ class MainActivity : ComponentActivity() {
             android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
             android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
             android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
-            android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or
-            android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+            android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
         setContent { NativeTheme { AlrafidainApp() } }
     }
 }
