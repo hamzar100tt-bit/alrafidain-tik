@@ -203,7 +203,7 @@ fun NativeCameraScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                            listOf("نص", "صورة", "فيديو").forEach { item ->
+                            listOf("صورة", "فيديو").forEach { item ->
                                 TextButton(onClick = { mode = item }) {
                                     Text(item, color = if (mode == item) Color.White else Color.LightGray,
                                         fontSize = if (mode == item) 18.sp else 15.sp)
