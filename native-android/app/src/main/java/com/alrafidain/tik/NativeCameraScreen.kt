@@ -278,7 +278,8 @@ fun NativeCameraScreen(
                                                                 busy = true
                                                                 scope.launch {
                                                                     try {
-                                                                        status = withContext(Dispatchers.IO) { repository.uploadVideo(uri, caption) }
+                                                                        val editedUri = if (chosenSound != null || filter != "طبيعي") exportEditedVideo(context, uri, chosenSound, filter) else uri
+                                                                        status = withContext(Dispatchers.IO) { repository.uploadVideo(editedUri, caption) }
                                                                         onUploaded()
                                                                     } catch (e: Exception) { status = e.message ?: "فشل نشر الفيديو" }
                                                                     finally { busy = false }
