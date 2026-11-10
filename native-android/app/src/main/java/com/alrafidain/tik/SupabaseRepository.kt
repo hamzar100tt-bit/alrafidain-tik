@@ -278,6 +278,78 @@ class SupabaseRepository(private val context: Context) {
         }
     }
 
+
+    data class DiscoverProfile(val id: String, val username: String, val displayName: String, val avatarUrl: String?)
+    data class InboxConversation(val userId: String, val username: String, val displayName: String, val avatarUrl: String?, val lastMessage: String)
+    data class DirectMessage(val id: String, val senderId: String, val body: String, val createdAt: String)
+
+    private fun publicRows(path: String): JSONArray {
+        val token = accessToken ?: key
+        val request = Request.Builder().url("$base/rest/v1/$path")
+            .addHeader("apikey", key).addHeader("Authorization", "Bearer $token").get().build()
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IOException("تعذر تحميل البيانات (${response.code})")
+            return JSONArray(body)
+        }
+    }
+
+    fun searchProfiles(term: String): List<DiscoverProfile> {
+        val q = java.net.URLEncoder.encode("%$term%", "UTF-8")
+        val rows = publicRows("profiles?select=id,username,display_name,avatar_url&or=(username.ilike.$q,display_name.ilike.$q)&limit=30")
+        return (0 until rows.length()).map { i ->
+            val row = rows.getJSONObject(i)
+            DiscoverProfile(row.optString("id"), row.optString("username"),
+                row.optString("display_name").ifBlank { row.optString("username") },
+                row.optString("avatar_url").takeIf { it.isNotBlank() })
+        }
+    }
+
+    fun searchVideos(term: String): List<TikVideo> {
+        val q = java.net.URLEncoder.encode("%$term%", "UTF-8")
+        val rows = publicRows("videos?select=id,caption,video_url,storage_path,user_id,media_type,profiles!videos_user_id_fkey(display_name,username,avatar_url)&caption=ilike.$q&order=created_at.desc&limit=30")
+        return parseVideoRows(rows)
+    }
+
+    fun loadInbox(): List<InboxConversation> {
+        val me = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
+        val rows = fetchAuthedRows("messages?or=(sender_id.eq.$me,receiver_id.eq.$me)&select=id,sender_id,receiver_id,body,created_at&order=created_at.desc&limit=500")
+        val latest = linkedMapOf<String, JSONObject>()
+        for (i in 0 until rows.length()) {
+            val row = rows.getJSONObject(i)
+            val peer = if (row.optString("sender_id") == me) row.optString("receiver_id") else row.optString("sender_id")
+            if (peer.isNotBlank() && !latest.containsKey(peer)) latest[peer] = row
+        }
+        return latest.map { (peer, message) ->
+            val profiles = publicRows("profiles?id=eq.$peer&select=username,display_name,avatar_url")
+            val profile = if (profiles.length() > 0) profiles.getJSONObject(0) else JSONObject()
+            InboxConversation(peer, profile.optString("username"),
+                profile.optString("display_name").ifBlank { profile.optString("username").ifBlank { "مستخدم" } },
+                profile.optString("avatar_url").takeIf { it.isNotBlank() }, message.optString("body"))
+        }
+    }
+
+    fun loadConversation(otherUserId: String): List<DirectMessage> {
+        val me = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
+        val rows = fetchAuthedRows("messages?or=(and(sender_id.eq.$me,receiver_id.eq.$otherUserId),and(sender_id.eq.$otherUserId,receiver_id.eq.$me))&select=id,sender_id,body,created_at&order=created_at.asc&limit=500")
+        return (0 until rows.length()).map { i ->
+            val row = rows.getJSONObject(i)
+            DirectMessage(row.optString("id"), row.optString("sender_id"), row.optString("body"), row.optString("created_at"))
+        }
+    }
+
+    fun sendMessage(otherUserId: String, body: String) {
+        val me = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
+        if (body.isBlank()) return
+        val payload = JSONObject().put("sender_id", me).put("receiver_id", otherUserId).put("body", body.trim())
+        val request = authedRequest("$base/rest/v1/messages")
+            .addHeader("Content-Type", "application/json").addHeader("Prefer", "return=minimal")
+            .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("تعذر إرسال الرسالة (${response.code})")
+        }
+    }
+
     private fun applyPhotoFilter(source: android.graphics.Bitmap, filter: String): android.graphics.Bitmap {
         if (filter == "طبيعي") return source
         val width = source.width
