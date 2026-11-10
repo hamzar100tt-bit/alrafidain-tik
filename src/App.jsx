@@ -243,7 +243,7 @@ function App() {
             <div className="video-shade"/>
             <button className="sound-toggle" onClick={() => setMuted(!muted)} aria-label="الصوت">{muted ? <VolumeX/> : <Volume2/>}</button>
             <div className="video-info">
-              <div className="creator"><span className="avatar">{video.avatar}</span><div><b>@{video.user}</b><small>{video.name}</small></div><button className="follow-btn" onClick={() => handleFollow(video)}>{following[video.userId] ? "تتابعه" : "متابعة"}</button></div>
+              <div className="creator"><span className="avatar">{typeof video.avatar === "string" && video.avatar.startsWith("http") ? <img src={video.avatar} alt="" /> : video.avatar}</span><div><b>@{video.user}</b><small>{video.name}</small></div><button className="follow-btn" onClick={() => handleFollow(video)}>{following[video.userId] ? "تتابعه" : "متابعة"}</button></div>
               <p>{video.caption}</p><small className="sound-line">♫ الرافدين تيك</small>
             </div>
             <div className="video-actions">
