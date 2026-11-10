@@ -250,8 +250,9 @@ class SupabaseRepository(private val context: Context) {
     fun uploadPhoto(uri: Uri, caption: String, filter: String = "طبيعي"): String {
         val token = accessToken ?: throw IOException("سجّل الدخول أولاً")
         val userId = currentUserId() ?: throw IOException("تعذر تحديد الحساب الحالي")
-        val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
-        if (!mime.startsWith("image/")) throw IOException("الملف المحدد ليس صورة")
+        val sourceMime = context.contentResolver.getType(uri) ?: "image/jpeg"
+        if (!sourceMime.startsWith("image/")) throw IOException("الملف المحدد ليس صورة")
+        val mime = "image/jpeg"
         val original = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             ?: throw IOException("تعذر قراءة الصورة")
         if (original.isEmpty()) throw IOException("الصورة فارغة")
@@ -262,8 +263,7 @@ class SupabaseRepository(private val context: Context) {
         filtered.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, output)
         val bytes = output.toByteArray()
         if (bytes.size > 15 * 1024 * 1024) throw IOException("حجم الصورة أكبر من 15 ميغابايت")
-        val ext = when (mime.substringAfter("/")) { "png" -> "png"; "webp" -> "webp"; else -> "jpg" }
-        val path = "$userId/${UUID.randomUUID()}.$ext"
+        val path = "$userId/${UUID.randomUUID()}.jpg"
         val upload = Request.Builder().url("$base/storage/v1/object/videos/$path")
             .addHeader("apikey", key).addHeader("Authorization", "Bearer $token")
             .addHeader("Content-Type", mime).put(bytes.toRequestBody(mime.toMediaType())).build()
