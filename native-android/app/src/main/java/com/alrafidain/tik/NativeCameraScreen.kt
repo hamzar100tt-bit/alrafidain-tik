@@ -4,6 +4,10 @@ import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.media.MediaPlayer
+import android.graphics.ColorMatrix as AndroidColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
+import android.view.View
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,13 +38,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
@@ -145,15 +146,14 @@ fun NativeCameraScreen(
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (hasPermission) {
                 AndroidView(
-                    modifier = Modifier.fillMaxSize().graphicsLayer {
-                        colorFilter = cameraComposeFilter(filter)
-                    },
+                    modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
                         val previewView = PreviewView(ctx).apply {
                             scaleType = PreviewView.ScaleType.FILL_CENTER
                             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
                         }
                         previewViewState = previewView
+                        applyCameraFilter(previewView, filter)
                         val future = ProcessCameraProvider.getInstance(ctx)
                         future.addListener({
                             val provider = future.get()
@@ -179,7 +179,7 @@ fun NativeCameraScreen(
                         }, executor)
                         previewView
                     },
-                    update = { }
+                    update = { view -> applyCameraFilter(view, filter) }
                 )
                 // Camera preview is edge-to-edge, with TikTok-style capture controls.
                 Column(
@@ -405,19 +405,20 @@ private fun filterSwatch(name: String): Color = when (name) {
     else -> Color(0xFF8B9A83)
 }
 
-private fun cameraComposeFilter(name: String): ColorFilter? {
-    val values = when (name) {
-        "أبيض وأسود", "رمادي" -> floatArrayOf(.213f,.715f,.072f,0f,0f, .213f,.715f,.072f,0f,0f, .213f,.715f,.072f,0f,0f, 0f,0f,0f,1f,0f)
-        "دافئ" -> floatArrayOf(1.18f,0f,0f,0f,18f, 0f,1.02f,0f,0f,5f, 0f,0f,.82f,0f,0f, 0f,0f,0f,1f,0f)
-        "ذهبي" -> floatArrayOf(1.22f,0f,0f,0f,22f, 0f,1.08f,0f,0f,10f, 0f,0f,.70f,0f,0f, 0f,0f,0f,1f,0f)
-        "بارد" -> floatArrayOf(.90f,0f,0f,0f,0f, 0f,1.02f,0f,0f,0f, 0f,0f,1.22f,0f,18f, 0f,0f,0f,1f,0f)
-        "زاهي" -> floatArrayOf(1.28f,-.10f,-.10f,0f,4f, -.08f,1.20f,-.08f,0f,4f, -.08f,-.08f,1.28f,0f,4f, 0f,0f,0f,1f,0f)
-        "سينما" -> floatArrayOf(1.12f,0f,0f,0f,-8f, 0f,1.05f,0f,0f,-5f, 0f,0f,.92f,0f,5f, 0f,0f,0f,1f,0f)
-        "وردي" -> floatArrayOf(1.12f,0f,0f,0f,10f, 0f,.94f,0f,0f,0f, 0f,0f,1.02f,0f,8f, 0f,0f,0f,1f,0f)
-        "قديم" -> floatArrayOf(.92f,.12f,.04f,0f,12f, .08f,.90f,.02f,0f,7f, .04f,.08f,.72f,0f,0f, 0f,0f,0f,1f,0f)
-        "ليلي" -> floatArrayOf(.78f,0f,.08f,0f,0f, 0f,.86f,.04f,0f,0f, .08f,.04f,1.16f,0f,12f, 0f,0f,0f,1f,0f)
-        "ناعم" -> floatArrayOf(1.06f,0f,0f,0f,8f, 0f,1.02f,0f,0f,5f, 0f,0f,1f,0f,5f, 0f,0f,0f,1f,0f)
+private fun applyCameraFilter(view: PreviewView, name: String) {
+    val matrix = when (name) {
+        "أبيض وأسود", "رمادي" -> AndroidColorMatrix().apply { setSaturation(0f) }
+        "دافئ" -> AndroidColorMatrix(floatArrayOf(1.18f,0f,0f,0f,18f, 0f,1.02f,0f,0f,5f, 0f,0f,.82f,0f,0f, 0f,0f,0f,1f,0f))
+        "ذهبي" -> AndroidColorMatrix(floatArrayOf(1.22f,0f,0f,0f,22f, 0f,1.08f,0f,0f,10f, 0f,0f,.70f,0f,0f, 0f,0f,0f,1f,0f))
+        "بارد" -> AndroidColorMatrix(floatArrayOf(.90f,0f,0f,0f,0f, 0f,1.02f,0f,0f,0f, 0f,0f,1.22f,0f,18f, 0f,0f,0f,1f,0f))
+        "زاهي" -> AndroidColorMatrix(floatArrayOf(1.28f,-.10f,-.10f,0f,4f, -.08f,1.20f,-.08f,0f,4f, -.08f,-.08f,1.28f,0f,4f, 0f,0f,0f,1f,0f))
+        "سينما" -> AndroidColorMatrix(floatArrayOf(1.12f,0f,0f,0f,-8f, 0f,1.05f,0f,0f,-5f, 0f,0f,.92f,0f,5f, 0f,0f,0f,1f,0f))
+        "وردي" -> AndroidColorMatrix(floatArrayOf(1.12f,0f,0f,0f,10f, 0f,.94f,0f,0f,0f, 0f,0f,1.02f,0f,8f, 0f,0f,0f,1f,0f))
+        "قديم" -> AndroidColorMatrix(floatArrayOf(.92f,.12f,.04f,0f,12f, .08f,.90f,.02f,0f,7f, .04f,.08f,.72f,0f,0f, 0f,0f,0f,1f,0f))
+        "ليلي" -> AndroidColorMatrix(floatArrayOf(.78f,0f,.08f,0f,0f, 0f,.86f,.04f,0f,0f, .08f,.04f,1.16f,0f,12f, 0f,0f,0f,1f,0f))
+        "ناعم" -> AndroidColorMatrix(floatArrayOf(1.06f,0f,0f,0f,8f, 0f,1.02f,0f,0f,5f, 0f,0f,1f,0f,5f, 0f,0f,0f,1f,0f))
         else -> null
     }
-    return values?.let { ColorFilter.colorMatrix(ColorMatrix(it)) }
+    if (matrix == null) view.setLayerType(View.LAYER_TYPE_NONE, null)
+    else view.setLayerType(View.LAYER_TYPE_HARDWARE, Paint().apply { colorFilter = ColorMatrixColorFilter(matrix) })
 }
