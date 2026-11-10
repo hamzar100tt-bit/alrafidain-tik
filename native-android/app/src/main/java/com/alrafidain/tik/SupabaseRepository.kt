@@ -11,7 +11,8 @@ import org.json.JSONObject
 import java.io.IOException
 import java.util.UUID
 
-data class TikVideo(val id: String, val caption: String, val videoUrl: String, val userId: String)
+data class TikVideo(val id: String, val caption: String, val videoUrl: String, val userId: String, val creatorName: String = "", val creatorAvatar: String? = null)
+data class TikComment(val body: String, val displayName: String, val username: String, val avatarUrl: String?)
 
 class SupabaseRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences("alrafidain_session", Context.MODE_PRIVATE)
@@ -59,7 +60,7 @@ class SupabaseRepository(private val context: Context) {
     fun loadVideos(): List<TikVideo> {
         val token = accessToken ?: key
         val request = Request.Builder()
-            .url("$base/rest/v1/videos?select=id,caption,video_url,storage_path,user_id&order=created_at.desc&limit=30")
+            .url("$base/rest/v1/videos?select=id,caption,video_url,storage_path,user_id,profiles!videos_user_id_fkey(display_name,username,avatar_url)&order=created_at.desc&limit=30")
             .addHeader("apikey", key).addHeader("Authorization", "Bearer $token").get().build()
         client.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
@@ -71,7 +72,10 @@ class SupabaseRepository(private val context: Context) {
                 val path = item.optString("storage_path")
                 val encodedPath = path.split("/").joinToString("/") { java.net.URLEncoder.encode(it, "UTF-8") }
                 val url = if (stored.isNotBlank()) stored else "$base/storage/v1/object/public/videos/$encodedPath"
-                TikVideo(item.optString("id"), item.optString("caption"), url, item.optString("user_id"))
+                TikVideo(item.optString("id"), item.optString("caption"), url, item.optString("user_id"),
+                    item.optJSONObject("profiles")?.optString("display_name")?.takeIf { it.isNotBlank() }
+                        ?: item.optJSONObject("profiles")?.optString("username").orEmpty(),
+                    item.optJSONObject("profiles")?.optString("avatar_url")?.takeIf { it.isNotBlank() })
             }
         }
     }
@@ -179,16 +183,24 @@ class SupabaseRepository(private val context: Context) {
         return !already
     }
 
-    fun loadComments(videoId: String): List<Pair<String, String>> {
-        val request = authedRequest("$base/rest/v1/comments?video_id=eq.$videoId&select=body,user_id&order=created_at.desc&limit=100")
-            .get().build()
+    fun loadComments(videoId: String): List<TikComment> {
+        val token = accessToken ?: key
+        val request = Request.Builder()
+            .url("$base/rest/v1/comments?video_id=eq.$videoId&select=body,user_id,profiles!comments_user_id_fkey(display_name,username,avatar_url)&order=created_at.desc&limit=100")
+            .addHeader("apikey", key).addHeader("Authorization", "Bearer $token").get().build()
         client.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) throw IOException("تعذر تحميل التعليقات")
             val rows = JSONArray(body)
             return (0 until rows.length()).map { i ->
                 val row = rows.getJSONObject(i)
-                row.optString("user_id").take(8) to row.optString("body")
+                val profile = row.optJSONObject("profiles")
+                TikComment(
+                    body = row.optString("body"),
+                    displayName = profile?.optString("display_name")?.takeIf { it.isNotBlank() } ?: "مستخدم",
+                    username = profile?.optString("username").orEmpty(),
+                    avatarUrl = profile?.optString("avatar_url")?.takeIf { it.isNotBlank() }
+                )
             }
         }
     }
