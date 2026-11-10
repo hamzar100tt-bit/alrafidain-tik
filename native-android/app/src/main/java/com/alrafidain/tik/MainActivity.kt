@@ -3,6 +3,7 @@ package com.alrafidain.tik
 import android.os.Bundle
 import android.net.Uri
 import android.content.Intent
+import coil.compose.AsyncImage
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -555,28 +556,123 @@ private fun UploadScreen(repository: SupabaseRepository, onUploaded: () -> Unit)
 
 @Composable
 private fun ProfileScreen(repository: SupabaseRepository, onSignOut: () -> Unit) {
+    val scope = rememberCoroutineScope()
     var profile by remember { mutableStateOf<org.json.JSONObject?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) {
-        try { profile = withContext(Dispatchers.IO) { repository.loadProfile() } }
-        catch (e: Exception) { error = e.message }
+    var displayName by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+    var bio by remember { mutableStateOf("") }
+    var avatarUrl by remember { mutableStateOf<String?>(null) }
+    var loading by remember { mutableStateOf(true) }
+    var saving by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+
+    fun refresh() {
+        scope.launch {
+            loading = true
+            try {
+                val data = withContext(Dispatchers.IO) { repository.loadProfile() }
+                profile = data
+                displayName = data.optString("display_name")
+                username = data.optString("username")
+                bio = data.optString("bio")
+                avatarUrl = data.optString("avatar_url").takeIf { it.isNotBlank() }
+                message = null
+            } catch (e: Exception) {
+                message = e.message ?: "تعذر تحميل الحساب"
+            } finally { loading = false }
+        }
     }
-    Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center) {
-        Icon(Icons.Default.AccountCircle, null, tint = Brand, modifier = Modifier.size(86.dp))
-        Spacer(Modifier.height(12.dp))
-        Text(profile?.optString("display_name")?.takeIf { !it.isNullOrBlank() }
-            ?: profile?.optString("username")?.takeIf { !it.isNullOrBlank() } ?: "حسابي",
-            fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        profile?.optString("username")?.takeIf { it.isNotBlank() }?.let {
-            Text("@$it", color = Muted, fontSize = 14.sp)
+
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                saving = true
+                message = "جاري رفع الصورة..."
+                try {
+                    avatarUrl = withContext(Dispatchers.IO) { repository.uploadAvatar(uri) }
+                    message = "تم تحديث الصورة الشخصية"
+                } catch (e: Exception) {
+                    message = e.message ?: "تعذر رفع الصورة"
+                } finally { saving = false }
+            }
         }
-        profile?.optString("bio")?.takeIf { it.isNotBlank() }?.let {
-            Text(it, color = Ink, modifier = Modifier.padding(top = 10.dp), textAlign = TextAlign.Center)
+    }
+
+    LaunchedEffect(Unit) { refresh() }
+
+    Column(
+        Modifier.fillMaxSize().background(Canvas).padding(horizontal = 22.dp, vertical = 18.dp)
+            .imePadding(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        if (loading && profile == null) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Brand)
+            }
+        } else {
+            Spacer(Modifier.height(22.dp))
+            Box(contentAlignment = Alignment.BottomEnd) {
+                if (!avatarUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = avatarUrl,
+                        contentDescription = "الصورة الشخصية",
+                        modifier = Modifier.size(112.dp).background(Color.White, RoundedCornerShape(100.dp))
+                    )
+                } else {
+                    Icon(Icons.Default.AccountCircle, null, tint = Brand, modifier = Modifier.size(112.dp))
+                }
+                IconButton(
+                    onClick = { imagePicker.launch("image/*") },
+                    modifier = Modifier.size(36.dp).background(Color.White, RoundedCornerShape(50))
+                ) {
+                    Icon(Icons.Default.CameraAlt, contentDescription = "تغيير الصورة", tint = Brand)
+                }
+            }
+            Text("ملفي الشخصي", fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, color = Ink)
+            Text("غيّر صورتك واسمك ومعلومات حسابك", fontSize = 13.sp, color = Muted)
+            OutlinedTextField(
+                value = displayName, onValueChange = { displayName = it },
+                label = { Text("الاسم الظاهر") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(
+                value = username, onValueChange = { username = it },
+                label = { Text("اسم المستخدم (إنجليزي)") },
+                supportingText = { Text("3 إلى 24 حرفاً: a-z و0-9 وشرطة سفلية") },
+                singleLine = true, modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(
+                value = bio, onValueChange = { bio = it },
+                label = { Text("نبذة عنك") }, minLines = 2, maxLines = 3,
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (message != null) Text(message!!, color = if (message!!.contains("تم")) Brand else MaterialTheme.colorScheme.error,
+                fontSize = 13.sp, textAlign = TextAlign.Center)
+            Button(
+                onClick = {
+                    scope.launch {
+                        saving = true
+                        message = null
+                        try {
+                            withContext(Dispatchers.IO) { repository.updateProfile(displayName, username, bio) }
+                            message = "تم حفظ الملف الشخصي"
+                            refresh()
+                        } catch (e: Exception) {
+                            message = e.message ?: "تعذر حفظ التغييرات"
+                        } finally { saving = false }
+                    }
+                },
+                enabled = !saving && displayName.isNotBlank() && username.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Brand)
+            ) {
+                if (saving) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                else Text("حفظ التغييرات", fontWeight = FontWeight.Bold)
+            }
+            OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
+                Text("تسجيل الخروج", color = Brand)
+            }
         }
-        if (error != null) Text(error!!, color = Muted, fontSize = 12.sp)
-        Spacer(Modifier.height(22.dp))
-        OutlinedButton(onClick = onSignOut) { Text("تسجيل الخروج", color = Brand) }
     }
 }
 
