@@ -41,6 +41,7 @@ Deno.serve(async (request: Request) => {
     return json({ error: "طلب غير صالح." }, 400);
   }
   const room = typeof body.room === "string" ? body.room.trim() : "";
+  const role = body.role === "viewer" ? "viewer" : "host";
   if (room.length < 3 || room.length > 60 || !/^[\p{L}\p{N} _.-]+$/u.test(room)) {
     return json({ error: "اسم الغرفة لازم يكون 3 إلى 60 حرفاً أو رقماً." }, 400);
   }
@@ -54,9 +55,9 @@ Deno.serve(async (request: Request) => {
   token.addGrant({
     roomJoin: true,
     room,
-    canPublish: true,
+    canPublish: role === "host",
     canSubscribe: true,
-    canPublishData: true
+    canPublishData: role === "host"
   });
 
   try {
