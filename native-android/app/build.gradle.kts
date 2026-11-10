@@ -12,10 +12,10 @@ android {
         targetSdk = 35
         versionCode = 2
         versionName = "1.1.0-native"
+        buildConfigField("String", "SUPABASE_URL", "\"https://gxzbgwgovtejjsmkouuv.supabase.co\"")
+        buildConfigField("String", "SUPABASE_KEY", "\"sb_publishable_My_DP4QQei1tdT32rYLeGg_9XYinUWp\"")
     }
     buildFeatures { compose = true; buildConfig = true }
-    buildConfigField("String", "SUPABASE_URL", "\"https://gxzbgwgovtejjsmkouuv.supabase.co\"")
-    buildConfigField("String", "SUPABASE_KEY", "\"sb_publishable_My_DP4QQei1tdT32rYLeGg_9XYinUWp\"")
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
