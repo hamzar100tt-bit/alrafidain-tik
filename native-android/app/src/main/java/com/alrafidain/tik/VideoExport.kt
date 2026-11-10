@@ -5,7 +5,7 @@ import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Effect
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.effect.Effects
+import androidx.media3.transformer.Effects
 import androidx.media3.effect.RgbFilter
 import androidx.media3.effect.RgbMatrix
 import androidx.media3.transformer.Composition
