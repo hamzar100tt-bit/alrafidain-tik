@@ -184,6 +184,12 @@ fun NativeCameraScreen(
                     },
                     update = { view -> applyCameraFilter(view, filter) }
                 )
+                // Visible live tint overlay: the preview responds immediately to the selected filter.
+                if (filter != "طبيعي") {
+                    Box(
+                        Modifier.fillMaxSize().background(cameraPreviewTint(filter))
+                    )
+                }
                 // Camera preview is edge-to-edge, with TikTok-style capture controls.
                 Column(
                     Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 18.dp, vertical = 10.dp),
@@ -388,6 +394,21 @@ fun NativeCameraScreen(
             }
         }
     }
+}
+
+
+private fun cameraPreviewTint(name: String): Color = when (name) {
+    "ناعم" -> Color(0x22F4C8B8)
+    "دافئ" -> Color(0x33FF9A42)
+    "ذهبي" -> Color(0x3DDAA02D)
+    "بارد" -> Color(0x3380BCEB)
+    "أبيض وأسود", "رمادي" -> Color(0x22777777)
+    "زاهي" -> Color(0x22FF3D78)
+    "سينما" -> Color(0x33415C50)
+    "وردي" -> Color(0x33FF83B3)
+    "قديم" -> Color(0x339B7048)
+    "ليلي" -> Color(0x443D478B)
+    else -> Color.Transparent
 }
 
 private fun filterSwatch(name: String): Color = when (name) {
