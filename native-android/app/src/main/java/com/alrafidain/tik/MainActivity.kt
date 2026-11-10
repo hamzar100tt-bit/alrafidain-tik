@@ -3,10 +3,10 @@ package com.alrafidain.tik
 import android.os.Bundle
 import android.net.Uri
 import android.content.Intent
-import coil.ImageLoader
+import android.media.MediaMetadataRetriever
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import coil.video.VideoFrameDecoder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -713,12 +713,6 @@ private fun ProfileScreen(repository: SupabaseRepository, onSignOut: () -> Unit)
 @Composable
 private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit, onSignOut: () -> Unit) {
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-    val profileVideoImageLoader = remember(context) {
-        ImageLoader.Builder(context).components {
-            add(VideoFrameDecoder.Factory())
-        }.build()
-    }
     var profile by remember { mutableStateOf<org.json.JSONObject?>(null) }
     var stats by remember { mutableStateOf<TikProfileStats?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -869,15 +863,9 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                                 AsyncImage(model = post.videoUrl, contentDescription = post.caption,
                                     contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                             } else {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(context)
-                                        .data(post.videoUrl)
-                                        .videoFrameMillis(1000)
-                                        .crossfade(true)
-                                        .build(),
-                                    imageLoader = profileVideoImageLoader,
+                                VideoPostThumbnail(
+                                    videoUrl = post.videoUrl,
                                     contentDescription = post.caption,
-                                    contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize()
                                 )
                                 Box(Modifier.align(Alignment.Center).size(34.dp)
@@ -898,6 +886,39 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                 Text("لقد اطلعت على جميع المنشورات", color = Muted, fontSize = 12.sp,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), textAlign = TextAlign.Center)
             }
+        }
+    }
+}
+
+@Composable
+private fun VideoPostThumbnail(
+    videoUrl: String,
+    contentDescription: String,
+    modifier: Modifier = Modifier
+) {
+    val bitmap by produceState<Bitmap?>(initialValue = null, videoUrl) {
+        value = withContext(Dispatchers.IO) {
+            val retriever = MediaMetadataRetriever()
+            try {
+                retriever.setDataSource(videoUrl, emptyMap())
+                retriever.getFrameAtTime(1_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+            } catch (_: Exception) {
+                null
+            } finally {
+                try { retriever.release() } catch (_: Exception) { }
+            }
+        }
+    }
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap!!.asImageBitmap(),
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+        )
+    } else {
+        Box(modifier.background(Color(0xFF181818)), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.PlayArrow, contentDescription = "فيديو", tint = Color.White, modifier = Modifier.size(36.dp))
         }
     }
 }
