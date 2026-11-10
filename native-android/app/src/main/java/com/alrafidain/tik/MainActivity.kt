@@ -9,6 +9,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -124,7 +128,7 @@ private fun AlrafidainApp() {
         when (selected) {
             0 -> FeedScreen(videos, loading, error, ::refreshFeed, replaySignal, repository, signedIn) { showAuth = true }
             1 -> NativePlaceholder("اكتشف", "قريباً: البحث عن الفيديوهات والحسابات", Icons.Default.Explore)
-            2 -> if (signedIn) UploadScreen(repository, onUploaded = { refreshFeed(); selected = 0 }) else GuestGate { showAuth = true }
+            2 -> if (signedIn) UploadScreen(repository, onBack = { selected = 0 }, onUploaded = { refreshFeed(); selected = 0 }) else GuestGate { showAuth = true }
             3 -> if (signedIn) NativePlaceholder("الرسائل", "محادثاتك ورسائلك الخاصة", Icons.Default.ChatBubble) else GuestGate { showAuth = true }
             else -> if (signedIn) ProfileScreen(repository, onSignOut = { repository.signOut(); signedIn = false; selected = 0 }) else GuestGate { showAuth = true }
         }
@@ -517,7 +521,7 @@ private fun CommentDialog(videoId: String, repository: SupabaseRepository, signe
 }
 
 @Composable
-private fun UploadScreen(repository: SupabaseRepository, onUploaded: () -> Unit) {
+private fun UploadScreen(repository: SupabaseRepository, onBack: () -> Unit, onUploaded: () -> Unit) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var caption by remember { mutableStateOf("") }
@@ -584,7 +588,7 @@ private fun UploadScreen(repository: SupabaseRepository, onUploaded: () -> Unit)
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("الرافدين تيك", color = Brand, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
-            IconButton(onClick = { /* return to feed using bottom home */ }) {
+            IconButton(onClick = onBack) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White)
             }
         }
