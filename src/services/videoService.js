@@ -1,7 +1,11 @@
 import { supabase, isSupabaseConfigured } from "../lib/supabase.js";
 
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
-const ALLOWED_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
+const VIDEO_TYPES_BY_EXTENSION = {
+  mp4: "video/mp4",
+  webm: "video/webm",
+  mov: "video/quicktime"
+};
 
 function requireSupabase() {
   if (!isSupabaseConfigured || !supabase) throw new Error("أضف مفاتيح Supabase أولاً.");
@@ -31,13 +35,18 @@ export async function signOut() {
 
 export async function publishVideo({ file, caption, userId }) {
   requireSupabase();
-  if (!file || !ALLOWED_TYPES.includes(file.type)) throw new Error("اختر فيديو MP4 أو WebM أو MOV.");
-  if (file.size > MAX_VIDEO_SIZE) throw new Error("حجم الفيديو الأقصى 100 ميغابايت حالياً.");
+  if (!file) throw new Error("اختار فيديو من جهازك أولاً.");
   if (!userId) throw new Error("سجّل الدخول قبل نشر الفيديو.");
-  const extension = file.name.split(".").pop()?.toLowerCase() || "mp4";
+  const extension = file.name.split(".").pop()?.toLowerCase() || "";
+  const expectedType = VIDEO_TYPES_BY_EXTENSION[extension];
+  if (!expectedType) throw new Error("الصيغ المدعومة حالياً: MP4 وWebM وMOV.");
+  if (file.type && file.type !== expectedType && !(extension === "mov" && file.type === "video/mp4")) {
+    throw new Error("نوع الملف لا يطابق امتداده. جرّب اختيار فيديو MP4 أو MOV أو WebM.");
+  }
+  if (!file.size || file.size > MAX_VIDEO_SIZE) throw new Error("حجم الفيديو يجب أن يكون أكبر من صفر وأقل من 100 ميغابايت.");
   const path = `${userId}/${crypto.randomUUID()}.${extension}`;
   const { error: uploadError } = await supabase.storage.from("videos").upload(path, file, {
-    contentType: file.type, upsert: false
+    contentType: file.type || expectedType, upsert: false
   });
   if (uploadError) throw uploadError;
   const { data: urlData } = supabase.storage.from("videos").getPublicUrl(path);
