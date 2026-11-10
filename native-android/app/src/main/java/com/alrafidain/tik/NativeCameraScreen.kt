@@ -197,10 +197,6 @@ fun NativeCameraScreen(
                                 Text(if (soundName.isBlank()) "♫ إضافة صوت" else "♫ ${soundName.take(18)}", color = Color.White, modifier = Modifier
                                     .background(Color(0xAA222222), RoundedCornerShape(30.dp)).padding(horizontal = 18.dp, vertical = 10.dp))
                             }
-                            IconButton(onClick = {
-                                flash = !flash
-                                imageCapture?.flashMode = if (flash) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF
-                            }) { Icon(if (flash) Icons.Default.FlashOn else Icons.Default.FlashOff, "الفلاش", tint = Color.White) }
                         }
                     }
                     Column(
@@ -303,6 +299,10 @@ fun NativeCameraScreen(
                             IconButton(onClick = { galleryVideo.launch("video/*") }) {
                                 Icon(Icons.Default.VideoLibrary, "اختيار فيديو", tint = Color.White, modifier = Modifier.size(28.dp))
                             }
+                            IconButton(onClick = {
+                                flash = !flash
+                                imageCapture?.flashMode = if (flash) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF
+                            }) { Icon(if (flash) Icons.Default.FlashOn else Icons.Default.FlashOff, "الفلاش", tint = Color.White, modifier = Modifier.size(26.dp)) }
                             IconButton(onClick = {
                                 lens = if (lens == CameraSelector.LENS_FACING_BACK) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
                                 cameraProvider?.let { provider ->
