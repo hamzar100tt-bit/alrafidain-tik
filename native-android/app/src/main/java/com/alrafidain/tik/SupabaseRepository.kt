@@ -362,17 +362,23 @@ class SupabaseRepository(private val context: Context) {
             var g = android.graphics.Color.green(color).toFloat()
             var b = android.graphics.Color.blue(color).toFloat()
             when (filter) {
-                "أبيض وأسود" -> {
+                "أبيض وأسود", "رمادي" -> {
                     val gray = 0.299f * r + 0.587f * g + 0.114f * b
                     r = gray; g = gray; b = gray
                 }
-                "دافئ" -> { r = (r + 22f).coerceAtMost(255f); g = (g + 8f).coerceAtMost(255f); b = (b - 14f).coerceAtLeast(0f) }
+                "دافئ", "ذهبي" -> { r = (r + if (filter == "ذهبي") 30f else 22f).coerceAtMost(255f); g = (g + 10f).coerceAtMost(255f); b = (b - if (filter == "ذهبي") 24f else 14f).coerceAtLeast(0f) }
+                "بارد" -> { r = (r - 8f).coerceAtLeast(0f); g = (g + 3f).coerceAtMost(255f); b = (b + 24f).coerceAtMost(255f) }
                 "زاهي" -> {
                     val avg = (r + g + b) / 3f
-                    r = (avg + (r - avg) * 1.28f).coerceIn(0f,255f)
-                    g = (avg + (g - avg) * 1.28f).coerceIn(0f,255f)
-                    b = (avg + (b - avg) * 1.28f).coerceIn(0f,255f)
+                    r = (avg + (r - avg) * 1.35f).coerceIn(0f,255f)
+                    g = (avg + (g - avg) * 1.35f).coerceIn(0f,255f)
+                    b = (avg + (b - avg) * 1.35f).coerceIn(0f,255f)
                 }
+                "وردي" -> { r = (r + 22f).coerceAtMost(255f); g = (g - 5f).coerceAtLeast(0f); b = (b + 16f).coerceAtMost(255f) }
+                "قديم" -> { r = (r * .92f + 20f).coerceIn(0f,255f); g = (g * .88f + 15f).coerceIn(0f,255f); b = (b * .72f + 8f).coerceIn(0f,255f) }
+                "سينما" -> { r = (r * 1.10f - 8f).coerceIn(0f,255f); g = (g * 1.04f - 4f).coerceIn(0f,255f); b = (b * .92f + 5f).coerceIn(0f,255f) }
+                "ليلي" -> { r = (r * .78f).coerceAtLeast(0f); g = (g * .86f).coerceAtLeast(0f); b = (b * 1.14f).coerceAtMost(255f) }
+                "ناعم" -> { r = (r * 1.04f + 8f).coerceAtMost(255f); g = (g * 1.02f + 5f).coerceAtMost(255f); b = (b + 4f).coerceAtMost(255f) }
             }
             pixels[i] = android.graphics.Color.argb(android.graphics.Color.alpha(color), r.toInt(), g.toInt(), b.toInt())
         }
