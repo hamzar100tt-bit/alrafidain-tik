@@ -1,6 +1,7 @@
 package com.alrafidain.tik
 
 import android.content.Context
+import android.net.Uri
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -8,10 +9,11 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
+import java.util.UUID
 
 data class TikVideo(val id: String, val caption: String, val videoUrl: String, val userId: String)
 
-class SupabaseRepository(context: Context) {
+class SupabaseRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences("alrafidain_session", Context.MODE_PRIVATE)
     private val client = OkHttpClient()
     private val base = BuildConfig.SUPABASE_URL
@@ -72,5 +74,35 @@ class SupabaseRepository(context: Context) {
                 TikVideo(item.optString("id"), item.optString("caption"), url, item.optString("user_id"))
             }
         }
+    }
+
+    fun uploadVideo(uri: Uri, caption: String): String {
+        val token = accessToken ?: throw IOException("سجّل الدخول أولاً")
+        val userId = prefs.getString("user_id", null) ?: throw IOException("تعذر تحديد الحساب الحالي")
+        val mime = context.contentResolver.getType(uri) ?: "video/mp4"
+        if (!mime.startsWith("video/")) throw IOException("الملف المحدد ليس فيديو")
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: throw IOException("تعذر قراءة الفيديو من الجهاز")
+        if (bytes.isEmpty()) throw IOException("الفيديو فارغ")
+        if (bytes.size > 100 * 1024 * 1024) throw IOException("حجم الفيديو أكبر من 100 ميغابايت")
+        val path = "$userId/${UUID.randomUUID()}.mp4"
+        val upload = Request.Builder().url("$base/storage/v1/object/videos/$path")
+            .addHeader("apikey", key).addHeader("Authorization", "Bearer $token")
+            .addHeader("Content-Type", mime).addHeader("x-upsert", "false")
+            .put(bytes.toRequestBody(mime.toMediaType())).build()
+        client.newCall(upload).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("فشل رفع الفيديو إلى التخزين (${response.code})")
+        }
+        val publicUrl = "$base/storage/v1/object/public/videos/$path"
+        val row = JSONObject().put("user_id", userId).put("caption", caption)
+            .put("storage_path", path).put("video_url", publicUrl)
+        val insert = Request.Builder().url("$base/rest/v1/videos")
+            .addHeader("apikey", key).addHeader("Authorization", "Bearer $token")
+            .addHeader("Content-Type", "application/json").addHeader("Prefer", "return=minimal")
+            .post(row.toString().toRequestBody("application/json".toMediaType())).build()
+        client.newCall(insert).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("تم رفع الملف لكن تعذر تسجيله في قائمة الفيديوهات (${response.code})")
+        }
+        return "تم نشر الفيديو بنجاح"
     }
 }
