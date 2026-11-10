@@ -1,7 +1,5 @@
 package com.alrafidain.tik
 
-private val CameraCameraBrand = Color(0xFFFF3157)
-
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
@@ -43,6 +41,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Locale
+
+private val CameraBrand = Color(0xFFFF3157)
 
 @Composable
 fun NativeCameraScreen(
