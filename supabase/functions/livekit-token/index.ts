@@ -35,7 +35,7 @@ Deno.serve(async (request: Request) => {
   const { data: authData, error: authError } = await supabase.auth.getUser(jwt);
   if (authError || !authData.user) return json({ error: "جلسة الدخول غير صالحة." }, 401);
 
-  let body: { room?: unknown };
+  let body: { room?: unknown; role?: unknown };
   try {
     body = await request.json();
   } catch {
