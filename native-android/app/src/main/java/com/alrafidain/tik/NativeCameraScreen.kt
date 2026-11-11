@@ -205,8 +205,9 @@ fun NativeCameraScreen(
                             }
                         }
                     }
+                    Box(Modifier.fillMaxWidth().weight(1f)) {
                     Column(
-                        Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
+                        Modifier.align(Alignment.BottomCenter).fillMaxWidth().verticalScroll(rememberScrollState()),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -382,6 +383,7 @@ fun NativeCameraScreen(
                         }
                         if (busy) CircularProgressIndicator(color = CameraBrand, modifier = Modifier.padding(8.dp))
                         if (status.isNotBlank()) Text(status, color = Color.White, fontSize = 12.sp)
+                    }
                     }
                 }
             } else {
