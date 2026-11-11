@@ -345,6 +345,48 @@ private fun LiveRoomsScreen(onStartVideoPost: () -> Unit, onRequireLogin: () -> 
     }
 }
 @Composable
+private fun PublicCommentProfileScreen(repository: SupabaseRepository, userId: String, onBack: () -> Unit) {
+    var profile by remember(userId) { mutableStateOf<SupabaseRepository.DiscoverProfile?>(null) }
+    var videos by remember(userId) { mutableStateOf<List<TikVideo>>(emptyList()) }
+    var loading by remember(userId) { mutableStateOf(true) }
+    var error by remember(userId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(userId) {
+        try {
+            val result = withContext(Dispatchers.IO) { repository.loadPublicProfile(userId) to repository.loadPublicUserVideos(userId) }
+            profile = result.first; videos = result.second
+        } catch (e: Exception) { error = e.message ?: "تعذر تحميل الحساب" }
+        finally { loading = false }
+    }
+    Column(Modifier.fillMaxWidth().fillMaxHeight(0.82f).background(Color.White)) {
+        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "رجوع", tint = Ink) }
+            Text("الملف الشخصي", color = Ink, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        }
+        if (loading) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Brand) }
+        else if (error != null) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text(error!!, color = Muted) }
+        else {
+            Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                val avatar = profile?.avatarUrl
+                if (!avatar.isNullOrBlank()) AsyncImage(model = avatar, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(86.dp).clip(CircleShape))
+                else Icon(Icons.Default.AccountCircle, null, tint = Brand, modifier = Modifier.size(86.dp))
+                Text(profile?.displayName.orEmpty(), color = Ink, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                Text("@${profile?.username.orEmpty()}", color = Muted, fontSize = 13.sp)
+                Text("${videos.size} منشور", color = Muted, modifier = Modifier.padding(top = 6.dp))
+            }
+            HorizontalDivider(color = Color(0xFFEDEDED))
+            LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+                items(videos) { video ->
+                    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(if (video.mediaType == "image") Icons.Default.Image else Icons.Default.PlayCircle, null, tint = Brand, modifier = Modifier.size(32.dp))
+                        Text(video.caption.ifBlank { "منشور بدون وصف" }, color = Ink, modifier = Modifier.padding(start = 10.dp), maxLines = 2)
+                    }
+                    HorizontalDivider(color = Color(0xFFEFEFEF))
+                }
+            }
+        }
+    }
+}
+@Composable
 private fun AuthScreen(
     onContinueGuest: () -> Unit,
     onAuth: (String, String, Boolean) -> Unit,
@@ -558,6 +600,7 @@ private fun CommentDialog(videoId: String, repository: SupabaseRepository, signe
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
     var sending by remember { mutableStateOf(false) }
+    var selectedCommentProfile by remember { mutableStateOf<String?>(null) }
 
     fun reload() {
         scope.launch {
@@ -589,7 +632,9 @@ private fun CommentDialog(videoId: String, repository: SupabaseRepository, signe
             }
         }
     ) {
-        Column(
+        if (selectedCommentProfile != null) {
+            PublicCommentProfileScreen(repository, selectedCommentProfile!!, onBack = { selectedCommentProfile = null })
+        } else Column(
             Modifier.fillMaxWidth().fillMaxHeight(0.82f)
                 .imePadding()
                 .navigationBarsPadding()
@@ -624,11 +669,18 @@ private fun CommentDialog(videoId: String, repository: SupabaseRepository, signe
                 ) {
                     items(comments) { item ->
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            if (!item.avatarUrl.isNullOrBlank()) AsyncImage(model = item.avatarUrl, contentDescription = null, modifier = Modifier.size(38.dp).background(Color(0xFFE9E9ED), RoundedCornerShape(50)))
-                            else Icon(Icons.Default.AccountCircle, null, tint = Muted, modifier = Modifier.size(38.dp))
+                            if (!item.avatarUrl.isNullOrBlank()) {
+                                AsyncImage(model = item.avatarUrl, contentDescription = null, contentScale = ContentScale.Crop,
+                                    modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFFE9E9ED))
+                                        .clickable { if (item.userId.isNotBlank()) selectedCommentProfile = item.userId })
+                            } else {
+                                Icon(Icons.Default.AccountCircle, null, tint = Muted,
+                                    modifier = Modifier.size(40.dp).clip(CircleShape)
+                                        .clickable { if (item.userId.isNotBlank()) selectedCommentProfile = item.userId })
+                            }
                             Column(Modifier.weight(1f)) {
-                                Text(item.displayName, fontSize = 13.sp, color = Muted, fontWeight = FontWeight.SemiBold)
-                                if (item.username.isNotBlank()) Text("@${item.username}", fontSize = 11.sp, color = Muted)
+                                Text(item.displayName, fontSize = 13.sp, color = Muted, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { if (item.userId.isNotBlank()) selectedCommentProfile = item.userId })
+                                if (item.username.isNotBlank()) Text("@${item.username}", fontSize = 11.sp, color = Muted, modifier = Modifier.clickable { if (item.userId.isNotBlank()) selectedCommentProfile = item.userId })
                                 Text(item.body, fontSize = 14.sp, color = Ink)
                             }
                         }
