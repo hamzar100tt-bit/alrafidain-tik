@@ -42,6 +42,28 @@ class SupabaseRepository(private val context: Context) {
             return LiveKitCredentials(url, token, json.optString("room", room), json.optString("role", role))
         }
     }
+    fun createLiveRoom(title: String, roomType: String): String {
+        val userId = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
+        val roomKey = "live-" + UUID.randomUUID().toString().replace("-", "").take(20)
+        val payload = JSONObject()
+            .put("room_key", roomKey)
+            .put("title", title.trim().ifBlank { "بث مباشر" })
+            .put("room_type", roomType)
+            .put("owner_id", userId)
+            .put("is_live", true)
+        val request = authedRequest("$base/rest/v1/live_rooms")
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Prefer", "return=representation")
+            .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IOException("تعذر إنشاء الغرفة (${response.code}): $body")
+            val rows = JSONArray(body)
+            if (rows.length() == 0) throw IOException("لم يتم إنشاء الغرفة")
+            return rows.getJSONObject(0).optString("room_key")
+        }
+    }
+
     fun hasSession(): Boolean = !accessToken.isNullOrBlank()
     fun signOut() {
         accessToken = null
