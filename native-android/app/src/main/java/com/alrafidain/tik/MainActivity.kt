@@ -53,6 +53,8 @@ import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import io.livekit.android.LiveKit
+import io.livekit.android.room.Room
 
 private val Brand = Color(0xFFFF3157)
 private val Ink = Color(0xFF17171B)
@@ -136,7 +138,7 @@ private fun AlrafidainApp() {
         } else when (selected) {
             0 -> FeedScreen(videos, loading, error, ::refreshFeed, replaySignal, repository, signedIn) { showAuth = true }
             1 -> DiscoverScreen(repository)
-            2 -> LiveRoomsScreen(onStartVideoPost = { if (signedIn) selected = 5 else showAuth = true }, onRequireLogin = { showAuth = true })
+            2 -> LiveRoomsScreen(repository, onStartVideoPost = { if (signedIn) selected = 5 else showAuth = true }, onRequireLogin = { showAuth = true })
             3 -> if (signedIn) MessagesScreen(repository) else GuestGate { showAuth = true }
             4 -> if (signedIn) ProfileScreen(repository, onSignOut = { repository.signOut(); signedIn = false; selected = 0 }) else GuestGate { showAuth = true }
             5 -> if (signedIn) NativeCameraScreen(repository, onBack = { selected = 2 }, onUploaded = { refreshFeed(); selected = 0 }) else GuestGate { showAuth = true }
@@ -200,7 +202,7 @@ private fun AlrafidainApp() {
 }
 
 @Composable
-private fun LiveRoomsScreen(onStartVideoPost: () -> Unit, onRequireLogin: () -> Unit) {
+private fun LiveRoomsScreen(repository: SupabaseRepository, onStartVideoPost: () -> Unit, onRequireLogin: () -> Unit) {
     var openedRoom by remember { mutableStateOf<String?>(null) }
     var openedVideoRoom by remember { mutableStateOf<String?>(null) }
     var roomType by remember { mutableStateOf("جميع الغرف") }
@@ -216,7 +218,7 @@ private fun LiveRoomsScreen(onStartVideoPost: () -> Unit, onRequireLogin: () -> 
     )
     val shownRooms = rooms.filter { it.first.contains(searchText.trim(), ignoreCase = true) }
     if (openedVideoRoom != null) {
-        VideoLiveRoomScreen(roomName = openedVideoRoom!!, onBack = { openedVideoRoom = null }, onRequireLogin = onRequireLogin)
+        VideoLiveRoomScreen(repository, roomName = openedVideoRoom!!, onBack = { openedVideoRoom = null }, onRequireLogin = onRequireLogin)
         return
     }
     if (openedRoom != null) {
@@ -355,9 +357,50 @@ private fun VideoLiveRoomScreen(
     onBack: () -> Unit,
     onRequireLogin: () -> Unit
 ) {
+    val context = LocalContext.current
+    val liveRoom = remember(roomName) { LiveKit.create(context.applicationContext) }
+    val scope = rememberCoroutineScope()
     var cameraEnabled by remember(roomName) { mutableStateOf(false) }
     var micEnabled by remember(roomName) { mutableStateOf(false) }
+    var connectionState by remember(roomName) { mutableStateOf("جارٍ الاتصال بالغرفة...") }
+    var connectionError by remember(roomName) { mutableStateOf<String?>(null) }
+    var connected by remember(roomName) { mutableStateOf(false) }
+    var credentials by remember(roomName) { mutableStateOf<LiveKitCredentials?>(null) }
     var showChat by remember(roomName) { mutableStateOf(true) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        val granted = grants[android.Manifest.permission.CAMERA] == true &&
+            grants[android.Manifest.permission.RECORD_AUDIO] == true
+        if (granted) {
+            scope.launch {
+                try {
+                    val ok = liveRoom.localParticipant.setCameraEnabled(true)
+                    cameraEnabled = ok
+                    val micOk = liveRoom.localParticipant.setMicrophoneEnabled(true)
+                    micEnabled = micOk
+                    if (!ok || !micOk) connectionError = "تعذر تشغيل الكاميرا أو المايك؛ تأكد من صلاحيات البث."
+                } catch (e: Exception) { connectionError = e.message ?: "تعذر تشغيل الكاميرا والمايك" }
+            }
+        } else connectionError = "اسمح للتطبيق باستخدام الكاميرا والمايك حتى تبث."
+    }
+    DisposableEffect(liveRoom) {
+        onDispose { liveRoom.disconnect() }
+    }
+    LaunchedEffect(roomName) {
+        try {
+            connectionState = "جارٍ جلب تصريح الدخول..."
+            val auth = withContext(Dispatchers.IO) { repository.requestLiveKitToken(roomName, "viewer") }
+            credentials = auth
+            connectionState = "جارٍ الاتصال بخادم البث..."
+            liveRoom.connect(auth.serverUrl, auth.participantToken)
+            connected = true
+            connectionState = "متصل بالغرفة"
+        } catch (e: Exception) {
+            connectionState = "فشل الاتصال"
+            connectionError = e.message ?: "تعذر الاتصال بالغرفة"
+        }
+    }
     var message by remember(roomName) { mutableStateOf("") }
     var chatItems by remember(roomName) { mutableStateOf(listOf("أحمد انضم إلى الغرفة", "نور: هلا بالجميع ❤️")) }
     var showMenu by remember(roomName) { mutableStateOf(false) }
@@ -370,7 +413,7 @@ private fun VideoLiveRoomScreen(
                 Spacer(Modifier.weight(1f))
                 Column(horizontalAlignment = Alignment.End) {
                     Text(roomName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                    Text("بث فيديو مباشر", color = Color.LightGray, fontSize = 12.sp)
+                    Text(if (connected) "● متصل بالبث" else connectionState, color = if (connected) Color(0xFF62E6B2) else Color.LightGray, fontSize = 12.sp)
                 }
                 IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, "المزيد", tint = Color.White) }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
@@ -445,11 +488,11 @@ private fun VideoLiveRoomScreen(
                 }
             }
         }
-        Row(Modifier.fillMaxWidth().background(Color(0xFF100C13)).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp),
+        if (connectionError != null) Text(connectionError!!, color = Color(0xFFFFA8B8), fontSize = 12.sp, modifier = Modifier.fillMaxWidth().background(Color(0xFF100C13)).padding(horizontal = 12.dp, vertical = 5.dp))\n        Row(Modifier.fillMaxWidth().background(Color(0xFF100C13)).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onRequireLogin) { Icon(Icons.Default.CardGiftcard, "هدايا", tint = Color(0xFFFF3D70)) }
-            IconButton(onClick = { cameraEnabled = !cameraEnabled }) { Icon(if (cameraEnabled) Icons.Default.Videocam else Icons.Default.VideocamOff, "الكاميرا", tint = Color.White) }
-            IconButton(onClick = { micEnabled = !micEnabled }) { Icon(if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff, "المايك", tint = if (micEnabled) Color.Cyan else Color.White) }
+            IconButton(onClick = { if (!connected) connectionError = "انتظر اتصال الغرفة أولاً" else if (credentials?.role == "viewer") connectionError = "أنت مشاهد حالياً؛ المضيف يمنحك صلاحية الكاميرا" else permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA, android.Manifest.permission.RECORD_AUDIO)) }) { Icon(if (cameraEnabled) Icons.Default.Videocam else Icons.Default.VideocamOff, "الكاميرا", tint = Color.White) }
+            IconButton(onClick = { if (!connected) connectionError = "انتظر اتصال الغرفة أولاً" else if (credentials?.role == "viewer") connectionError = "أنت مشاهد حالياً؛ المضيف يمنحك صلاحية المايك" else { permissionLauncher.launch(arrayOf(android.Manifest.permission.RECORD_AUDIO)); scope.launch { try { val next = !micEnabled; liveRoom.localParticipant.setMicrophoneEnabled(next); micEnabled = next } catch (e: Exception) { connectionError = e.message ?: "تعذر تشغيل المايك" } } } }) { Icon(if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff, "المايك", tint = if (micEnabled) Color.Cyan else Color.White) }
             TextButton(onClick = onRequireLogin) { Text("الانضمام ✋", color = Color.White) }
             IconButton(onClick = { showChat = !showChat }) { Icon(Icons.Default.Chat, "التعليقات", tint = Color.White) }
         }
