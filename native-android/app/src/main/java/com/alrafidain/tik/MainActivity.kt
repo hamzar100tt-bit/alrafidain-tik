@@ -202,6 +202,7 @@ private fun AlrafidainApp() {
 @Composable
 private fun LiveRoomsScreen(onStartVideoPost: () -> Unit, onRequireLogin: () -> Unit) {
     var openedRoom by remember { mutableStateOf<String?>(null) }
+    var openedVideoRoom by remember { mutableStateOf<String?>(null) }
     var roomType by remember { mutableStateOf("جميع الغرف") }
     var searchOpen by remember { mutableStateOf(false) }
     var searchText by remember { mutableStateOf("") }
@@ -214,6 +215,10 @@ private fun LiveRoomsScreen(onStartVideoPost: () -> Unit, onRequireLogin: () -> 
         Triple("موسيقى وطرب", "زينب", "98")
     )
     val shownRooms = rooms.filter { it.first.contains(searchText.trim(), ignoreCase = true) }
+    if (openedVideoRoom != null) {
+        VideoLiveRoomScreen(roomName = openedVideoRoom!!, onBack = { openedVideoRoom = null }, onRequireLogin = onRequireLogin)
+        return
+    }
     if (openedRoom != null) {
         var muted by remember(openedRoom) { mutableStateOf(true) }
         Column(Modifier.fillMaxSize().background(Color(0xFF111B2B)).statusBarsPadding()) {
@@ -314,7 +319,7 @@ private fun LiveRoomsScreen(onStartVideoPost: () -> Unit, onRequireLogin: () -> 
             items(shownRooms.size) { i ->
                 val room = shownRooms[i]
                 Column(Modifier.clip(RoundedCornerShape(16.dp)).background(Color(0xFF251B2B))
-                    .clickable { openedRoom = room.first }) {
+                    .clickable { if (roomType == "الفيديو") openedVideoRoom = room.first else openedRoom = room.first }) {
                     Box(Modifier.fillMaxWidth().height(130.dp)
                         .background(listOf(Color(0xFF573C67), Color(0xFF17456A), Color(0xFF70483E))[i % 3],
                             RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
@@ -344,6 +349,93 @@ private fun LiveRoomsScreen(onStartVideoPost: () -> Unit, onRequireLogin: () -> 
         }
     }
 }
+@Composable
+private fun VideoLiveRoomScreen(
+    roomName: String,
+    onBack: () -> Unit,
+    onRequireLogin: () -> Unit
+) {
+    var cameraEnabled by remember(roomName) { mutableStateOf(false) }
+    var micEnabled by remember(roomName) { mutableStateOf(false) }
+    var showChat by remember(roomName) { mutableStateOf(true) }
+    var message by remember(roomName) { mutableStateOf("") }
+    var chatItems by remember(roomName) { mutableStateOf(listOf("أحمد انضم إلى الغرفة", "نور: هلا بالجميع ❤️")) }
+    var showMenu by remember(roomName) { mutableStateOf(false) }
+    Column(Modifier.fillMaxSize().background(Color(0xFF241014)).statusBarsPadding()) {
+        Box(Modifier.fillMaxWidth().height(112.dp).background(Color(0xFF3A1B22))) {
+            Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.Default.Close, "إغلاق", tint = Color.White) }
+                IconButton(onClick = { }) { Icon(Icons.Default.Fullscreen, "تكبير", tint = Color.White) }
+                IconButton(onClick = { }) { Icon(Icons.Default.Refresh, "تحديث", tint = Color.White) }
+                Spacer(Modifier.weight(1f))
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(roomName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    Text("بث فيديو مباشر", color = Color.LightGray, fontSize = 12.sp)
+                }
+                IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, "المزيد", tint = Color.White) }
+                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                    DropdownMenuItem(text = { Text("الإبلاغ عن الغرفة") }, onClick = { showMenu = false })
+                    DropdownMenuItem(text = { Text("مشاركة") }, onClick = { showMenu = false })
+                }
+            }
+            Row(Modifier.align(Alignment.BottomStart).padding(start = 14.dp, bottom = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("100", color = Color.White, modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Color.Black.copy(alpha = .3f)).padding(horizontal = 12.dp, vertical = 5.dp))
+                Spacer(Modifier.width(8.dp))
+                repeat(3) {
+                    Box(Modifier.padding(end = 5.dp).size(32.dp).background(Color(0xFF66516B), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Person, null, tint = Color.White)
+                    }
+                }
+            }
+        }
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            modifier = Modifier.fillMaxWidth().height(430.dp).background(Color(0xFF21161B)),
+            contentPadding = PaddingValues(2.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            items(6) { index ->
+                val host = index == 4
+                Box(Modifier.fillMaxWidth().height(142.dp).background(if (index % 2 == 0) Color(0xFF39262D) else Color(0xFF2C2028)), contentAlignment = Alignment.Center) {
+                    Icon(if (host && cameraEnabled) Icons.Default.Videocam else Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(46.dp))
+                    Text(if (host) "Host" else "مقعد " + (index + 1), color = Color.White,
+                        modifier = Modifier.align(Alignment.BottomStart).padding(6.dp).background(Color.Black.copy(alpha = .35f), RoundedCornerShape(10.dp)).padding(horizontal = 7.dp, vertical = 3.dp),
+                        fontSize = 11.sp)
+                    if (!host) Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).size(20.dp))
+                }
+            }
+        }
+        if (showChat) {
+            Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Text("التعليقات", color = Color.White, fontWeight = FontWeight.Bold)
+                chatItems.takeLast(4).forEach { line ->
+                    Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.AccountCircle, null, tint = Color.LightGray, modifier = Modifier.size(24.dp))
+                        Text(line, color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(start = 7.dp))
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(value = message, onValueChange = { message = it }, modifier = Modifier.weight(1f), singleLine = true, placeholder = { Text("اكتب تعليقاً...") })
+                    IconButton(onClick = { if (message.isNotBlank()) { chatItems = chatItems + ("أنت: " + message); message = "" } }) {
+                        Icon(Icons.Default.Send, "إرسال", tint = Color.White)
+                    }
+                }
+            }
+        } else Spacer(Modifier.weight(1f))
+        Row(Modifier.fillMaxWidth().background(Color(0xFF120D13)).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onRequireLogin) { Icon(Icons.Default.CardGiftcard, "هدايا", tint = Color(0xFFFF3D70)) }
+            IconButton(onClick = { cameraEnabled = !cameraEnabled }) { Icon(if (cameraEnabled) Icons.Default.Videocam else Icons.Default.VideocamOff, "الكاميرا", tint = Color.White) }
+            IconButton(onClick = { micEnabled = !micEnabled }) { Icon(if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff, "المايك", tint = Color.White) }
+            TextButton(onClick = onRequireLogin) { Text("الانضمام ✋", color = Color.White) }
+            IconButton(onClick = { showChat = !showChat }) { Icon(Icons.Default.Chat, "التعليقات", tint = Color.White) }
+        }
+    }
+}
+
+
 @Composable
 private fun PublicCommentProfileScreen(repository: SupabaseRepository, userId: String, onBack: () -> Unit) {
     var profile by remember(userId) { mutableStateOf<SupabaseRepository.DiscoverProfile?>(null) }
