@@ -22,9 +22,10 @@ Deno.serve(async (request: Request) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const livekitUrl = Deno.env.get("LIVEKIT_URL");
   const livekitApiKey = Deno.env.get("LIVEKIT_API_KEY");
   const livekitApiSecret = Deno.env.get("LIVEKIT_API_SECRET");
-  if (!supabaseUrl || !supabaseAnonKey || !livekitApiKey || !livekitApiSecret) {
+  if (!supabaseUrl || !supabaseAnonKey || !livekitUrl || !livekitApiKey || !livekitApiSecret) {
     return json({ error: "خدمة البث غير مهيأة على الخادم." }, 503);
   }
 
@@ -41,7 +42,7 @@ Deno.serve(async (request: Request) => {
     return json({ error: "طلب غير صالح." }, 400);
   }
   const room = typeof body.room === "string" ? body.room.trim() : "";
-  const role = body.role === "viewer" ? "viewer" : "host";
+  const role = body.role === "viewer" ? "viewer" : body.role === "speaker" ? "speaker" : "host";
   if (room.length < 3 || room.length > 60 || !/^[\p{L}\p{N} _.-]+$/u.test(room)) {
     return json({ error: "اسم الغرفة لازم يكون 3 إلى 60 حرفاً أو رقماً." }, 400);
   }
@@ -55,13 +56,13 @@ Deno.serve(async (request: Request) => {
   token.addGrant({
     roomJoin: true,
     room,
-    canPublish: role === "host",
+    canPublish: role === "host" || role === "speaker",
     canSubscribe: true,
-    canPublishData: role === "host"
+    canPublishData: true
   });
 
   try {
-    return json({ token: await token.toJwt() });
+    return json({ serverUrl: livekitUrl, participantToken: await token.toJwt(), room, role });
   } catch {
     return json({ error: "تعذر إنشاء تصريح البث." }, 500);
   }
