@@ -16,6 +16,8 @@ data class TikComment(val body: String, val displayName: String, val username: S
 data class TikProfileStats(val posts: List<TikVideo>, val following: Int, val followers: Int, val likes: Int)
 data class TikNotification(val id: String, val actorName: String, val actorUsername: String, val kind: String, val createdAt: String, val videoId: String?)
 
+data class LiveKitCredentials(val serverUrl: String, val participantToken: String, val room: String, val role: String)
+
 class SupabaseRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences("alrafidain_session", Context.MODE_PRIVATE)
     private val client = OkHttpClient()
@@ -25,6 +27,21 @@ class SupabaseRepository(private val context: Context) {
         get() = prefs.getString("access_token", null)
         set(value) { prefs.edit().putString("access_token", value).apply() }
 
+    fun requestLiveKitToken(room: String, role: String): LiveKitCredentials {
+        val payload = JSONObject().put("room", room).put("role", role)
+        val request = authedRequest("$base/functions/v1/livekit-token")
+            .addHeader("Content-Type", "application/json")
+            .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(body) }.getOrElse { JSONObject() }
+            if (!response.isSuccessful) throw IOException(json.optString("error").ifBlank { "تعذر الاتصال بخدمة البث (${response.code})" })
+            val url = json.optString("serverUrl")
+            val token = json.optString("participantToken")
+            if (url.isBlank() || token.isBlank()) throw IOException("بيانات الاتصال بالبث غير مكتملة")
+            return LiveKitCredentials(url, token, json.optString("room", room), json.optString("role", role))
+        }
+    }
     fun hasSession(): Boolean = !accessToken.isNullOrBlank()
     fun signOut() {
         accessToken = null
