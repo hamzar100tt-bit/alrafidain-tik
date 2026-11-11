@@ -361,9 +361,9 @@ private fun VideoLiveRoomScreen(
     var message by remember(roomName) { mutableStateOf("") }
     var chatItems by remember(roomName) { mutableStateOf(listOf("أحمد انضم إلى الغرفة", "نور: هلا بالجميع ❤️")) }
     var showMenu by remember(roomName) { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().background(Color(0xFF241014)).statusBarsPadding()) {
-        Box(Modifier.fillMaxWidth().height(112.dp).background(Color(0xFF3A1B22))) {
-            Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Column(Modifier.fillMaxSize().background(Color(0xFF26141A)).statusBarsPadding()) {
+        Box(Modifier.fillMaxWidth().height(104.dp).background(Color(0xFF3B202B))) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.Default.Close, "إغلاق", tint = Color.White) }
                 IconButton(onClick = { }) { Icon(Icons.Default.Fullscreen, "تكبير", tint = Color.White) }
                 IconButton(onClick = { }) { Icon(Icons.Default.Refresh, "تحديث", tint = Color.White) }
@@ -388,53 +388,73 @@ private fun VideoLiveRoomScreen(
                 }
             }
         }
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            modifier = Modifier.fillMaxWidth().height(430.dp).background(Color(0xFF21161B)),
-            contentPadding = PaddingValues(2.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            items(6) { index ->
-                val host = index == 4
-                Box(Modifier.fillMaxWidth().height(142.dp).background(if (index % 2 == 0) Color(0xFF39262D) else Color(0xFF2C2028)), contentAlignment = Alignment.Center) {
-                    Icon(if (host && cameraEnabled) Icons.Default.Videocam else Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(46.dp))
-                    Text(if (host) "Host" else "مقعد " + (index + 1), color = Color.White,
-                        modifier = Modifier.align(Alignment.BottomStart).padding(6.dp).background(Color.Black.copy(alpha = .35f), RoundedCornerShape(10.dp)).padding(horizontal = 7.dp, vertical = 3.dp),
-                        fontSize = 11.sp)
-                    if (!host) Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).size(20.dp))
+        Column(Modifier.weight(1f).fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth().height(390.dp).background(Color(0xFF25171F))) {
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    (1..2).forEach { seat ->
+                        Box(Modifier.weight(1f).fillMaxWidth().padding(1.dp)
+                            .background(Color(0xFF402B35)), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Chair, null, tint = Color(0xFFC18A52), modifier = Modifier.size(48.dp))
+                            Text(seat.toString(), color = Color.LightGray, modifier = Modifier.align(Alignment.TopEnd).padding(6.dp))
+                            Icon(Icons.Default.Mic, null, tint = Color(0xFF25D0C4), modifier = Modifier.align(Alignment.TopStart).padding(7.dp).size(18.dp))
+                        }
+                    }
+                }
+                Box(Modifier.weight(2f).fillMaxHeight().padding(1.dp).background(Color(0xFF60414A)), contentAlignment = Alignment.Center) {
+                    if (cameraEnabled) {
+                        Icon(Icons.Default.Videocam, null, tint = Color.White, modifier = Modifier.size(64.dp))
+                        Text("كاميرتك مفعّلة", color = Color.White, modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp))
+                    } else {
+                        Icon(Icons.Default.Person, null, tint = Color.White.copy(alpha = .8f), modifier = Modifier.size(86.dp))
+                        Text("البث الرئيسي", color = Color.White, modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp))
+                    }
+                    Text("5", color = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).background(Color.Black.copy(alpha = .4f), CircleShape).padding(horizontal = 8.dp, vertical = 3.dp))
+                    Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomStart).padding(8.dp))
+                }
+            }
+            Row(Modifier.fillMaxWidth().height(92.dp).background(Color(0xFF25171F))) {
+                listOf("Host", "4", "3").forEachIndexed { index, label ->
+                    Box(Modifier.weight(1f).fillMaxHeight().padding(1.dp).background(Color(0xFF382630)), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(38.dp))
+                        Text(label, color = if (index == 0) Color.Cyan else Color.White,
+                            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 5.dp)
+                                .background(Color.Black.copy(alpha = .35f), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
+                            fontSize = 12.sp)
+                        Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(5.dp).size(17.dp))
+                    }
+                }
+            }
+            if (showChat) {
+                Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    Spacer(Modifier.weight(1f))
+                    chatItems.takeLast(4).forEach { line ->
+                        Row(Modifier.padding(top = 6.dp).clip(RoundedCornerShape(18.dp))
+                            .background(Color.Black.copy(alpha = .28f)).padding(horizontal = 9.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AccountCircle, null, tint = Color.LightGray, modifier = Modifier.size(24.dp))
+                            Text(line, color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(start = 7.dp))
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(value = message, onValueChange = { message = it }, modifier = Modifier.weight(1f),
+                            singleLine = true, placeholder = { Text("اكتب تعليقاً...") })
+                        IconButton(onClick = { if (message.isNotBlank()) { chatItems = chatItems + ("أنت: " + message); message = "" } }) {
+                            Icon(Icons.Default.Send, "إرسال", tint = Color.White)
+                        }
+                    }
                 }
             }
         }
-        if (showChat) {
-            Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
-                Text("التعليقات", color = Color.White, fontWeight = FontWeight.Bold)
-                chatItems.takeLast(4).forEach { line ->
-                    Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AccountCircle, null, tint = Color.LightGray, modifier = Modifier.size(24.dp))
-                        Text(line, color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(start = 7.dp))
-                    }
-                }
-                Spacer(Modifier.weight(1f))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(value = message, onValueChange = { message = it }, modifier = Modifier.weight(1f), singleLine = true, placeholder = { Text("اكتب تعليقاً...") })
-                    IconButton(onClick = { if (message.isNotBlank()) { chatItems = chatItems + ("أنت: " + message); message = "" } }) {
-                        Icon(Icons.Default.Send, "إرسال", tint = Color.White)
-                    }
-                }
-            }
-        } else Spacer(Modifier.weight(1f))
-        Row(Modifier.fillMaxWidth().background(Color(0xFF120D13)).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 10.dp),
+        Row(Modifier.fillMaxWidth().background(Color(0xFF100C13)).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onRequireLogin) { Icon(Icons.Default.CardGiftcard, "هدايا", tint = Color(0xFFFF3D70)) }
             IconButton(onClick = { cameraEnabled = !cameraEnabled }) { Icon(if (cameraEnabled) Icons.Default.Videocam else Icons.Default.VideocamOff, "الكاميرا", tint = Color.White) }
-            IconButton(onClick = { micEnabled = !micEnabled }) { Icon(if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff, "المايك", tint = Color.White) }
+            IconButton(onClick = { micEnabled = !micEnabled }) { Icon(if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff, "المايك", tint = if (micEnabled) Color.Cyan else Color.White) }
             TextButton(onClick = onRequireLogin) { Text("الانضمام ✋", color = Color.White) }
             IconButton(onClick = { showChat = !showChat }) { Icon(Icons.Default.Chat, "التعليقات", tint = Color.White) }
         }
     }
 }
-
 
 @Composable
 private fun PublicCommentProfileScreen(repository: SupabaseRepository, userId: String, onBack: () -> Unit) {
