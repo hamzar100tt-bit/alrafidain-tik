@@ -350,7 +350,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onStartVideoPost: ()
                 Icon(Icons.Default.Videocam, null); Text("ابدأ بث فيديو", maxLines = 1)
             }
         }
-        if (roomError != null) Text(roomError!!, color = Color(0xFFFFA8B8), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp))\n        TextButton(onClick = onStartVideoPost, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+        TextButton(onClick = onStartVideoPost, modifier = Modifier.align(Alignment.CenterHorizontally)) {
             Text("نشر فيديو عادي", color = Color.LightGray)
         }
     }
@@ -494,7 +494,8 @@ private fun VideoLiveRoomScreen(
                 }
             }
         }
-        if (connectionError != null) Text(connectionError!!, color = Color(0xFFFFA8B8), fontSize = 12.sp, modifier = Modifier.fillMaxWidth().background(Color(0xFF100C13)).padding(horizontal = 12.dp, vertical = 5.dp))\n        Row(Modifier.fillMaxWidth().background(Color(0xFF100C13)).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp),
+        if (connectionError != null) Text(connectionError!!, color = Color(0xFFFFA8B8), fontSize = 12.sp, modifier = Modifier.fillMaxWidth().background(Color(0xFF100C13)).padding(horizontal = 12.dp, vertical = 5.dp))
+        Row(Modifier.fillMaxWidth().background(Color(0xFF100C13)).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onRequireLogin) { Icon(Icons.Default.CardGiftcard, "هدايا", tint = Color(0xFFFF3D70)) }
             IconButton(onClick = { if (!connected) connectionError = "انتظر اتصال الغرفة أولاً" else if (credentials?.role == "viewer") connectionError = "أنت مشاهد حالياً؛ المضيف يمنحك صلاحية الكاميرا" else permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA, android.Manifest.permission.RECORD_AUDIO)) }) { Icon(if (cameraEnabled) Icons.Default.Videocam else Icons.Default.VideocamOff, "الكاميرا", tint = Color.White) }
