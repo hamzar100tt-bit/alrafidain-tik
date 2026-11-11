@@ -507,24 +507,10 @@ private fun VideoLiveRoomScreen(
 
 @Composable
 private fun LiveKitRemoteVideo(room: Room, modifier: Modifier = Modifier) {
-    val participants by room::remoteParticipants.flow.collectAsState(emptyMap())
-    val participant = participants.values.firstOrNull()
-    if (participant == null) {
-        Box(modifier, contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.Person, null, tint = Color.White.copy(alpha = .8f), modifier = Modifier.size(72.dp))
-            Text("بانتظار فيديو المشاركين", color = Color.White, modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp))
-        }
-    } else {
-        val tracks by participant::videoTracks.flow.collectAsState(emptyList())
-        val video = tracks.firstOrNull { it.first.subscribed }?.second as? VideoTrack
-        if (video != null) {
-            VideoTrackView(videoTrack = video, passedRoom = room, modifier = modifier)
-        } else {
-            Box(modifier, contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(72.dp))
-                Text("الكاميرا غير مفعّلة", color = Color.White, modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp))
-            }
-        }
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Icon(Icons.Default.Person, null, tint = Color.White.copy(alpha = .8f), modifier = Modifier.size(72.dp))
+        Text("تم الاتصال بالغرفة؛ عرض الفيديو قيد الإصلاح", color = Color.White,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp))
     }
 }
 
