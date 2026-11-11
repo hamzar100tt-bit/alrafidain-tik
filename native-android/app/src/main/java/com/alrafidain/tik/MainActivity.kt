@@ -150,7 +150,7 @@ private fun AlrafidainApp() {
                 Icon(Icons.Default.Notifications, contentDescription = "الإشعارات", tint = Color.White, modifier = Modifier.size(27.dp))
             }
         }
-        if (selected != 0 && selected != 5) Row(
+        if (selected != 0 && selected != 2 && selected != 5) Row(
             Modifier.align(Alignment.TopCenter)
                 .fillMaxWidth()
                 .statusBarsPadding()
@@ -203,6 +203,8 @@ private fun AlrafidainApp() {
 private fun LiveRoomsScreen(onStartVideoPost: () -> Unit, onRequireLogin: () -> Unit) {
     var openedRoom by remember { mutableStateOf<String?>(null) }
     var roomType by remember { mutableStateOf("جميع الغرف") }
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchText by remember { mutableStateOf("") }
     val rooms = listOf(
         Triple("سوالف عراقية", "حمزة", "447"),
         Triple("جلسة دردشة عامة", "نور", "295"),
@@ -211,39 +213,89 @@ private fun LiveRoomsScreen(onStartVideoPost: () -> Unit, onRequireLogin: () -> 
         Triple("شعر وقصائد", "حيدر", "120"),
         Triple("موسيقى وطرب", "زينب", "98")
     )
+    val shownRooms = rooms.filter { it.first.contains(searchText.trim(), ignoreCase = true) }
     if (openedRoom != null) {
-        Column(Modifier.fillMaxSize().background(Color(0xFF17131F)).statusBarsPadding().padding(16.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { openedRoom = null }) { Icon(Icons.Default.ArrowBack, "رجوع", tint = Color.White) }
-                Text(openedRoom!!, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.weight(1f))
-                Text("مباشر", color = Brand, fontWeight = FontWeight.Bold)
-            }
-            Text("غرفة صوتية • 8 مايكات", color = Color.LightGray, modifier = Modifier.padding(8.dp))
-            LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(18.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(8) { seat ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(Modifier.size(88.dp).background(Color(0xFF49365D), CircleShape), contentAlignment = Alignment.Center) {
-                            Icon(if (seat == 0) Icons.Default.Person else Icons.Default.Mic, null, tint = Color.White, modifier = Modifier.size(38.dp))
-                        }
-                        Text(if (seat == 0) "المضيف" else "مايك ${seat + 1}", color = Color.White)
+        var muted by remember(openedRoom) { mutableStateOf(true) }
+        Column(Modifier.fillMaxSize().background(Color(0xFF111B2B)).statusBarsPadding()) {
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                Box(Modifier.fillMaxSize().background(Color(0xFF17354B)))
+                Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { openedRoom = null }) { Icon(Icons.Default.ArrowBack, "رجوع", tint = Color.White) }
+                        Text(openedRoom!!, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.weight(1f))
+                        Text("● 447", color = Color.White, fontSize = 13.sp)
+                        IconButton(onClick = { }) { Icon(Icons.Default.MoreVert, "المزيد", tint = Color.White) }
                     }
+                    Spacer(Modifier.height(8.dp))
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(Modifier.size(78.dp).background(Color(0xFF704A83), CircleShape), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(42.dp))
+                            }
+                            Text("المضيف", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Spacer(Modifier.height(18.dp))
+                    LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        items(4) { seat ->
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(Modifier.size(54.dp).background(Color(0xFF344E69), CircleShape), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(30.dp))
+                                }
+                                Text((seat + 1).toString(), color = Color.White, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        items(4) { seat ->
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(Modifier.size(54.dp).background(Color(0xFF26384E), CircleShape), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Mic, null, tint = Color.White, modifier = Modifier.size(25.dp))
+                                }
+                                Text((seat + 5).toString(), color = Color.White, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Text("الدردشة", color = Color.White, fontWeight = FontWeight.Bold)
+                    listOf("أحمد انضم إلى الغرفة", "نور: مساء الخير للجميع ❤️", "علي: أجواء جميلة").forEach { line ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AccountCircle, null, tint = Color(0xFFB9C8E0))
+                            Text(line, color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp))
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
                 }
             }
-            Button(onClick = onRequireLogin, modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Brand)) { Text("طلب المايك") }
+            Row(Modifier.fillMaxWidth().background(Color(0xFF0C101A)).navigationBarsPadding().padding(10.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { }) { Icon(Icons.Default.VolumeUp, "الصوت", tint = Color.White) }
+                IconButton(onClick = { muted = !muted }) { Icon(if (muted) Icons.Default.MicOff else Icons.Default.Mic, "كتم", tint = if (muted) Brand else Color.White) }
+                IconButton(onClick = onRequireLogin) { Icon(Icons.Default.People, "الحضور", tint = Color.White) }
+                IconButton(onClick = onRequireLogin) { Icon(Icons.Default.CardGiftcard, "هدايا", tint = Brand) }
+                IconButton(onClick = { }) { Icon(Icons.Default.MoreHoriz, "المزيد", tint = Color.White) }
+            }
         }
         return
     }
     Column(Modifier.fillMaxSize().background(Color(0xFF09070D)).statusBarsPadding().padding(bottom = 78.dp)) {
-        Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Notifications, null, tint = Color.White)
             Spacer(Modifier.weight(1f))
             Text("البث المباشر", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
-            Icon(Icons.Default.Videocam, null, tint = Brand, modifier = Modifier.padding(start = 8.dp))
             Spacer(Modifier.weight(1f))
-            Icon(Icons.Default.Search, null, tint = Color.White)
+            IconButton(onClick = { searchOpen = !searchOpen }) { Icon(Icons.Default.Search, "بحث عن غرفة", tint = Color.White) }
+        }
+        if (searchOpen) {
+            OutlinedTextField(value = searchText, onValueChange = { searchText = it },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+                singleLine = true, placeholder = { Text("اكتب اسم الغرفة") },
+                leadingIcon = { Icon(Icons.Default.Search, null) },
+                trailingIcon = { IconButton(onClick = { searchText = "" }) { Icon(Icons.Default.Close, "مسح") } })
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp).clip(RoundedCornerShape(26.dp))
             .background(Color(0xFF211D29)).padding(4.dp)) {
@@ -259,8 +311,8 @@ private fun LiveRoomsScreen(onStartVideoPost: () -> Unit, onRequireLogin: () -> 
         LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(rooms.size) { i ->
-                val room = rooms[i]
+            items(shownRooms.size) { i ->
+                val room = shownRooms[i]
                 Column(Modifier.clip(RoundedCornerShape(16.dp)).background(Color(0xFF251B2B))
                     .clickable { openedRoom = room.first }) {
                     Box(Modifier.fillMaxWidth().height(130.dp)
