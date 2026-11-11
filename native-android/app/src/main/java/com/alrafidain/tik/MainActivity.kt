@@ -353,6 +353,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onStartVideoPost: ()
 }
 @Composable
 private fun VideoLiveRoomScreen(
+    repository: SupabaseRepository,
     roomName: String,
     onBack: () -> Unit,
     onRequireLogin: () -> Unit
