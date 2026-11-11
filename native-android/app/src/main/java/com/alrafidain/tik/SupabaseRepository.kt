@@ -12,7 +12,7 @@ import java.io.IOException
 import java.util.UUID
 
 data class TikVideo(val id: String, val caption: String, val videoUrl: String, val userId: String, val creatorName: String = "", val creatorAvatar: String? = null, val mediaType: String = "video")
-data class TikComment(val body: String, val displayName: String, val username: String, val avatarUrl: String?)
+data class TikComment(val body: String, val displayName: String, val username: String, val avatarUrl: String?, val userId: String = "")
 data class TikProfileStats(val posts: List<TikVideo>, val following: Int, val followers: Int, val likes: Int)
 data class TikNotification(val id: String, val actorName: String, val actorUsername: String, val kind: String, val createdAt: String, val videoId: String?)
 
@@ -283,7 +283,8 @@ class SupabaseRepository(private val context: Context) {
                     body = row.optString("body"),
                     displayName = profile?.optString("display_name")?.takeIf { it.isNotBlank() } ?: "مستخدم",
                     username = profile?.optString("username").orEmpty(),
-                    avatarUrl = profile?.optString("avatar_url")?.takeIf { it.isNotBlank() }
+                    avatarUrl = profile?.optString("avatar_url")?.takeIf { it.isNotBlank() },
+                    userId = row.optString("user_id")
                 )
             }
         }
@@ -316,6 +317,19 @@ class SupabaseRepository(private val context: Context) {
         }
     }
 
+    fun loadPublicProfile(userId: String): DiscoverProfile {
+        val rows = publicRows("profiles?id=eq.$userId&select=id,username,display_name,avatar_url&limit=1")
+        if (rows.length() == 0) throw IOException("الحساب غير موجود")
+        val row = rows.getJSONObject(0)
+        return DiscoverProfile(row.optString("id"), row.optString("username"),
+            row.optString("display_name").ifBlank { row.optString("username") },
+            row.optString("avatar_url").takeIf { it.isNotBlank() })
+    }
+
+    fun loadPublicUserVideos(userId: String): List<TikVideo> {
+        val fields = "id,caption,video_url,storage_path,user_id,media_type,profiles!videos_user_id_fkey(display_name,username,avatar_url)"
+        return parseVideoRows(publicRows("videos?user_id=eq.$userId&select=$fields&order=created_at.desc&limit=60"))
+    }
     fun searchProfiles(term: String): List<DiscoverProfile> {
         val q = java.net.URLEncoder.encode("%$term%", "UTF-8")
         val rows = publicRows("profiles?select=id,username,display_name,avatar_url&or=(username.ilike.$q,display_name.ilike.$q)&limit=30")
