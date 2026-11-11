@@ -55,6 +55,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import io.livekit.android.LiveKit
 import io.livekit.android.room.Room
+import io.livekit.android.room.participant.Participant
+import io.livekit.android.room.track.VideoTrack
+import io.livekit.android.util.flow
+import io.livekit.android.compose.ui.VideoTrackView
 
 private val Brand = Color(0xFFFF3157)
 private val Ink = Color(0xFF17171B)
@@ -496,6 +500,29 @@ private fun VideoLiveRoomScreen(
             IconButton(onClick = { if (!connected) connectionError = "انتظر اتصال الغرفة أولاً" else if (credentials?.role == "viewer") connectionError = "أنت مشاهد حالياً؛ المضيف يمنحك صلاحية المايك" else { permissionLauncher.launch(arrayOf(android.Manifest.permission.RECORD_AUDIO)); scope.launch { try { val next = !micEnabled; liveRoom.localParticipant.setMicrophoneEnabled(next); micEnabled = next } catch (e: Exception) { connectionError = e.message ?: "تعذر تشغيل المايك" } } } }) { Icon(if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff, "المايك", tint = if (micEnabled) Color.Cyan else Color.White) }
             TextButton(onClick = onRequireLogin) { Text("الانضمام ✋", color = Color.White) }
             IconButton(onClick = { showChat = !showChat }) { Icon(Icons.Default.Chat, "التعليقات", tint = Color.White) }
+        }
+    }
+}
+
+@Composable
+private fun LiveKitRemoteVideo(room: Room, modifier: Modifier = Modifier) {
+    val participants by room::remoteParticipants.flow.collectAsState(emptyMap())
+    val participant = participants.values.firstOrNull()
+    if (participant == null) {
+        Box(modifier, contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.Person, null, tint = Color.White.copy(alpha = .8f), modifier = Modifier.size(72.dp))
+            Text("بانتظار فيديو المشاركين", color = Color.White, modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp))
+        }
+    } else {
+        val tracks by participant::videoTracks.flow.collectAsState(emptyList())
+        val video = tracks.firstOrNull { it.first.subscribed }?.second as? VideoTrack
+        if (video != null) {
+            VideoTrackView(videoTrack = video, passedRoom = room, modifier = modifier)
+        } else {
+            Box(modifier, contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(72.dp))
+                Text("الكاميرا غير مفعّلة", color = Color.White, modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp))
+            }
         }
     }
 }
