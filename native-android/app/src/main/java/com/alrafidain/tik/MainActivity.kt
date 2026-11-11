@@ -346,7 +346,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onStartVideoPost: ()
                 Icon(Icons.Default.Videocam, null); Text("ابدأ بث فيديو", maxLines = 1)
             }
         }
-        TextButton(onClick = onStartVideoPost, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+        if (roomError != null) Text(roomError!!, color = Color(0xFFFFA8B8), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp))\n        TextButton(onClick = onStartVideoPost, modifier = Modifier.align(Alignment.CenterHorizontally)) {
             Text("نشر فيديو عادي", color = Color.LightGray)
         }
     }
