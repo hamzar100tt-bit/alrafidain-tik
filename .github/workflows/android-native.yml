@@ -1,4 +1,4 @@
-name: Build Native Android APK
+name: Build Native Android APK # validate current Android source
 
 on:
   workflow_dispatch:
