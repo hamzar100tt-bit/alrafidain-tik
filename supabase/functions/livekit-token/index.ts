@@ -30,24 +30,51 @@ Deno.serve(async (request: Request) => {
   }
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: `Bearer ${jwt}` } },
     auth: { persistSession: false, autoRefreshToken: false }
   });
   const { data: authData, error: authError } = await supabase.auth.getUser(jwt);
   if (authError || !authData.user) return json({ error: "جلسة الدخول غير صالحة." }, 401);
 
-  let body: { room?: unknown; role?: unknown };
+  let body: { room?: unknown };
   try {
     body = await request.json();
   } catch {
     return json({ error: "طلب غير صالح." }, 400);
   }
   const room = typeof body.room === "string" ? body.room.trim() : "";
-  const role = body.role === "viewer" ? "viewer" : body.role === "speaker" ? "speaker" : "host";
-  if (room.length < 3 || room.length > 60 || !/^[\p{L}\p{N} _.-]+$/u.test(room)) {
+  if (room.length < 3 || room.length > 60 || !/^[\\p{L}\\p{N} _.-]+$/u.test(room)) {
     return json({ error: "اسم الغرفة لازم يكون 3 إلى 60 حرفاً أو رقماً." }, 400);
   }
 
-  const displayName = String(authData.user.user_metadata?.username || authData.user.email || "مستخدم").slice(0, 80);
+  const { data: roomRow, error: roomError } = await supabase
+    .from("live_rooms")
+    .select("id, owner_id, is_live")
+    .eq("room_key", room)
+    .eq("is_live", true)
+    .maybeSingle();
+  if (roomError) return json({ error: "تعذر التحقق من الغرفة." }, 500);
+  if (!roomRow) return json({ error: "الغرفة غير موجودة أو انتهى البث." }, 404);
+
+  let role = "viewer";
+  if (roomRow.owner_id === authData.user.id) {
+    role = "host";
+  } else {
+    const { data: speaker } = await supabase
+      .from("live_room_speakers")
+      .select("user_id")
+      .eq("room_id", roomRow.id)
+      .eq("user_id", authData.user.id)
+      .maybeSingle();
+    if (speaker) role = "speaker";
+  }
+
+  const displayName = String(
+    authData.user.user_metadata?.display_name ||
+    authData.user.user_metadata?.username ||
+    authData.user.email ||
+    "مستخدم"
+  ).slice(0, 80);
   const token = new AccessToken(livekitApiKey, livekitApiSecret, {
     identity: authData.user.id,
     name: displayName,
