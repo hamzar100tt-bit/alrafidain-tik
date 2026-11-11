@@ -128,8 +128,8 @@ private fun AlrafidainApp() {
         return
     }
 
-    val labels = listOf("الرئيسية", "اكتشف", "نشر", "الرسائل", "حسابي")
-    val icons = listOf(Icons.Default.Home, Icons.Default.Explore, Icons.Default.AddCircle, Icons.Default.ChatBubble, Icons.Default.Person)
+    val labels = listOf("الرئيسية", "اكتشف", "نشر", "البث", "الرسائل", "حسابي")
+    val icons = listOf(Icons.Default.Home, Icons.Default.Explore, Icons.Default.AddCircle, Icons.Default.Mic, Icons.Default.ChatBubble, Icons.Default.Person)
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (showNotifications) {
             NotificationsScreen(repository, onBack = { showNotifications = false })
@@ -137,7 +137,8 @@ private fun AlrafidainApp() {
             0 -> FeedScreen(videos, loading, error, ::refreshFeed, replaySignal, repository, signedIn) { showAuth = true }
             1 -> DiscoverScreen(repository)
             2 -> if (signedIn) NativeCameraScreen(repository, onBack = { selected = 0 }, onUploaded = { refreshFeed(); selected = 0 }) else GuestGate { showAuth = true }
-            3 -> if (signedIn) MessagesScreen(repository) else GuestGate { showAuth = true }
+            3 -> LiveRoomsScreen()
+            4 -> if (signedIn) MessagesScreen(repository) else GuestGate { showAuth = true }
             else -> if (signedIn) ProfileScreen(repository, onSignOut = { repository.signOut(); signedIn = false; selected = 0 }) else GuestGate { showAuth = true }
         }
 
@@ -149,7 +150,7 @@ private fun AlrafidainApp() {
                 Icon(Icons.Default.Notifications, contentDescription = "الإشعارات", tint = Color.White, modifier = Modifier.size(27.dp))
             }
         }
-        if (selected != 0 && selected != 2 && selected != 4) Row(
+        if (selected != 0 && selected != 2 && selected != 5) Row(
             Modifier.align(Alignment.TopCenter)
                 .fillMaxWidth()
                 .statusBarsPadding()
@@ -174,7 +175,7 @@ private fun AlrafidainApp() {
                 modifier = Modifier.align(Alignment.BottomCenter)
                     .navigationBarsPadding()
                     .fillMaxWidth(),
-                containerColor = if (selected == 4) Color.White else Color.Transparent,
+                containerColor = if (selected == 5) Color.White else Color.Transparent,
                 tonalElevation = 0.dp,
                 windowInsets = WindowInsets(0)
             ) {
@@ -187,11 +188,72 @@ private fun AlrafidainApp() {
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Brand,
                             selectedTextColor = Brand,
-                            indicatorColor = if (selected == 4) Color(0xFFFFE7ED) else Color.White.copy(alpha = 0.16f),
-                            unselectedIconColor = if (selected == 4) Muted else Color.White.copy(alpha = 0.82f),
-                            unselectedTextColor = if (selected == 4) Muted else Color.White.copy(alpha = 0.82f)
+                            indicatorColor = if (selected == 5) Color(0xFFFFE7ED) else Color.White.copy(alpha = 0.16f),
+                            unselectedIconColor = if (selected == 5) Muted else Color.White.copy(alpha = 0.82f),
+                            unselectedTextColor = if (selected == 5) Muted else Color.White.copy(alpha = 0.82f)
                         )
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LiveRoomsScreen() {
+    var openedRoom by remember { mutableStateOf<String?>(null) }
+    val rooms = listOf(
+        Triple("سوالف الرافدين", "حمزة", "128"),
+        Triple("لمة الأصدقاء", "نور", "74"),
+        Triple("استراحة الليل", "علي", "52"),
+        Triple("مجلس العراق", "سارة", "96"),
+        Triple("ضحك ووناسة", "مصطفى", "31"),
+        Triple("أهل الرافدين", "زينب", "210")
+    )
+    if (openedRoom != null) {
+        Column(Modifier.fillMaxSize().background(Color(0xFF17131F)).statusBarsPadding().padding(16.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { openedRoom = null }) { Icon(Icons.Default.ArrowBack, "رجوع", tint = Color.White) }
+                Text(openedRoom!!, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                Text("مباشر", color = Color(0xFFFF5577), fontWeight = FontWeight.Bold)
+            }
+            Text("غرفة صوتية • 8 مايكات", color = Color.LightGray, modifier = Modifier.padding(start = 8.dp, bottom = 18.dp))
+            LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(8.dp), verticalArrangement = Arrangement.spacedBy(18.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(8) { seat ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 8.dp)) {
+                        Box(Modifier.size(88.dp).background(listOf(Color(0xFF5B416F), Color(0xFF315C70), Color(0xFF795044), Color(0xFF3C665A))[seat % 4], CircleShape), contentAlignment = Alignment.Center) {
+                            Icon(if (seat == 0) Icons.Default.Person else Icons.Default.Mic, contentDescription = null, tint = Color.White, modifier = Modifier.size(38.dp))
+                        }
+                        Text(if (seat == 0) "المضيف" else "مايك ${seat + 1}", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                Text("💬 دردشة", color = Color.White); Text("🎁 هدايا", color = Color.White); Text("👥 حضور", color = Color.White)
+            }
+            Button(onClick = { }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Brand)) {
+                Icon(Icons.Default.Mic, null); Spacer(Modifier.width(8.dp)); Text("واجهة المايكات قيد الربط الصوتي")
+            }
+        }
+        return
+    }
+    Column(Modifier.fillMaxSize().background(Color(0xFF15131A)).statusBarsPadding().padding(bottom = 82.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("البثوث الصوتية", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
+            Spacer(Modifier.weight(1f)); Icon(Icons.Default.Search, null, tint = Color(0xFFFFC04D), modifier = Modifier.size(26.dp))
+        }
+        Text("غرف الرافدين المباشرة", color = Color(0xFFFFC04D), modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp))
+        LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(rooms.size) { roomIndex ->
+                val room = rooms[roomIndex]
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF29232E)).clickable { openedRoom = room.first }) {
+                    Box(Modifier.fillMaxWidth().height(142.dp).background(listOf(Color(0xFF573C67), Color(0xFF31546B), Color(0xFF70483E))[roomIndex % 3], RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Groups, null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(58.dp))
+                        Text("● ${room.third}", color = Color.White, modifier = Modifier.align(Alignment.TopStart).padding(10.dp), fontSize = 12.sp)
+                        Text("صوتي", color = Color.White, modifier = Modifier.align(Alignment.TopEnd).padding(10.dp), fontSize = 12.sp)
+                    }
+                    Column(Modifier.padding(11.dp)) { Text(room.first, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1); Text("المضيف: ${room.second}", color = Color.LightGray, fontSize = 12.sp) }
                 }
             }
         }
