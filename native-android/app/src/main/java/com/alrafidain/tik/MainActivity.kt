@@ -449,6 +449,7 @@ private fun VideoLiveRoomScreen(
                     }
                 }
                 Box(Modifier.weight(2f).fillMaxHeight().padding(1.dp).background(Color(0xFF60414A)), contentAlignment = Alignment.Center) {
+                    LiveKitRemoteVideo(liveRoom, Modifier.fillMaxSize())
                     if (cameraEnabled) {
                         Icon(Icons.Default.Videocam, null, tint = Color.White, modifier = Modifier.size(64.dp))
                         Text("كاميرتك مفعّلة", color = Color.White, modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp))
