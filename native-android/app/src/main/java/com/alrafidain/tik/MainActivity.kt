@@ -337,12 +337,6 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
         return
     }
     if (showCreateAudioRoom) {
-        androidx.compose.ui.window.Dialog(
-            onDismissRequest = { if (!creatingAudioRoom) showCreateAudioRoom = false },
-            properties = androidx.compose.ui.window.DialogProperties(
-                usePlatformDefaultWidth = false
-            )
-        ) {
             val backgrounds = listOf("ملعب كرة القدم", "خلفية زرقاء", "غرفة ألعاب", "مدينة ليلية", "شاطئ الغروب", "مسجد ليلي")
             val backgroundIcons = listOf("⚽", "🌊", "🎮", "🌃", "🌅", "🕌")
             val backgroundBrushes = listOf(
@@ -471,7 +465,6 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
                     Text("إلغاء", color = Color(0xFFB9C9E0))
                 }
             }
-        }
     }
     if (showCreateVideoRoom) {
         AlertDialog(
