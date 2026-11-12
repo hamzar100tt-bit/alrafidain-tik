@@ -760,11 +760,18 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                 }
             } else Spacer(Modifier.weight(1f))
 
-            Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(value = draft, onValueChange = { draft = it }, singleLine = true, modifier = Modifier.weight(1f),
-                    placeholder = { Text("اكتب تعليقاً... ", color = Color.White.copy(alpha = .75f)) },
+            // Composer and quick reactions inspired by the reference live-room toolbar.
+            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { giftsOpen = true }, modifier = Modifier.size(42.dp).border(1.dp, Color.White.copy(alpha = .55f), CircleShape)) {
+                    Icon(Icons.Default.Add, "إضافة", tint = Color.White, modifier = Modifier.size(24.dp))
+                }
+                Spacer(Modifier.width(8.dp))
+                OutlinedTextField(value = draft, onValueChange = { draft = it }, singleLine = true, modifier = Modifier.weight(1f).height(50.dp),
+                    placeholder = { Text("اكتب تعليقاً...", color = Color.White.copy(alpha = .78f)) },
+                    shape = RoundedCornerShape(28.dp),
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color.White.copy(alpha = .7f), unfocusedBorderColor = Color.White.copy(alpha = .4f), cursorColor = Color.White))
+                        focusedBorderColor = Color.White, unfocusedBorderColor = Color.White.copy(alpha = .75f), cursorColor = Color.White))
+                Spacer(Modifier.width(7.dp))
                 IconButton(onClick = {
                     if (draft.isNotBlank()) {
                         val message = draft.trim()
@@ -774,23 +781,46 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                                 withContext(Dispatchers.IO) { repository.sendLiveChatMessage(roomName, message) }
                                 val latest = withContext(Dispatchers.IO) { repository.loadLiveChatMessages(roomName) }
                                 chat = latest.map { LiveChatMessage(it.userId, it.body, it.displayName, it.avatarUrl) }
-                            } catch (e: Exception) {
-                                error = e.message ?: "تعذر إرسال التعليق"
-                            }
+                            } catch (e: Exception) { error = e.message ?: "تعذر إرسال التعليق" }
                         }
                     }
-                }) { Icon(Icons.Default.Send, "إرسال", tint = Color.White) }
+                }, modifier = Modifier.size(43.dp).background(Color(0xFF7545F5), CircleShape)) {
+                    Icon(Icons.Default.Send, "إرسال", tint = Color.White, modifier = Modifier.size(23.dp))
+                }
             }
-            Row(Modifier.fillMaxWidth().background(Color(0xCC102E58)).padding(horizontal = 5.dp, vertical = 5.dp),
+            Row(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 3.dp),
+                horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("✨", modifier = Modifier.clickable { draft += "✨" }.padding(5.dp), fontSize = 20.sp)
+                Text("👏", modifier = Modifier.clickable { draft += "👏" }.padding(5.dp), fontSize = 20.sp)
+                Text("👍 أحسنت", color = Color.White, fontSize = 12.sp,
+                    modifier = Modifier.clip(RoundedCornerShape(22.dp)).background(Color(0x665B718B)).clickable { draft = "👍 أحسنت" }.padding(horizontal = 12.dp, vertical = 8.dp))
+                Text("😂😂😂", color = Color.White, fontSize = 14.sp,
+                    modifier = Modifier.clip(RoundedCornerShape(22.dp)).background(Color(0x665B718B)).clickable { draft = "😂😂😂" }.padding(horizontal = 12.dp, vertical = 8.dp))
+                Text("😊 أهلاً", color = Color.White, fontSize = 12.sp,
+                    modifier = Modifier.clip(RoundedCornerShape(22.dp)).background(Color(0x665B718B)).clickable { draft = "😊 أهلاً" }.padding(horizontal = 12.dp, vertical = 8.dp))
+            }
+            Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp)
+                .clip(RoundedCornerShape(25.dp)).background(Color(0xE6101238))
+                .padding(horizontal = 7.dp, vertical = 5.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { giftsOpen = !giftsOpen }) { Icon(Icons.Default.CardGiftcard, "الهدايا", tint = Color(0xFFFFD56A), modifier = Modifier.size(26.dp)) }
-                IconButton(onClick = { inviteOpen = true }) { Icon(Icons.Default.GroupAdd, "إضافة أصدقاء", tint = Color.White, modifier = Modifier.size(26.dp)) }
-                IconButton(onClick = { liked = !liked }) { Icon(Icons.Default.Favorite, "إعجاب", tint = if (liked) Color(0xFFFF477E) else Color.White, modifier = Modifier.size(26.dp)) }
+                Text("🎁", fontSize = 24.sp, modifier = Modifier.clickable { giftsOpen = true }.padding(5.dp))
+                Text("🌹", fontSize = 23.sp, modifier = Modifier.clickable { giftsOpen = true }.padding(5.dp))
+                Text("🏷️", fontSize = 23.sp, modifier = Modifier.clickable { menuOpen = true }.padding(5.dp))
+                Text("☰", color = Color.White, fontSize = 24.sp, modifier = Modifier.clickable { menuOpen = true }.padding(horizontal = 9.dp))
+                Text("الإنضمام ✋", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Color(0x553B58A5)).clickable { inviteOpen = true }.padding(horizontal = 12.dp, vertical = 9.dp))
+                IconButton(onClick = { chatOpen = !chatOpen }) { Icon(Icons.Default.ChatBubbleOutline, "الدردشة", tint = Color.White, modifier = Modifier.size(24.dp)) }
+            }
+            Row(Modifier.fillMaxWidth().background(Color(0xCC102E58)).padding(horizontal = 5.dp, vertical = 3.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { giftsOpen = !giftsOpen }) { Icon(Icons.Default.CardGiftcard, "الهدايا", tint = Color(0xFFFFD56A), modifier = Modifier.size(25.dp)) }
+                IconButton(onClick = { inviteOpen = true }) { Icon(Icons.Default.GroupAdd, "إضافة أصدقاء", tint = Color.White, modifier = Modifier.size(25.dp)) }
+                IconButton(onClick = { liked = !liked }) { Icon(Icons.Default.Favorite, "إعجاب", tint = if (liked) Color(0xFFFF477E) else Color.White, modifier = Modifier.size(25.dp)) }
                 IconButton(enabled = connected && canSpeak && !connecting, onClick = {
                     if (!micEnabled) permission.launch(android.Manifest.permission.RECORD_AUDIO)
                     else scope.launch { try { room.localParticipant.setMicrophoneEnabled(false); micEnabled = false; refreshSeats() } catch (e: Exception) { error = e.message } }
-                }) { Icon(if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff, "المايك", tint = if (micEnabled) Color(0xFF64F0C1) else Color.White, modifier = Modifier.size(26.dp)) }
-                IconButton(onClick = onBack) { Icon(Icons.Default.CallEnd, "إنهاء البث", tint = Color(0xFFFF5A78), modifier = Modifier.size(27.dp)) }
+                }) { Icon(if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff, "المايك", tint = if (micEnabled) Color(0xFF64F0C1) else Color.White, modifier = Modifier.size(25.dp)) }
+                IconButton(onClick = onBack) { Icon(Icons.Default.CallEnd, "إنهاء البث", tint = Color(0xFFFF5A78), modifier = Modifier.size(26.dp)) }
             }
             if (giftsOpen) Text("🎁 الهدايا قريباً", color = Color.White, modifier = Modifier.align(Alignment.CenterHorizontally).padding(4.dp))
         }
