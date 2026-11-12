@@ -530,7 +530,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
                 items(shownRooms.size) { i ->
                     val room = shownRooms[i]
                     Column(Modifier.clip(RoundedCornerShape(16.dp)).background(Color(0xFF251B2B))
-                        .clickable { if (room.roomType == "video") openedVideoRoom = room.roomKey else openedRoom = room.title }) {
+                        .clickable { if (room.roomType == "video") openedVideoRoom = room.roomKey else openedAudioRoom = room.roomKey }) {
                         Box(Modifier.fillMaxWidth().height(130.dp)
                             .background(listOf(Color(0xFF573C67), Color(0xFF17456A), Color(0xFF70483E))[i % 3], RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
                             Icon(if (room.roomType == "video") Icons.Default.Videocam else Icons.Default.Groups, null, tint = Color.White, modifier = Modifier.size(54.dp))
