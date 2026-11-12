@@ -988,46 +988,118 @@ private fun LiveKitRemoteVideo(track: VideoTrack?, modifier: Modifier = Modifier
 
 @Composable
 private fun PublicCommentProfileScreen(repository: SupabaseRepository, userId: String, onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
     var profile by remember(userId) { mutableStateOf<SupabaseRepository.DiscoverProfile?>(null) }
-    var videos by remember(userId) { mutableStateOf<List<TikVideo>>(emptyList()) }
+    var stats by remember(userId) { mutableStateOf<TikProfileStats?>(null) }
+    var following by remember(userId) { mutableStateOf(false) }
     var loading by remember(userId) { mutableStateOf(true) }
+    var followBusy by remember(userId) { mutableStateOf(false) }
     var error by remember(userId) { mutableStateOf<String?>(null) }
     LaunchedEffect(userId) {
         try {
-            val result = withContext(Dispatchers.IO) { repository.loadPublicProfile(userId) to repository.loadPublicUserVideos(userId) }
-            profile = result.first; videos = result.second
+            val result = withContext(Dispatchers.IO) {
+                Triple(repository.loadPublicProfile(userId), repository.loadPublicProfileStats(userId), repository.isFollowing(userId))
+            }
+            profile = result.first
+            stats = result.second
+            following = result.third
         } catch (e: Exception) { error = e.message ?: "تعذر تحميل الحساب" }
         finally { loading = false }
     }
-    Column(Modifier.fillMaxWidth().fillMaxHeight(0.82f).background(Color.White)) {
-        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "رجوع", tint = Ink) }
-            Text("الملف الشخصي", color = Ink, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+    Column(Modifier.fillMaxWidth().fillMaxHeight(0.90f)
+        .clip(RoundedCornerShape(topStart = 25.dp, topEnd = 25.dp)).background(Color.White)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("الملف الشخصي", color = Ink, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
+            IconButton(onClick = onBack) { Icon(Icons.Default.Close, "إغلاق", tint = Ink) }
         }
-        if (loading) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Brand) }
-        else if (error != null) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text(error!!, color = Muted) }
-        else {
-            Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                val avatar = profile?.avatarUrl
-                if (!avatar.isNullOrBlank()) AsyncImage(model = avatar, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(86.dp).clip(CircleShape))
-                else Icon(Icons.Default.AccountCircle, null, tint = Brand, modifier = Modifier.size(86.dp))
-                Text(profile?.displayName.orEmpty(), color = Ink, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                Text("@${profile?.username.orEmpty()}", color = Muted, fontSize = 13.sp)
-                Text("${videos.size} منشور", color = Muted, modifier = Modifier.padding(top = 6.dp))
-            }
-            HorizontalDivider(color = Color(0xFFEDEDED))
-            LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-                items(videos) { video ->
-                    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(if (video.mediaType == "image") Icons.Default.Image else Icons.Default.PlayCircle, null, tint = Brand, modifier = Modifier.size(32.dp))
-                        Text(video.caption.ifBlank { "منشور بدون وصف" }, color = Ink, modifier = Modifier.padding(start = 10.dp), maxLines = 2)
+        if (loading) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = Brand)
+        } else if (error != null) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Text(error!!, color = Muted)
+        } else {
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                Spacer(Modifier.height(8.dp))
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                    Box(Modifier.padding(top = 35.dp).fillMaxWidth().height(110.dp)
+                        .background(Brush.verticalGradient(listOf(Color(0xFF281047), Color(0xFF080D24)))))
+                    val avatar = profile?.avatarUrl
+                    if (!avatar.isNullOrBlank()) AsyncImage(
+                        model = avatar, contentDescription = profile?.displayName,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(112.dp).clip(CircleShape).border(4.dp, Color.White, CircleShape)
+                    ) else Box(Modifier.size(112.dp).clip(CircleShape).background(Brand), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(58.dp))
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(profile?.displayName.orEmpty(), color = Ink, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                Text("@${profile?.username.orEmpty()}", color = Muted, fontSize = 14.sp,
+                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                Spacer(Modifier.height(20.dp))
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("${stats?.posts?.size ?: 0}", color = Ink, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+                        Text("منشور", color = Muted, fontSize = 12.sp)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("${stats?.followers ?: 0}", color = Ink, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+                        Text("متابعون", color = Muted, fontSize = 12.sp)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("${stats?.following ?: 0}", color = Ink, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+                        Text("يتابع", color = Muted, fontSize = 12.sp)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("${stats?.likes ?: 0}", color = Ink, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+                        Text("إعجابات", color = Muted, fontSize = 12.sp)
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+                Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = {
+                            if (!followBusy) {
+                                followBusy = true
+                                scope.launch {
+                                    try { following = withContext(Dispatchers.IO) { repository.toggleFollow(userId) } }
+                                    catch (e: Exception) { error = e.message ?: "تعذر تحديث المتابعة" }
+                                    finally { followBusy = false }
+                                }
+                            }
+                        },
+                        enabled = !followBusy && repository.currentUserId() != userId,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = if (following) Color(0xFFECEEF4) else Color(0xFF16C8C3),
+                            contentColor = if (following) Ink else Color.White),
+                        shape = RoundedCornerShape(25.dp)
+                    ) {
+                        Text(if (followBusy) "..." else if (following) "متابَع ✓" else "＋ متابعة", fontWeight = FontWeight.Bold)
+                    }
+                    OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(25.dp)) { Text("إغلاق الملف") }
+                }
+                Spacer(Modifier.height(18.dp))
+                HorizontalDivider(color = Color(0xFFEAEAEA))
+                Text("المنشورات", color = Ink, fontWeight = FontWeight.Bold, fontSize = 17.sp,
+                    modifier = Modifier.fillMaxWidth().padding(15.dp))
+                stats?.posts.orEmpty().forEach { video ->
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(if (video.mediaType == "image") Icons.Default.Image else Icons.Default.PlayCircle,
+                            null, tint = Brand, modifier = Modifier.size(32.dp))
+                        Text(video.caption.ifBlank { "منشور بدون وصف" }, color = Ink,
+                            modifier = Modifier.padding(start = 10.dp).weight(1f), maxLines = 2)
                     }
                     HorizontalDivider(color = Color(0xFFEFEFEF))
                 }
+                if (stats?.posts.isNullOrEmpty()) Text("ماكو منشورات بعد", color = Muted,
+                    modifier = Modifier.fillMaxWidth().padding(24.dp), textAlign = TextAlign.Center)
+                Spacer(Modifier.height(18.dp))
             }
         }
     }
 }
+
 @Composable
 private fun AuthScreen(
     onContinueGuest: () -> Unit,
