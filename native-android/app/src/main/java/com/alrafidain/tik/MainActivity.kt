@@ -158,7 +158,18 @@ private fun AlrafidainApp() {
                 Icon(Icons.Default.Notifications, contentDescription = "الإشعارات", tint = Color.White, modifier = Modifier.size(27.dp))
             }
         }
-        if (selected != 0 && selected != 2 && selected != 5) Row(
+        if (selected == 3) {
+            Row(
+                Modifier.align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(end = 10.dp, top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { selected = 0 }) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Ink, modifier = Modifier.size(27.dp))
+                }
+            }
+        } else if (selected != 0 && selected != 2 && selected != 5) Row(
             Modifier.align(Alignment.TopCenter)
                 .fillMaxWidth()
                 .statusBarsPadding()
@@ -168,13 +179,13 @@ private fun AlrafidainApp() {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             IconButton(onClick = { if (signedIn) showNotifications = true else showAuth = true }) {
-                Icon(Icons.Default.Notifications, contentDescription = "الإشعارات", tint = if (selected == 0) Color.White else Ink)
+                Icon(Icons.Default.Notifications, contentDescription = "الإشعارات", tint = Ink)
             }
             Text(
                 "الرافدين تيك",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = if (selected == 0) Color.White else Brand
+                color = Brand
             )
         }
 
