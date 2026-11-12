@@ -144,7 +144,7 @@ private fun AlrafidainApp() {
         } else when (selected) {
             0 -> FeedScreen(videos, loading, error, ::refreshFeed, replaySignal, repository, signedIn) { showAuth = true }
             1 -> DiscoverScreen(repository)
-            2 -> LiveRoomsScreen(repository, onStartVideoPost = { if (signedIn) selected = 5 else showAuth = true }, onRequireLogin = { showAuth = true })
+            2 -> LiveRoomsScreen(repository, onBack = { selected = 0 }, onStartVideoPost = { if (signedIn) selected = 5 else showAuth = true }, onRequireLogin = { showAuth = true })
             3 -> if (signedIn) MessagesScreen(repository) else GuestGate { showAuth = true }
             4 -> if (signedIn) ProfileScreen(repository, onSignOut = { repository.signOut(); signedIn = false; selected = 0 }) else GuestGate { showAuth = true }
             5 -> if (signedIn) NativeCameraScreen(repository, onBack = { selected = 2 }, onUploaded = { refreshFeed(); selected = 0 }) else GuestGate { showAuth = true }
@@ -219,7 +219,7 @@ private fun AlrafidainApp() {
 }
 
 @Composable
-private fun LiveRoomsScreen(repository: SupabaseRepository, onStartVideoPost: () -> Unit, onRequireLogin: () -> Unit) {
+private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, onStartVideoPost: () -> Unit, onRequireLogin: () -> Unit) {
     var openedRoom by remember { mutableStateOf<String?>(null) }
     var openedVideoRoom by remember { mutableStateOf<String?>(null) }
     var roomType by remember { mutableStateOf("جميع الغرف") }
@@ -348,7 +348,9 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onStartVideoPost: ()
     }
     Column(Modifier.fillMaxSize().background(Color(0xFF09070D)).statusBarsPadding().padding(bottom = 78.dp)) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Notifications, null, tint = Color.White)
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "رجوع إلى الرئيسية", tint = Color.White, modifier = Modifier.size(27.dp))
+            }
             Spacer(Modifier.weight(1f))
             Text("البث المباشر", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
             Spacer(Modifier.weight(1f))
