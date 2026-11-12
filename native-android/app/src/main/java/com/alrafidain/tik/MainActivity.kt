@@ -222,6 +222,11 @@ private fun AlrafidainApp() {
 private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, onStartVideoPost: () -> Unit, onRequireLogin: () -> Unit) {
     var openedRoom by remember { mutableStateOf<String?>(null) }
     var openedVideoRoom by remember { mutableStateOf<String?>(null) }
+    var openedAudioRoom by remember { mutableStateOf<String?>(null) }
+    var showCreateAudioRoom by remember { mutableStateOf(false) }
+    var audioRoomTitle by remember { mutableStateOf("غرفة الرافدين الصوتية") }
+    var creatingAudioRoom by remember { mutableStateOf(false) }
+    var audioRoomError by remember { mutableStateOf<String?>(null) }
     var roomType by remember { mutableStateOf("جميع الغرف") }
     var searchOpen by remember { mutableStateOf(false) }
     var searchText by remember { mutableStateOf("") }
@@ -244,6 +249,10 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
     val shownRooms = rooms.filter { room ->
         room.title.contains(searchText.trim(), ignoreCase = true) &&
             (roomType == "جميع الغرف" || (roomType == "الصوتية" && room.roomType == "audio") || (roomType == "الفيديو" && room.roomType == "video"))
+    }
+    if (openedAudioRoom != null) {
+        AudioLiveRoomScreen(repository, roomName = openedAudioRoom!!, onBack = { openedAudioRoom = null })
+        return
     }
     if (openedVideoRoom != null) {
         VideoLiveRoomScreen(repository, roomName = openedVideoRoom!!, onBack = { openedVideoRoom = null }, onRequireLogin = onRequireLogin)
@@ -316,6 +325,46 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
             }
         }
         return
+    }
+    if (showCreateAudioRoom) {
+        AlertDialog(
+            onDismissRequest = { if (!creatingAudioRoom) showCreateAudioRoom = false },
+            title = { Text("إنشاء غرفة صوتية") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = audioRoomTitle,
+                        onValueChange = { audioRoomTitle = it },
+                        singleLine = true,
+                        label = { Text("اسم الغرفة") }
+                    )
+                    Text("غرفة صوتية مع 8 مقاعد للمايكات", color = Muted, fontSize = 12.sp)
+                    if (audioRoomError != null) Text(audioRoomError!!, color = MaterialTheme.colorScheme.error)
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = !creatingAudioRoom && audioRoomTitle.isNotBlank(), onClick = {
+                    creatingAudioRoom = true
+                    audioRoomError = null
+                    liveScope.launch {
+                        try {
+                            val roomKey = withContext(Dispatchers.IO) {
+                                repository.createLiveRoom(audioRoomTitle, "audio")
+                            }
+                            showCreateAudioRoom = false
+                            openedAudioRoom = roomKey
+                        } catch (e: Exception) {
+                            audioRoomError = e.message ?: "تعذر إنشاء الغرفة الصوتية"
+                        } finally {
+                            creatingAudioRoom = false
+                        }
+                    }
+                }) { Text(if (creatingAudioRoom) "جارٍ الإنشاء..." else "إنشاء وبدء الغرفة") }
+            },
+            dismissButton = {
+                TextButton(enabled = !creatingAudioRoom, onClick = { showCreateAudioRoom = false }) { Text("إلغاء") }
+            }
+        )
     }
     if (showCreateVideoRoom) {
         AlertDialog(
@@ -402,7 +451,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
             }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onRequireLogin, modifier = Modifier.weight(1f),
+            Button(onClick = { showCreateAudioRoom = true }, modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9226C5))) {
                 Icon(Icons.Default.Headphones, null); Text("ابدأ بث صوتي", maxLines = 1)
             }
@@ -416,6 +465,147 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
         }
     }
 }
+@Composable
+private fun AudioLiveRoomScreen(
+    repository: SupabaseRepository,
+    roomName: String,
+    onBack: () -> Unit
+) {
+    val context = LocalContext.current
+    val room = remember(roomName) { LiveKit.create(context.applicationContext) }
+    val scope = rememberCoroutineScope()
+    var connected by remember(roomName) { mutableStateOf(false) }
+    var status by remember(roomName) { mutableStateOf("جارٍ الاتصال بالغرفة...") }
+    var error by remember(roomName) { mutableStateOf<String?>(null) }
+    var micEnabled by remember(roomName) { mutableStateOf(false) }
+    var canSpeak by remember(roomName) { mutableStateOf(false) }
+    var connecting by remember(roomName) { mutableStateOf(true) }
+
+    DisposableEffect(room) {
+        onDispose { room.disconnect() }
+    }
+
+    val micPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            scope.launch {
+                try {
+                    room.localParticipant.setMicrophoneEnabled(true)
+                    micEnabled = true
+                } catch (e: Exception) {
+                    error = e.message ?: "تعذر تشغيل المايك"
+                }
+            }
+        } else {
+            error = "اسمح للتطبيق باستخدام المايك حتى تتحدث داخل الغرفة."
+        }
+    }
+
+    LaunchedEffect(roomName) {
+        try {
+            val credentials = withContext(Dispatchers.IO) {
+                repository.requestLiveKitToken(roomName, "viewer")
+            }
+            canSpeak = credentials.role == "host" || credentials.role == "speaker"
+            status = "جارٍ الاتصال بخادم الصوت..."
+            room.connect(credentials.serverUrl, credentials.participantToken)
+            connected = true
+            status = if (canSpeak) "أنت داخل الغرفة كمضيف" else "أنت مستمع داخل الغرفة"
+            if (canSpeak) {
+                micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+            }
+        } catch (e: Exception) {
+            status = "تعذر الاتصال"
+            error = e.message ?: "فشل الاتصال بالغرفة الصوتية"
+        } finally {
+            connecting = false
+        }
+    }
+
+    Column(
+        Modifier.fillMaxSize().background(Color(0xFF111B2B))
+            .statusBarsPadding().navigationBarsPadding().padding(16.dp)
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.ArrowBack, "مغادرة الغرفة", tint = Color.White)
+            }
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                Text(roomName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(status, color = if (connected) Color(0xFF62E6B2) else Color.LightGray, fontSize = 12.sp)
+            }
+            Icon(Icons.Default.Headphones, null, tint = Color(0xFFB23BE0), modifier = Modifier.size(28.dp))
+        }
+        Spacer(Modifier.height(24.dp))
+        Text("مقاعد المايكات", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Spacer(Modifier.height(16.dp))
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(4),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(22.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            items(8) { index ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        Modifier.size(62.dp).background(
+                            if (index == 0 && canSpeak) Color(0xFF704A83) else Color(0xFF26384E),
+                            CircleShape
+                        ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            if (index == 0 && micEnabled) Icons.Default.Mic else Icons.Default.Person,
+                            null, tint = Color.White, modifier = Modifier.size(30.dp)
+                        )
+                    }
+                    Text(if (index == 0 && canSpeak) "المضيف" else "مقعد ${index + 1}",
+                        color = Color.White, fontSize = 12.sp)
+                }
+            }
+        }
+        if (error != null) {
+            Text(error!!, color = Color(0xFFFFA8B8), fontSize = 13.sp,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
+        }
+        Row(
+            Modifier.fillMaxWidth().background(Color(0xFF0C101A), RoundedCornerShape(28.dp))
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.CallEnd, "إنهاء ومغادرة", tint = Color(0xFFFF5570))
+            }
+            Button(
+                enabled = connected && canSpeak && !connecting,
+                onClick = {
+                    if (!micEnabled) {
+                        micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+                    } else {
+                        scope.launch {
+                            try {
+                                room.localParticipant.setMicrophoneEnabled(false)
+                                micEnabled = false
+                            } catch (e: Exception) {
+                                error = e.message ?: "تعذر إيقاف المايك"
+                            }
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (micEnabled) Color(0xFFB23BE0) else Color(0xFF34465B)
+                )
+            ) {
+                Icon(if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff, null)
+                Spacer(Modifier.width(6.dp))
+                Text(if (micEnabled) "إيقاف المايك" else if (canSpeak) "تشغيل المايك" else "استماع فقط")
+            }
+        }
+    }
+}
+
 @Composable
 private fun VideoLiveRoomScreen(
     repository: SupabaseRepository,
