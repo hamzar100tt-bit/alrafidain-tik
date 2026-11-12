@@ -573,6 +573,8 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
     var activeSpeakers by remember { mutableStateOf<Set<String>>(emptySet()) }
     var host by remember { mutableStateOf<LiveRoomInfo?>(null) }
     var viewerCount by remember { mutableStateOf(1) }
+    var viewerProfiles by remember { mutableStateOf<List<SupabaseRepository.DiscoverProfile>>(emptyList()) }
+    var viewersDialog by remember { mutableStateOf(false) }
     var chatOpen by remember { mutableStateOf(true) }
     var draft by remember { mutableStateOf("") }
     var chat by remember { mutableStateOf<List<LiveChatMessage>>(emptyList()) }
@@ -591,8 +593,10 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
         }
         seatIds = ids.take(8)
         viewerCount = 1 + room.remoteParticipants.size
+        val allIds = (listOfNotNull(repository.currentUserId()) + room.remoteParticipants.values.mapNotNull { it.identity?.value }).distinct()
         scope.launch(Dispatchers.IO) {
             runCatching { repository.loadPublicProfiles(ids) }.onSuccess { seatProfiles = it }
+            runCatching { repository.loadPublicProfiles(allIds) }.onSuccess { viewerProfiles = it }
         }
     }
 
@@ -664,35 +668,54 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
     }
     Box(Modifier.fillMaxSize().background(sky)) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-            // Host strip: creator identity, follow/add, room actions and live stats.
-            Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 10.dp, top = 5.dp, bottom = 4.dp),
+            // Live room header: close, PiP minimize, share, add/invite, host name + account ID.
+            Row(Modifier.fillMaxWidth().padding(start = 5.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.Default.Close, "إغلاق البث", tint = Color.White, modifier = Modifier.size(27.dp)) }
-                IconButton(onClick = { inviteOpen = true }) { Icon(Icons.Default.Share, "مشاركة البث", tint = Color.White) }
-                Column(Modifier.weight(1f).padding(start = 5.dp)) {
-                    Text(host?.ownerName ?: "صاحب البث", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1)
-                    Text(if (connected) "● بث مباشر" else status, color = Color.White.copy(alpha = .9f), fontSize = 11.sp)
+                IconButton(onClick = onBack, modifier = Modifier.size(42.dp)) {
+                    Icon(Icons.Default.Close, "الخروج من البث", tint = Color.White, modifier = Modifier.size(29.dp))
                 }
-                IconButton(onClick = { inviteOpen = true }, modifier = Modifier.size(42.dp).background(Color(0xFF17C9C6), CircleShape)) {
-                    Icon(Icons.Default.Add, "إضافة أو متابعة", tint = Color.White, modifier = Modifier.size(27.dp))
+                IconButton(onClick = {
+                    val activity = context as? Activity
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && activity != null) {
+                        runCatching {
+                            activity.enterPictureInPictureMode(
+                                PictureInPictureParams.Builder().setAspectRatio(Rational(9, 16)).build()
+                            )
+                        }.onFailure { error = "تعذر تصغير البث على هذا الجهاز" }
+                    } else error = "تصغير البث يحتاج Android 8 أو أحدث"
+                }, modifier = Modifier.size(42.dp)) {
+                    Icon(Icons.Default.Fullscreen, "تصغير البث", tint = Color.White, modifier = Modifier.size(25.dp))
+                }
+                IconButton(onClick = {
+                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(android.content.Intent.EXTRA_TEXT, "انضم إلى بث " + (host?.title ?: "غرفة الرافدين") + " على الرافدين تيك")
+                    }
+                    runCatching { context.startActivity(android.content.Intent.createChooser(send, "مشاركة البث")) }
+                        .onFailure { error = "تعذرت مشاركة البث" }
+                }, modifier = Modifier.size(42.dp)) {
+                    Icon(Icons.Default.Share, "مشاركة البث", tint = Color.White, modifier = Modifier.size(25.dp))
+                }
+                Spacer(Modifier.width(4.dp))
+                IconButton(onClick = { inviteOpen = true }, modifier = Modifier.size(44.dp).background(Color(0xFF17C9C6), CircleShape)) {
+                    Icon(Icons.Default.Add, "إضافة أو دعوة", tint = Color.White, modifier = Modifier.size(29.dp))
+                }
+                Column(Modifier.weight(1f).padding(start = 8.dp), horizontalAlignment = Alignment.End) {
+                    Text(host?.ownerName ?: "صاحب البث", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp, maxLines = 1)
+                    Text("ID: ${host?.ownerId?.take(12) ?: "—"}", color = Color.White.copy(alpha = .8f), fontSize = 11.sp, maxLines = 1)
+                    Text(if (connected) "● بث مباشر" else status, color = Color.White.copy(alpha = .9f), fontSize = 10.sp)
                 }
                 Spacer(Modifier.width(7.dp))
-                Box(Modifier.size(42.dp).clip(CircleShape).background(Color(0xFF244F7D)), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(43.dp).clip(CircleShape).background(Color(0xFF244F7D)), contentAlignment = Alignment.Center) {
                     val avatar = host?.ownerAvatar
                     if (!avatar.isNullOrBlank()) AsyncImage(model = avatar, contentDescription = "صورة صاحب البث", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                     else Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(28.dp))
                 }
-                Box {
-                    IconButton(onClick = { menuOpen = true }) { Icon(Icons.Default.MoreVert, "المزيد", tint = Color.White) }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(text = { Text("نسخ اسم الغرفة") }, onClick = { android.content.ClipData.newPlainText("room", roomName).also { context.getSystemService(android.content.Context.CLIPBOARD_SERVICE).let { svc -> (svc as android.content.ClipboardManager).setPrimaryClip(it) } }; menuOpen = false })
-                        DropdownMenuItem(text = { Text("مشاركة الغرفة") }, onClick = { inviteOpen = true; menuOpen = false })
-                    }
-                }
             }
             // Room counters and participant avatars.
             Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.background(Color(0x55304F7A), RoundedCornerShape(20.dp)).padding(horizontal = 12.dp, vertical = 6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                    .background(Color(0x55304F7A)).clickable { viewersDialog = true }.padding(horizontal = 12.dp, vertical = 6.dp)) {
                     Icon(Icons.Default.Visibility, null, tint = Color.White, modifier = Modifier.size(15.dp))
                     Text(" $viewerCount", color = Color.White, fontSize = 13.sp)
                 }
@@ -791,6 +814,27 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
             }
 
         }
+    }
+    if (viewersDialog) {
+        AlertDialog(
+            onDismissRequest = { viewersDialog = false },
+            title = { Text("المشاهدون ($viewerCount)") },
+            text = {
+                Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                    if (viewerProfiles.isEmpty()) Text("لا توجد حسابات ظاهرة حالياً")
+                    viewerProfiles.forEach { viewer ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(38.dp).clip(CircleShape).background(Color(0xFFE4EAF3)), contentAlignment = Alignment.Center) {
+                                if (!viewer.avatarUrl.isNullOrBlank()) AsyncImage(model = viewer.avatarUrl, contentDescription = viewer.displayName, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                else Icon(Icons.Default.Person, null, tint = Brand)
+                            }
+                            Text(viewer.displayName, modifier = Modifier.padding(start = 10.dp), fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { viewersDialog = false }) { Text("إغلاق") } }
+        )
     }
     selectedChatUserId?.let { profileUserId ->
         androidx.compose.ui.window.Dialog(onDismissRequest = { selectedChatUserId = null },
