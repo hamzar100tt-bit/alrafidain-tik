@@ -669,10 +669,10 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
     Box(Modifier.fillMaxSize().background(sky)) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             // Live room header: close, PiP minimize, share, add/invite, host name + account ID.
-            Row(Modifier.fillMaxWidth().padding(start = 5.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+            Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack, modifier = Modifier.size(42.dp)) {
-                    Icon(Icons.Default.Close, "الخروج من البث", tint = Color.White, modifier = Modifier.size(29.dp))
+                IconButton(onClick = onBack, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.Default.Close, "الخروج من البث", tint = Color.White, modifier = Modifier.size(23.dp))
                 }
                 IconButton(onClick = {
                     val activity = context as? Activity
@@ -684,7 +684,7 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                         }.onFailure { error = "تعذر تصغير البث على هذا الجهاز" }
                     } else error = "تصغير البث يحتاج Android 8 أو أحدث"
                 }, modifier = Modifier.size(42.dp)) {
-                    Icon(Icons.Default.Fullscreen, "تصغير البث", tint = Color.White, modifier = Modifier.size(25.dp))
+                    Icon(Icons.Default.Fullscreen, "تصغير البث", tint = Color.White, modifier = Modifier.size(21.dp))
                 }
                 IconButton(onClick = {
                     val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
@@ -697,19 +697,19 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                     Icon(Icons.Default.Share, "مشاركة البث", tint = Color.White, modifier = Modifier.size(25.dp))
                 }
                 Spacer(Modifier.width(4.dp))
-                IconButton(onClick = { inviteOpen = true }, modifier = Modifier.size(44.dp).background(Color(0xFF17C9C6), CircleShape)) {
+                IconButton(onClick = { inviteOpen = true }, modifier = Modifier.size(36.dp).background(Color(0xFF17C9C6), CircleShape)) {
                     Icon(Icons.Default.Add, "إضافة أو دعوة", tint = Color.White, modifier = Modifier.size(29.dp))
                 }
                 Column(Modifier.weight(1f).padding(start = 8.dp), horizontalAlignment = Alignment.End) {
-                    Text(host?.ownerName ?: "صاحب البث", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp, maxLines = 1)
-                    Text("ID: ${host?.ownerId?.take(12) ?: "—"}", color = Color.White.copy(alpha = .8f), fontSize = 11.sp, maxLines = 1)
-                    Text(if (connected) "● بث مباشر" else status, color = Color.White.copy(alpha = .9f), fontSize = 10.sp)
+                    Text(host?.ownerName ?: "صاحب البث", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
+                    Text("ID: ${host?.ownerId?.take(12) ?: "—"}", color = Color.White.copy(alpha = .8f), fontSize = 9.sp, maxLines = 1)
+                    Text(if (connected) "● بث مباشر" else status, color = Color.White.copy(alpha = .9f), fontSize = 9.sp)
                 }
                 Spacer(Modifier.width(7.dp))
-                Box(Modifier.size(43.dp).clip(CircleShape).background(Color(0xFF244F7D)), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(36.dp).clip(CircleShape).background(Color(0xFF244F7D)), contentAlignment = Alignment.Center) {
                     val avatar = host?.ownerAvatar
                     if (!avatar.isNullOrBlank()) AsyncImage(model = avatar, contentDescription = "صورة صاحب البث", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    else Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(28.dp))
+                    else Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(23.dp))
                 }
             }
             // Room counters and participant avatars.
