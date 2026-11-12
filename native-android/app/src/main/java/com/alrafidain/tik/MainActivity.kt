@@ -330,80 +330,130 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
         return
     }
     if (showCreateAudioRoom) {
-        AlertDialog(
+        androidx.compose.ui.window.Dialog(
             onDismissRequest = { if (!creatingAudioRoom) showCreateAudioRoom = false },
-            title = { Text("إنشاء غرفة صوتية") },
-            text = {
-                Column {
+            properties = androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
+            val backgrounds = listOf("ملعب كرة القدم", "خلفية زرقاء", "غرفة ألعاب", "مدينة ليلية", "شاطئ الغروب", "مسجد ليلي")
+            val backgroundIcons = listOf("⚽", "🌊", "🎮", "🌃", "🌅", "🕌")
+            val backgroundBrushes = listOf(
+                listOf(Color(0xFF062C58), Color(0xFF087C9B), Color(0xFF164A32)),
+                listOf(Color(0xFF0066CC), Color(0xFF123A9C), Color(0xFF061B4A)),
+                listOf(Color(0xFF35105D), Color(0xFF711D86), Color(0xFF120D2B)),
+                listOf(Color(0xFF071B3D), Color(0xFF183C66), Color(0xFF030A19)),
+                listOf(Color(0xFFFFA45B), Color(0xFFB84F73), Color(0xFF253C70)),
+                listOf(Color(0xFF102A53), Color(0xFF28517A), Color(0xFF08192E))
+            )
+            Column(
+                Modifier.fillMaxSize().background(Color(0xFF050817)).statusBarsPadding()
+                    .navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { if (!creatingAudioRoom) showCreateAudioRoom = false }) {
+                        Icon(Icons.Default.ArrowBack, "رجوع", tint = Color.White)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Text("إنشاء بث صوتي مباشر", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                    Spacer(Modifier.weight(1f))
+                    Icon(Icons.Default.Mic, null, tint = Color(0xFF31C8FF), modifier = Modifier.size(28.dp))
+                }
+                Spacer(Modifier.height(12.dp))
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
+                    .background(Brush.horizontalGradient(listOf(Color(0xFF102C50), Color(0xFF071426))))
+                    .border(1.dp, Color(0xFF168BD1), RoundedCornerShape(22.dp)).padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(64.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF7C36E8), Color(0xFF11B8E8)))), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(38.dp))
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("مضيف البث", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Text("غرفتك الصوتية • 8 مقاعد للمايك", color = Color(0xFFB7C9E2), fontSize = 12.sp)
+                        }
+                        Icon(Icons.Default.Verified, null, tint = Color(0xFF29B6F6))
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
+                    .background(Color(0xFF0A1B31)).border(1.dp, Color(0xFF176B9E), RoundedCornerShape(22.dp)).padding(14.dp)) {
+                    Text("عنوان البث", color = Color.White, fontWeight = FontWeight.Bold)
                     OutlinedTextField(
-                        value = audioRoomTitle,
-                        onValueChange = { audioRoomTitle = it },
-                        singleLine = true,
-                        label = { Text("اسم الغرفة") }
+                        value = audioRoomTitle, onValueChange = { audioRoomTitle = it }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("اكتب اسم الغرفة") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF24B9F4), unfocusedBorderColor = Color(0xFF385878),
+                            focusedLabelColor = Color(0xFF70D7FF), unfocusedLabelColor = Color(0xFFB5C5D8),
+                            cursorColor = Color.White
+                        )
                     )
-                    Text("غرفة صوتية مع 8 مقاعد للمايكات", color = Muted, fontSize = 12.sp)
-                    Spacer(Modifier.height(12.dp))
-                    Text("اختار خلفية البث", fontWeight = FontWeight.Bold)
-                    val backgrounds = listOf("ملعب كرة القدم", "خلفية زرقاء", "غرفة ألعاب", "مدينة ليلية", "شاطئ الغروب", "مسجد ليلي")
-                    val backgroundIcons = listOf("⚽", "🌊", "🎮", "🌃", "🌅", "🕌")
-                    val backgroundBrushes = listOf(
-                        listOf(Color(0xFF062C58), Color(0xFF087C9B), Color(0xFF164A32)),
-                        listOf(Color(0xFF0066CC), Color(0xFF123A9C), Color(0xFF061B4A)),
-                        listOf(Color(0xFF35105D), Color(0xFF711D86), Color(0xFF120D2B)),
-                        listOf(Color(0xFF071B3D), Color(0xFF183C66), Color(0xFF030A19)),
-                        listOf(Color(0xFFFFA45B), Color(0xFFB84F73), Color(0xFF253C70)),
-                        listOf(Color(0xFF102A53), Color(0xFF28517A), Color(0xFF08192E))
-                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text("اختر خلفية البث", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("الخلفية المختارة تظهر داخل غرفة البث", color = Color(0xFFB7C9E2), fontSize = 12.sp)
+                    Spacer(Modifier.height(10.dp))
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
-                        modifier = Modifier.fillMaxWidth().height(220.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.fillMaxWidth().height(300.dp),
+                        verticalArrangement = Arrangement.spacedBy(9.dp),
+                        horizontalArrangement = Arrangement.spacedBy(9.dp)
                     ) {
                         items(backgrounds.size) { index ->
                             val chosen = selectedAudioBackground == index
                             Column(
-                                Modifier.fillMaxWidth().height(100.dp).clip(RoundedCornerShape(13.dp))
+                                Modifier.fillMaxWidth().height(132.dp).clip(RoundedCornerShape(16.dp))
                                     .background(Brush.verticalGradient(backgroundBrushes[index]))
-                                    .then(if (chosen) Modifier.padding(2.dp).border(2.dp, Brand, RoundedCornerShape(12.dp)) else Modifier)
-                                    .clickable { selectedAudioBackground = index }
-                                    .padding(9.dp),
+                                    .border(if (chosen) 3.dp else 1.dp, if (chosen) Color(0xFFE43DFF) else Color(0xFF287EB2), RoundedCornerShape(16.dp))
+                                    .clickable { selectedAudioBackground = index }.padding(11.dp),
                                 verticalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                    Text(backgroundIcons[index], fontSize = 23.sp)
-                                    if (chosen) Icon(Icons.Default.CheckCircle, "محدد", tint = Color.White)
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(backgroundIcons[index], fontSize = 28.sp)
+                                    if (chosen) Icon(Icons.Default.CheckCircle, "محدد", tint = Color.White, modifier = Modifier.size(25.dp))
                                 }
-                                Text(backgrounds[index], color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text(backgrounds[index], color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
-                    if (audioRoomError != null) Text(audioRoomError!!, color = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.height(12.dp))
+                    Text("إعدادات الغرفة", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("عدد مقاعد المايك", color = Color.White)
+                        Text("8 مقاعد", color = Color(0xFF6BD5FF), fontWeight = FontWeight.Bold)
+                    }
+                    if (audioRoomError != null) Text(audioRoomError!!, color = Color(0xFFFF7B91))
                 }
-            },
-            confirmButton = {
-                TextButton(enabled = !creatingAudioRoom && audioRoomTitle.isNotBlank(), onClick = {
-                    creatingAudioRoom = true
-                    audioRoomError = null
-                    liveScope.launch {
-                        try {
-                            val roomKey = withContext(Dispatchers.IO) {
-                                repository.createLiveRoom(audioRoomTitle, "audio")
-                            }
-                            showCreateAudioRoom = false
-                            openedAudioRoom = roomKey
-                        } catch (e: Exception) {
-                            audioRoomError = e.message ?: "تعذر إنشاء الغرفة الصوتية"
-                        } finally {
-                            creatingAudioRoom = false
+                Spacer(Modifier.height(16.dp))
+                Button(
+                    enabled = !creatingAudioRoom && audioRoomTitle.isNotBlank(),
+                    onClick = {
+                        creatingAudioRoom = true
+                        audioRoomError = null
+                        liveScope.launch {
+                            try {
+                                val roomKey = withContext(Dispatchers.IO) { repository.createLiveRoom(audioRoomTitle, "audio") }
+                                showCreateAudioRoom = false
+                                openedAudioRoom = roomKey
+                            } catch (e: Exception) {
+                                audioRoomError = e.message ?: "تعذر إنشاء الغرفة الصوتية"
+                            } finally { creatingAudioRoom = false }
                         }
-                    }
-                }) { Text(if (creatingAudioRoom) "جارٍ الإنشاء..." else "إنشاء وبدء الغرفة") }
-            },
-            dismissButton = {
-                TextButton(enabled = !creatingAudioRoom, onClick = { showCreateAudioRoom = false }) { Text("إلغاء") }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(58.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B24E8), contentColor = Color.White),
+                    shape = RoundedCornerShape(30.dp)
+                ) {
+                    Text(if (creatingAudioRoom) "جارٍ بدء البث..." else "بدء البث الآن  ◉", fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
+                }
+                TextButton(onClick = { if (!creatingAudioRoom) showCreateAudioRoom = false }) {
+                    Text("إلغاء", color = Color(0xFFB9C9E0))
+                }
             }
-        )
+        }
     }
     if (showCreateVideoRoom) {
         AlertDialog(
