@@ -344,7 +344,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
                     Spacer(Modifier.height(12.dp))
                     Text("اختار خلفية البث", fontWeight = FontWeight.Bold)
                     val backgrounds = listOf("ملعب كرة القدم", "خلفية زرقاء", "غرفة ألعاب", "مدينة ليلية", "شاطئ الغروب", "مسجد ليلي")
-                    val backgroundIcons = listOf(Icons.Default.Stadium, Icons.Default.Waves, Icons.Default.SportsEsports, Icons.Default.LocationCity, Icons.Default.BeachAccess, Icons.Default.Mosque)
+                    val backgroundIcons = listOf("⚽", "🌊", "🎮", "🌃", "🌅", "🕌")
                     val backgroundBrushes = listOf(
                         listOf(Color(0xFF062C58), Color(0xFF087C9B), Color(0xFF164A32)),
                         listOf(Color(0xFF0066CC), Color(0xFF123A9C), Color(0xFF061B4A)),
@@ -370,7 +370,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
                                 verticalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(backgroundIcons[index], null, tint = Color.White, modifier = Modifier.size(25.dp))
+                                    Text(backgroundIcons[index], fontSize = 23.sp)
                                     if (chosen) Icon(Icons.Default.CheckCircle, "محدد", tint = Color.White)
                                 }
                                 Text(backgrounds[index], color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
