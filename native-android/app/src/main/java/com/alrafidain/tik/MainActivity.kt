@@ -51,12 +51,12 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import io.livekit.android.LiveKit
 import io.livekit.android.room.Room
 import io.livekit.android.events.RoomEvent
+import io.livekit.android.events.collect
 import io.livekit.android.room.participant.Participant
 import io.livekit.android.room.track.VideoTrack
 import io.livekit.android.util.flow
@@ -442,20 +442,18 @@ private fun VideoLiveRoomScreen(
         onDispose { liveRoom.disconnect() }
     }
     LaunchedEffect(liveRoom) {
-        liveRoom.events.collect(object : kotlinx.coroutines.flow.FlowCollector<RoomEvent> {
-            override suspend fun emit(event: RoomEvent) {
-                when (event) {
-                    is RoomEvent.TrackSubscribed -> {
-                        val track = event.track
-                        if (track is VideoTrack) remoteVideoTrack = track
-                    }
-                    is RoomEvent.TrackUnsubscribed -> {
-                        if (event.track == remoteVideoTrack) remoteVideoTrack = null
-                    }
-                    else -> Unit
+        liveRoom.events.collect { event ->
+            when (event) {
+                is RoomEvent.TrackSubscribed -> {
+                    val track = event.track
+                    if (track is VideoTrack) remoteVideoTrack = track
                 }
+                is RoomEvent.TrackUnsubscribed -> {
+                    if (event.track == remoteVideoTrack) remoteVideoTrack = null
+                }
+                else -> Unit
             }
-        })
+        }
     }
     LaunchedEffect(roomName) {
         try {
