@@ -69,6 +69,8 @@ private val Ink = Color(0xFF17171B)
 private val Muted = Color(0xFF777780)
 private val Canvas = Color(0xFFF7F7F8)
 
+private data class LiveChatMessage(val userId: String, val text: String, val displayName: String, val avatarUrl: String?)
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -572,7 +574,9 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
     var viewerCount by remember { mutableStateOf(1) }
     var chatOpen by remember { mutableStateOf(true) }
     var draft by remember { mutableStateOf("") }
-    var chat by remember { mutableStateOf(listOf("أهلاً وسهلاً بالجميع ❤️", "انضموا للمقاعد وشاركونا الحديث")) }
+    var chat by remember { mutableStateOf<List<LiveChatMessage>>(emptyList()) }
+    var myChatProfile by remember { mutableStateOf<SupabaseRepository.DiscoverProfile?>(null) }
+    var selectedChatUserId by remember { mutableStateOf<String?>(null) }
     var giftsOpen by remember { mutableStateOf(false) }
     var inviteOpen by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -613,6 +617,15 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
     }
     LaunchedEffect(roomName) {
         try {
+            myChatProfile = withContext(Dispatchers.IO) {
+                val me = repository.currentUserId()
+                val profile = repository.loadProfile()
+                if (me.isNullOrBlank()) null else SupabaseRepository.DiscoverProfile(
+                    me, profile.optString("username"),
+                    profile.optString("display_name").ifBlank { profile.optString("username").ifBlank { "مستخدم" } },
+                    profile.optString("avatar_url").takeIf { it.isNotBlank() }
+                )
+            }
             host = withContext(Dispatchers.IO) {
                 repository.loadLiveRooms().firstOrNull { it.roomKey == roomName }
             }
@@ -711,11 +724,23 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
             }
             if (chatOpen) {
                 Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 14.dp), verticalArrangement = Arrangement.Bottom) {
-                    chat.takeLast(5).forEach { line ->
+                    chat.takeLast(5).forEach { message ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.AccountCircle, null, tint = Color(0xFFD2E7F8), modifier = Modifier.size(25.dp))
-                            Text(line, color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(start = 7.dp)
-                                .background(Color(0x55304F7A), RoundedCornerShape(17.dp)).padding(horizontal = 11.dp, vertical = 7.dp))
+                            Box(Modifier.size(29.dp).clip(CircleShape).background(Color(0xFFD2E7F8))
+                                .clickable { if (message.userId.isNotBlank()) selectedChatUserId = message.userId },
+                                contentAlignment = Alignment.Center) {
+                                if (!message.avatarUrl.isNullOrBlank()) AsyncImage(
+                                    model = message.avatarUrl, contentDescription = message.displayName,
+                                    contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()
+                                ) else Icon(Icons.Default.AccountCircle, null, tint = Color(0xFF176B78))
+                            }
+                            Column(Modifier.padding(start = 7.dp).clip(RoundedCornerShape(15.dp))
+                                .background(Color(0x55304F7A)).clickable {
+                                    if (message.userId.isNotBlank()) selectedChatUserId = message.userId
+                                }.padding(horizontal = 11.dp, vertical = 6.dp)) {
+                                Text(message.displayName, color = Color(0xFF9FE8FF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text(message.text, color = Color.White, fontSize = 13.sp)
+                            }
                         }
                     }
                     error?.let { Text(it, color = Color(0xFFFFD0D8), fontSize = 12.sp, modifier = Modifier.padding(vertical = 3.dp)) }
@@ -727,7 +752,14 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                     placeholder = { Text("اكتب تعليقاً... ", color = Color.White.copy(alpha = .75f)) },
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White,
                         focusedBorderColor = Color.White.copy(alpha = .7f), unfocusedBorderColor = Color.White.copy(alpha = .4f), cursorColor = Color.White))
-                IconButton(onClick = { if (draft.isNotBlank()) { chat = chat + draft.trim(); draft = "" } }) { Icon(Icons.Default.Send, "إرسال", tint = Color.White) }
+                IconButton(onClick = {
+                    if (draft.isNotBlank()) {
+                        val profile = myChatProfile
+                        chat = chat + LiveChatMessage(profile?.id.orEmpty(), draft.trim(),
+                            profile?.displayName ?: "مستخدم", profile?.avatarUrl)
+                        draft = ""
+                    }
+                }) { Icon(Icons.Default.Send, "إرسال", tint = Color.White) }
             }
             Row(Modifier.fillMaxWidth().background(Color(0xCC102E58)).padding(horizontal = 5.dp, vertical = 5.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
@@ -741,6 +773,12 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                 IconButton(onClick = onBack) { Icon(Icons.Default.CallEnd, "إنهاء البث", tint = Color(0xFFFF5A78), modifier = Modifier.size(27.dp)) }
             }
             if (giftsOpen) Text("🎁 الهدايا قريباً", color = Color.White, modifier = Modifier.align(Alignment.CenterHorizontally).padding(4.dp))
+        }
+    }
+    selectedChatUserId?.let { profileUserId ->
+        androidx.compose.ui.window.Dialog(onDismissRequest = { selectedChatUserId = null },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+            PublicCommentProfileScreen(repository, profileUserId, onBack = { selectedChatUserId = null })
         }
     }
     if (inviteOpen) AlertDialog(onDismissRequest = { inviteOpen = false }, title = { Text("دعوة إلى الغرفة") },
