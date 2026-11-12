@@ -37,6 +37,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -466,182 +467,121 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
     }
 }
 @Composable
-private fun AudioLiveRoomScreen(
-    repository: SupabaseRepository,
-    roomName: String,
-    onBack: () -> Unit
-) {
+private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String, onBack: () -> Unit) {
     val context = LocalContext.current
     val room = remember(roomName) { LiveKit.create(context.applicationContext) }
     val scope = rememberCoroutineScope()
-    var connected by remember(roomName) { mutableStateOf(false) }
-    var status by remember(roomName) { mutableStateOf("جارٍ الاتصال بالغرفة...") }
-    var error by remember(roomName) { mutableStateOf<String?>(null) }
-    var micEnabled by remember(roomName) { mutableStateOf(false) }
-    var canSpeak by remember(roomName) { mutableStateOf(false) }
-    var connecting by remember(roomName) { mutableStateOf(true) }
-    var micSeatNames by remember(roomName) { mutableStateOf<List<String>>(emptyList()) }
-    var activeSpeakerNames by remember(roomName) { mutableStateOf<Set<String>>(emptySet()) }
-
-    fun refreshMicSeats() {
-        val names = mutableListOf<String>()
-        if (room.localParticipant.isMicrophoneEnabled) {
-            names.add(room.localParticipant.name?.takeIf { it.isNotBlank() } ?: "المضيف")
-        }
-        room.remoteParticipants.values
-            .filter { it.isMicrophoneEnabled }
-            .forEach { participant ->
-                names.add(participant.name?.takeIf { it.isNotBlank() }
-                    ?: participant.identity?.value ?: "مشارك")
-            }
-        micSeatNames = names.take(8)
+    var connected by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("جارٍ الاتصال بالغرفة...") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var micEnabled by remember { mutableStateOf(false) }
+    var canSpeak by remember { mutableStateOf(false) }
+    var connecting by remember { mutableStateOf(true) }
+    var names by remember { mutableStateOf<List<String>>(emptyList()) }
+    var speakers by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var chatOpen by remember { mutableStateOf(true) }
+    var draft by remember { mutableStateOf("") }
+    var chat by remember { mutableStateOf(listOf("أهلاً وسهلاً بالجميع ❤️", "انضموا للمقاعد وشاركونا الحديث")) }
+    var gifts by remember { mutableStateOf(false) }
+    fun refreshSeats() {
+        val list = mutableListOf<String>()
+        if (room.localParticipant.isMicrophoneEnabled) list.add(room.localParticipant.name?.takeIf { it.isNotBlank() } ?: "المضيف")
+        room.remoteParticipants.values.filter { it.isMicrophoneEnabled }.forEach { p -> list.add(p.name?.takeIf { it.isNotBlank() } ?: p.identity?.value ?: "مشارك") }
+        names = list.take(8)
     }
-
-    DisposableEffect(room) {
-        onDispose { room.disconnect() }
+    DisposableEffect(room) { onDispose { room.disconnect() } }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) scope.launch { try { room.localParticipant.setMicrophoneEnabled(true); micEnabled = true; refreshSeats() } catch (e: Exception) { error = e.message } }
+        else error = "اسمح للتطبيق باستخدام المايك."
     }
-
-    val micPermission = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            scope.launch {
-                try {
-                    room.localParticipant.setMicrophoneEnabled(true)
-                    micEnabled = true
-                    refreshMicSeats()
-                } catch (e: Exception) {
-                    error = e.message ?: "تعذر تشغيل المايك"
-                }
-            }
-        } else {
-            error = "اسمح للتطبيق باستخدام المايك حتى تتحدث داخل الغرفة."
-        }
-    }
-
     LaunchedEffect(room) {
-        room.events.collect { event ->
-            when (event) {
-                is RoomEvent.ParticipantConnected,
-                is RoomEvent.ParticipantDisconnected,
-                is RoomEvent.TrackMuted,
-                is RoomEvent.TrackUnmuted -> refreshMicSeats()
-                is RoomEvent.ActiveSpeakersChanged -> {
-                    activeSpeakerNames = event.speakers.mapNotNull { participant ->
-                        participant.name?.takeIf { it.isNotBlank() }
-                            ?: participant.identity?.value
-                    }.toSet()
-                    refreshMicSeats()
-                }
+        room.events.collect { e ->
+            when (e) {
+                is RoomEvent.ParticipantConnected, is RoomEvent.ParticipantDisconnected, is RoomEvent.TrackMuted, is RoomEvent.TrackUnmuted -> refreshSeats()
+                is RoomEvent.ActiveSpeakersChanged -> { speakers = e.speakers.mapNotNull { it.name?.takeIf(String::isNotBlank) ?: it.identity?.value }.toSet(); refreshSeats() }
                 else -> Unit
             }
         }
     }
-
     LaunchedEffect(roomName) {
         try {
-            val credentials = withContext(Dispatchers.IO) {
-                repository.requestLiveKitToken(roomName, "viewer")
-            }
-            canSpeak = credentials.role == "host" || credentials.role == "speaker"
-            status = "جارٍ الاتصال بخادم الصوت..."
-            room.connect(credentials.serverUrl, credentials.participantToken)
-            connected = true
-            refreshMicSeats()
-            status = if (canSpeak) "أنت داخل الغرفة كمضيف" else "أنت مستمع داخل الغرفة"
-            if (canSpeak) {
-                micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
-            }
-        } catch (e: Exception) {
-            status = "تعذر الاتصال"
-            error = e.message ?: "فشل الاتصال بالغرفة الصوتية"
-        } finally {
-            connecting = false
-        }
+            val c = withContext(Dispatchers.IO) { repository.requestLiveKitToken(roomName, "viewer") }
+            canSpeak = c.role == "host" || c.role == "speaker"
+            room.connect(c.serverUrl, c.participantToken)
+            connected = true; refreshSeats()
+            status = if (canSpeak) "أنت المضيف" else "متصل — مستمع"
+            if (canSpeak) permission.launch(android.Manifest.permission.RECORD_AUDIO)
+        } catch (e: Exception) { status = "تعذر الاتصال"; error = e.message ?: "فشل الاتصال بالغرفة" }
+        finally { connecting = false }
     }
-
-    Column(
-        Modifier.fillMaxSize().background(Color(0xFF111B2B))
-            .statusBarsPadding().navigationBarsPadding().padding(16.dp)
-    ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, "مغادرة الغرفة", tint = Color.White)
-            }
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                Text(roomName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Text(status, color = if (connected) Color(0xFF62E6B2) else Color.LightGray, fontSize = 12.sp)
-            }
-            Icon(Icons.Default.Headphones, null, tint = Color(0xFFB23BE0), modifier = Modifier.size(28.dp))
-        }
-        Spacer(Modifier.height(24.dp))
-        Text("مقاعد المايكات", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        Spacer(Modifier.height(16.dp))
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(4),
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(22.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            items(8) { index ->
-                val occupant = micSeatNames.getOrNull(index)
-                val speaking = occupant != null && activeSpeakerNames.contains(occupant)
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        Modifier.size(62.dp).background(
-                            if (speaking) Color(0xFF188B69) else if (occupant != null) Color(0xFF704A83) else Color(0xFF26384E),
-                            CircleShape
-                        ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            if (occupant != null) Icons.Default.Mic else Icons.Default.Person,
-                            null, tint = Color.White, modifier = Modifier.size(30.dp)
-                        )
-                    }
-                    Text(occupant ?: "مقعد ${index + 1}",
-                        color = Color.White, fontSize = 11.sp, maxLines = 1)
+    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF1677D7), Color(0xFF278FE8), Color(0xFF79C9F4), Color(0xFF174477))))) {
+        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 7.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.Default.Close, "خروج", tint = Color.White) }
+                IconButton(onClick = {}) { Icon(Icons.Default.Fullscreen, "تكبير", tint = Color.White) }
+                IconButton(onClick = {}) { Icon(Icons.Default.Refresh, "تحديث", tint = Color.White) }
+                Spacer(Modifier.weight(1f))
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("غرفة الرافدين", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(if (connected) "● متصل بالصوت" else status, color = Color.White, fontSize = 11.sp)
+                }
+                Box(Modifier.padding(start = 8.dp).size(42.dp).background(Color(0xFF234B7B), CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Headphones, null, tint = Color(0xFFFFD66B), modifier = Modifier.size(27.dp))
                 }
             }
-        }
-        if (error != null) {
-            Text(error!!, color = Color(0xFFFFA8B8), fontSize = 13.sp,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
-        }
-        Row(
-            Modifier.fillMaxWidth().background(Color(0xFF0C101A), RoundedCornerShape(28.dp))
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.CallEnd, "إنهاء ومغادرة", tint = Color(0xFFFF5570))
+            Row(Modifier.fillMaxWidth().padding(horizontal = 17.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("125", color = Color.White, modifier = Modifier.background(Color(0x55304F7A), RoundedCornerShape(18.dp)).padding(horizontal = 13.dp, vertical = 6.dp))
+                Spacer(Modifier.width(8.dp))
+                repeat(3) { i -> Box(Modifier.padding(end = 5.dp).size(31.dp).background(listOf(Color(0xFFB7D8F2), Color(0xFF263B59), Color(0xFFE9B9A0))[i], CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Default.Person, null, tint = Color.White) } }
+                Spacer(Modifier.weight(1f))
+                Text("🏠 الغرفة الرئيسية", color = Color.White, modifier = Modifier.background(Color(0x55304F7A), RoundedCornerShape(18.dp)).padding(horizontal = 12.dp, vertical = 6.dp))
             }
-            Button(
-                enabled = connected && canSpeak && !connecting,
-                onClick = {
-                    if (!micEnabled) {
-                        micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
-                    } else {
-                        scope.launch {
-                            try {
-                                room.localParticipant.setMicrophoneEnabled(false)
-                                micEnabled = false
-                                refreshMicSeats()
-                            } catch (e: Exception) {
-                                error = e.message ?: "تعذر إيقاف المايك"
-                            }
-                        }
+            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(Modifier.size(67.dp).background(Color(0x554B9FE5), CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(37.dp)) }
+                    Text("دعوة", color = Color.White, fontSize = 11.sp)
+                }
+                listOf("المضيف", "ضيف", "مشارك").forEachIndexed { i, label ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(Modifier.size(67.dp).background(listOf(Color(0xFFB7D8F2), Color(0xFF263B59), Color(0xFF477DAE))[i], CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(42.dp)) }
+                        Text(label, color = Color.White, fontSize = 11.sp)
                     }
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (micEnabled) Color(0xFFB23BE0) else Color(0xFF34465B)
-                )
-            ) {
-                Icon(if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff, null)
-                Spacer(Modifier.width(6.dp))
-                Text(if (micEnabled) "إيقاف المايك" else if (canSpeak) "تشغيل المايك" else "استماع فقط")
+                }
             }
+            LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp).height(180.dp),
+                verticalArrangement = Arrangement.spacedBy(13.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                items(8) { i ->
+                    val person = names.getOrNull(i)
+                    val active = person != null && speakers.contains(person)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(Modifier.size(57.dp).background(if (active) Color(0xFF18A77D) else if (person != null) Color(0xFF477EAF) else Color(0x554A91CE), CircleShape), contentAlignment = Alignment.Center) {
+                            Icon(if (person == null) Icons.Default.Add else Icons.Default.Mic, null, tint = Color.White, modifier = Modifier.size(29.dp))
+                        }
+                        Text(person ?: "مقعد ${i + 1}", color = Color.White, fontSize = 11.sp, maxLines = 1)
+                    }
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            if (chatOpen) Column(Modifier.fillMaxWidth().weight(1f, fill = false).padding(horizontal = 15.dp), verticalArrangement = Arrangement.Bottom) {
+                chat.takeLast(4).forEach { line -> Text(line, color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(vertical = 3.dp).background(Color(0x66304F7A), RoundedCornerShape(18.dp)).padding(horizontal = 12.dp, vertical = 8.dp)) }
+                error?.let { Text(it, color = Color(0xFFFFD0D8), fontSize = 12.sp) }
+            } else Spacer(Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(value = draft, onValueChange = { draft = it }, singleLine = true, modifier = Modifier.weight(1f), placeholder = { Text("اكتب رسالة...") },
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color.White, unfocusedBorderColor = Color.White.copy(alpha = .5f), cursorColor = Color.White))
+                IconButton(onClick = { if (draft.isNotBlank()) { chat = chat + draft.trim(); draft = "" } }) { Icon(Icons.Default.Send, "إرسال", tint = Color.White) }
+            }
+            Row(Modifier.fillMaxWidth().background(Color(0xCC102E58)).padding(vertical = 5.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { gifts = !gifts }) { Icon(Icons.Default.CardGiftcard, "هدايا", tint = Color(0xFFFFD56A)) }
+                IconButton(onClick = { chatOpen = !chatOpen }) { Icon(Icons.Default.ChatBubble, "الدردشة", tint = Color.White) }
+                IconButton(onClick = {}) { Icon(Icons.Default.Favorite, "إعجاب", tint = Color(0xFFFF6A91)) }
+                IconButton(enabled = connected && canSpeak && !connecting, onClick = {
+                    if (!micEnabled) permission.launch(android.Manifest.permission.RECORD_AUDIO)
+                    else scope.launch { try { room.localParticipant.setMicrophoneEnabled(false); micEnabled = false; refreshSeats() } catch (e: Exception) { error = e.message } }
+                }) { Icon(if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff, "المايك", tint = if (micEnabled) Color(0xFF64F0C1) else Color.White) }
+                IconButton(onClick = onBack) { Icon(Icons.Default.CallEnd, "إنهاء", tint = Color(0xFFFF5A78)) }
+            }
+            if (gifts) Text("🎁 الهدايا قريباً", color = Color.White, modifier = Modifier.align(Alignment.CenterHorizontally).padding(3.dp))
         }
     }
 }
