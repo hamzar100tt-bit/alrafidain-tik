@@ -18,6 +18,8 @@ data class TikNotification(val id: String, val actorName: String, val actorUsern
 
 data class LiveKitCredentials(val serverUrl: String, val participantToken: String, val room: String, val role: String)
 
+data class LiveRoomInfo(val id: String, val title: String, val roomKey: String, val roomType: String, val ownerId: String, val ownerName: String)
+
 class SupabaseRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences("alrafidain_session", Context.MODE_PRIVATE)
     private val client = OkHttpClient()
@@ -42,6 +44,20 @@ class SupabaseRepository(private val context: Context) {
             return LiveKitCredentials(url, token, json.optString("room", room), json.optString("role", role))
         }
     }
+    fun loadLiveRooms(): List<LiveRoomInfo> {
+        val rows = publicRows("live_rooms?is_live=eq.true&select=id,title,room_key,room_type,owner_id,created_at&order=created_at.desc&limit=50")
+        val result = ArrayList<LiveRoomInfo>()
+        for (i in 0 until rows.length()) {
+            val row = rows.getJSONObject(i)
+            val ownerId = row.optString("owner_id")
+            val profileRows = publicRows("profiles?id=eq.$ownerId&select=display_name,username&limit=1")
+            val profile = if (profileRows.length() > 0) profileRows.getJSONObject(0) else JSONObject()
+            val ownerName = profile.optString("display_name").ifBlank { profile.optString("username").ifBlank { "مستخدم" } }
+            result.add(LiveRoomInfo(row.optString("id"), row.optString("title").ifBlank { "بث مباشر" }, row.optString("room_key"), row.optString("room_type"), ownerId, ownerName))
+        }
+        return result
+    }
+
     fun createLiveRoom(title: String, roomType: String): String {
         val userId = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
         val roomKey = "live-" + UUID.randomUUID().toString().replace("-", "").take(20)
