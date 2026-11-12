@@ -372,7 +372,19 @@ class SupabaseRepository(private val context: Context) {
         }
     }
 
-    fun loadPublicProfiles(userIds: List<String>): List<DiscoverProfile> {\n        val ids = userIds.distinct().filter { it.matches(Regex("[A-Fa-f0-9-]{16,}")) }\n        if (ids.isEmpty()) return emptyList()\n        val rows = publicRows("profiles?id=in.(${ids.joinToString(",")})&select=id,username,display_name,avatar_url")\n        return (0 until rows.length()).map { i ->\n            val row = rows.getJSONObject(i)\n            DiscoverProfile(row.optString("id"), row.optString("username"),\n                row.optString("display_name").ifBlank { row.optString("username").ifBlank { "مستخدم" } },\n                row.optString("avatar_url").takeIf { it.isNotBlank() })\n        }\n    }\n\n    fun loadPublicProfile(userId: String): DiscoverProfile {
+    fun loadPublicProfiles(userIds: List<String>): List<DiscoverProfile> {
+        val ids = userIds.distinct().filter { it.matches(Regex("[A-Fa-f0-9-]{16,}")) }
+        if (ids.isEmpty()) return emptyList()
+        val rows = publicRows("profiles?id=in.(${ids.joinToString(",")})&select=id,username,display_name,avatar_url")
+        return (0 until rows.length()).map { i ->
+            val row = rows.getJSONObject(i)
+            DiscoverProfile(row.optString("id"), row.optString("username"),
+                row.optString("display_name").ifBlank { row.optString("username").ifBlank { "مستخدم" } },
+                row.optString("avatar_url").takeIf { it.isNotBlank() })
+        }
+    }
+
+    fun loadPublicProfile(userId: String): DiscoverProfile {
         val rows = publicRows("profiles?id=eq.$userId&select=id,username,display_name,avatar_url&limit=1")
         if (rows.length() == 0) throw IOException("الحساب غير موجود")
         val row = rows.getJSONObject(0)
