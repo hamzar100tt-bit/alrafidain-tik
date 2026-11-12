@@ -54,6 +54,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import io.livekit.android.LiveKit
 import io.livekit.android.room.Room
@@ -615,6 +616,18 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
             }
         }
     }
+    LaunchedEffect(roomName, connected) {
+        if (connected) {
+            while (true) {
+                try {
+                    val latest = withContext(Dispatchers.IO) { repository.loadLiveChatMessages(roomName) }
+                    chat = latest.map { LiveChatMessage(it.userId, it.body, it.displayName, it.avatarUrl) }
+                } catch (_: Exception) { }
+                delay(2500)
+            }
+        }
+    }
+
     LaunchedEffect(roomName) {
         try {
             myChatProfile = withContext(Dispatchers.IO) {
@@ -754,10 +767,17 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                         focusedBorderColor = Color.White.copy(alpha = .7f), unfocusedBorderColor = Color.White.copy(alpha = .4f), cursorColor = Color.White))
                 IconButton(onClick = {
                     if (draft.isNotBlank()) {
-                        val profile = myChatProfile
-                        chat = chat + LiveChatMessage(profile?.id.orEmpty(), draft.trim(),
-                            profile?.displayName ?: "مستخدم", profile?.avatarUrl)
+                        val message = draft.trim()
                         draft = ""
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) { repository.sendLiveChatMessage(roomName, message) }
+                                val latest = withContext(Dispatchers.IO) { repository.loadLiveChatMessages(roomName) }
+                                chat = latest.map { LiveChatMessage(it.userId, it.body, it.displayName, it.avatarUrl) }
+                            } catch (e: Exception) {
+                                error = e.message ?: "تعذر إرسال التعليق"
+                            }
+                        }
                     }
                 }) { Icon(Icons.Default.Send, "إرسال", tint = Color.White) }
             }
