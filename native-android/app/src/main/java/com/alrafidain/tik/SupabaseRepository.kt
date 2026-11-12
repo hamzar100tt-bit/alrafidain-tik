@@ -18,7 +18,7 @@ data class TikNotification(val id: String, val actorName: String, val actorUsern
 
 data class LiveKitCredentials(val serverUrl: String, val participantToken: String, val room: String, val role: String)
 
-data class LiveRoomInfo(val id: String, val title: String, val roomKey: String, val roomType: String, val ownerId: String, val ownerName: String)
+data class LiveRoomInfo(val id: String, val title: String, val roomKey: String, val roomType: String, val ownerId: String, val ownerName: String, val ownerAvatar: String? = null)
 
 class SupabaseRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences("alrafidain_session", Context.MODE_PRIVATE)
@@ -50,10 +50,10 @@ class SupabaseRepository(private val context: Context) {
         for (i in 0 until rows.length()) {
             val row = rows.getJSONObject(i)
             val ownerId = row.optString("owner_id")
-            val profileRows = publicRows("profiles?id=eq.$ownerId&select=display_name,username&limit=1")
+            val profileRows = publicRows("profiles?id=eq.$ownerId&select=display_name,username,avatar_url&limit=1")
             val profile = if (profileRows.length() > 0) profileRows.getJSONObject(0) else JSONObject()
             val ownerName = profile.optString("display_name").ifBlank { profile.optString("username").ifBlank { "مستخدم" } }
-            result.add(LiveRoomInfo(row.optString("id"), row.optString("title").ifBlank { "بث مباشر" }, row.optString("room_key"), row.optString("room_type"), ownerId, ownerName))
+            result.add(LiveRoomInfo(row.optString("id"), row.optString("title").ifBlank { "بث مباشر" }, row.optString("room_key"), row.optString("room_type"), ownerId, ownerName, profile.optString("avatar_url").takeIf { it.isNotBlank() }))
         }
         return result
     }
@@ -372,7 +372,7 @@ class SupabaseRepository(private val context: Context) {
         }
     }
 
-    fun loadPublicProfile(userId: String): DiscoverProfile {
+    fun loadPublicProfiles(userIds: List<String>): List<DiscoverProfile> {\n        val ids = userIds.distinct().filter { it.matches(Regex("[A-Fa-f0-9-]{16,}")) }\n        if (ids.isEmpty()) return emptyList()\n        val rows = publicRows("profiles?id=in.(${ids.joinToString(",")})&select=id,username,display_name,avatar_url")\n        return (0 until rows.length()).map { i ->\n            val row = rows.getJSONObject(i)\n            DiscoverProfile(row.optString("id"), row.optString("username"),\n                row.optString("display_name").ifBlank { row.optString("username").ifBlank { "مستخدم" } },\n                row.optString("avatar_url").takeIf { it.isNotBlank() })\n        }\n    }\n\n    fun loadPublicProfile(userId: String): DiscoverProfile {
         val rows = publicRows("profiles?id=eq.$userId&select=id,username,display_name,avatar_url&limit=1")
         if (rows.length() == 0) throw IOException("الحساب غير موجود")
         val row = rows.getJSONObject(0)
