@@ -212,6 +212,11 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onStartVideoPost: ()
     var roomType by remember { mutableStateOf("جميع الغرف") }
     var searchOpen by remember { mutableStateOf(false) }
     var searchText by remember { mutableStateOf("") }
+    var showCreateVideoRoom by remember { mutableStateOf(false) }
+    var newRoomTitle by remember { mutableStateOf("بث الرافدين تيك") }
+    var creatingRoom by remember { mutableStateOf(false) }
+    var createRoomError by remember { mutableStateOf<String?>(null) }
+    val liveScope = rememberCoroutineScope()
     val rooms = listOf(
         Triple("سوالف عراقية", "حمزة", "447"),
         Triple("جلسة دردشة عامة", "نور", "295"),
@@ -293,6 +298,35 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onStartVideoPost: ()
         }
         return
     }
+    if (showCreateVideoRoom) {
+        AlertDialog(
+            onDismissRequest = { if (!creatingRoom) showCreateVideoRoom = false },
+            title = { Text("إنشاء بث فيديو مباشر") },
+            text = {
+                Column {
+                    OutlinedTextField(value = newRoomTitle, onValueChange = { newRoomTitle = it },
+                        singleLine = true, label = { Text("اسم البث") })
+                    if (createRoomError != null) Text(createRoomError!!, color = MaterialTheme.colorScheme.error)
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = !creatingRoom && newRoomTitle.isNotBlank(), onClick = {
+                    creatingRoom = true
+                    createRoomError = null
+                    liveScope.launch {
+                        try {
+                            val roomKey = withContext(Dispatchers.IO) { repository.createLiveRoom(newRoomTitle, "video") }
+                            showCreateVideoRoom = false
+                            openedVideoRoom = roomKey
+                        } catch (e: Exception) {
+                            createRoomError = e.message ?: "تعذر إنشاء البث"
+                        } finally { creatingRoom = false }
+                    }
+                }) { Text(if (creatingRoom) "جارٍ الإنشاء..." else "ابدأ البث") }
+            },
+            dismissButton = { TextButton(enabled = !creatingRoom, onClick = { showCreateVideoRoom = false }) { Text("إلغاء") } }
+        )
+    }
     Column(Modifier.fillMaxSize().background(Color(0xFF09070D)).statusBarsPadding().padding(bottom = 78.dp)) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Notifications, null, tint = Color.White)
@@ -345,7 +379,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onStartVideoPost: ()
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9226C5))) {
                 Icon(Icons.Default.Headphones, null); Text("ابدأ بث صوتي", maxLines = 1)
             }
-            Button(onClick = onStartVideoPost, modifier = Modifier.weight(1f),
+            Button(onClick = { showCreateVideoRoom = true }, modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = Brand)) {
                 Icon(Icons.Default.Videocam, null); Text("ابدأ بث فيديو", maxLines = 1)
             }
