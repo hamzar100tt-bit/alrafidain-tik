@@ -9,6 +9,7 @@ import android.content.Intent
 import android.media.MediaMetadataRetriever
 import android.graphics.Bitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -410,18 +411,30 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
                     ) {
                         items(backgrounds.size) { index ->
                             val chosen = selectedAudioBackground == index
-                            Column(
+                            Box(
                                 Modifier.fillMaxWidth().height(132.dp).clip(RoundedCornerShape(16.dp))
                                     .background(Brush.verticalGradient(backgroundBrushes[index]))
                                     .border(if (chosen) 3.dp else 1.dp, if (chosen) Color(0xFFE43DFF) else Color(0xFF287EB2), RoundedCornerShape(16.dp))
-                                    .clickable { selectedAudioBackground = index }.padding(11.dp),
-                                verticalArrangement = Arrangement.SpaceBetween
+                                    .clickable { selectedAudioBackground = index }
                             ) {
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text(backgroundIcons[index], fontSize = 28.sp)
-                                    if (chosen) Icon(Icons.Default.CheckCircle, "محدد", tint = Color.White, modifier = Modifier.size(25.dp))
+                                val previewImage = when (index) {
+                                    0 -> R.drawable.live_bg_stadium
+                                    1 -> R.drawable.live_bg_blue
+                                    2 -> R.drawable.live_bg_gaming
+                                    else -> 0
                                 }
-                                Text(backgrounds[index], color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                if (previewImage != 0) {
+                                    Image(painter = painterResource(previewImage), contentDescription = backgrounds[index],
+                                        contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.28f)))
+                                }
+                                Column(Modifier.fillMaxSize().padding(11.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text(backgroundIcons[index], fontSize = 28.sp)
+                                        if (chosen) Icon(Icons.Default.CheckCircle, "محدد", tint = Color.White, modifier = Modifier.size(25.dp))
+                                    }
+                                    Text(backgrounds[index], color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
@@ -670,6 +683,17 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
         else -> Brush.verticalGradient(listOf(Color(0xFF070D35), Color(0xFF10134B), Color(0xFF24105A), Color(0xFF080D2D)))
     }
     Box(Modifier.fillMaxSize().background(sky)) {
+        val liveBackgroundImage = when (backgroundStyle) {
+            0 -> R.drawable.live_bg_stadium
+            1 -> R.drawable.live_bg_blue
+            2 -> R.drawable.live_bg_gaming
+            else -> 0
+        }
+        if (liveBackgroundImage != 0) {
+            Image(painter = painterResource(liveBackgroundImage), contentDescription = "خلفية البث",
+                contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.34f)))
+        }
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             // Live room header: close, PiP minimize, share, add/invite, host name + account ID.
             Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
