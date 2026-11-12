@@ -55,6 +55,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import io.livekit.android.LiveKit
 import io.livekit.android.room.Room
+import io.livekit.android.events.RoomEvent
 import io.livekit.android.room.participant.Participant
 import io.livekit.android.room.track.VideoTrack
 import io.livekit.android.util.flow
@@ -417,6 +418,7 @@ private fun VideoLiveRoomScreen(
     var connectionError by remember(roomName) { mutableStateOf<String?>(null) }
     var connected by remember(roomName) { mutableStateOf(false) }
     var credentials by remember(roomName) { mutableStateOf<LiveKitCredentials?>(null) }
+    var remoteVideoTrack by remember(roomName) { mutableStateOf<VideoTrack?>(null) }
     var showChat by remember(roomName) { mutableStateOf(true) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -437,6 +439,20 @@ private fun VideoLiveRoomScreen(
     }
     DisposableEffect(liveRoom) {
         onDispose { liveRoom.disconnect() }
+    }
+    LaunchedEffect(liveRoom) {
+        liveRoom.events.collect { event ->
+            when (event) {
+                is RoomEvent.TrackSubscribed -> {
+                    val track = event.track
+                    if (track is VideoTrack) remoteVideoTrack = track
+                }
+                is RoomEvent.TrackUnsubscribed -> {
+                    if (event.track == remoteVideoTrack) remoteVideoTrack = null
+                }
+                else -> Unit
+            }
+        }
     }
     LaunchedEffect(roomName) {
         try {
@@ -495,7 +511,7 @@ private fun VideoLiveRoomScreen(
                     }
                 }
                 Box(Modifier.weight(2f).fillMaxHeight().padding(1.dp).background(Color(0xFF60414A)), contentAlignment = Alignment.Center) {
-                    LiveKitRemoteVideo(liveRoom, Modifier.fillMaxSize())
+                    LiveKitRemoteVideo(remoteVideoTrack, Modifier.fillMaxSize())
                     if (cameraEnabled) {
                         Icon(Icons.Default.Videocam, null, tint = Color.White, modifier = Modifier.size(64.dp))
                         Text("كاميرتك مفعّلة", color = Color.White, modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp))
@@ -553,11 +569,15 @@ private fun VideoLiveRoomScreen(
 }
 
 @Composable
-private fun LiveKitRemoteVideo(room: Room, modifier: Modifier = Modifier) {
-    Box(modifier, contentAlignment = Alignment.Center) {
-        Icon(Icons.Default.Person, null, tint = Color.White.copy(alpha = .8f), modifier = Modifier.size(72.dp))
-        Text("تم الاتصال بالغرفة؛ عرض الفيديو قيد الإصلاح", color = Color.White,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp))
+private fun LiveKitRemoteVideo(track: VideoTrack?, modifier: Modifier = Modifier) {
+    if (track != null) {
+        VideoTrackView(videoTrack = track, modifier = modifier)
+    } else {
+        Box(modifier, contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.Person, null, tint = Color.White.copy(alpha = .8f), modifier = Modifier.size(72.dp))
+            Text("بانتظار فيديو المضيف...", color = Color.White,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp))
+        }
     }
 }
 
