@@ -16,6 +16,8 @@ data class TikComment(val body: String, val displayName: String, val username: S
 data class TikProfileStats(val posts: List<TikVideo>, val following: Int, val followers: Int, val likes: Int)
 data class TikNotification(val id: String, val actorName: String, val actorUsername: String, val kind: String, val createdAt: String, val videoId: String?)
 
+data class LiveChatItem(val id: String, val userId: String, val body: String, val displayName: String, val avatarUrl: String?, val createdAt: String)
+
 data class LiveKitCredentials(val serverUrl: String, val participantToken: String, val room: String, val role: String)
 
 data class LiveRoomInfo(val id: String, val title: String, val roomKey: String, val roomType: String, val ownerId: String, val ownerName: String, val ownerAvatar: String? = null)
@@ -56,6 +58,35 @@ class SupabaseRepository(private val context: Context) {
             result.add(LiveRoomInfo(row.optString("id"), row.optString("title").ifBlank { "بث مباشر" }, row.optString("room_key"), row.optString("room_type"), ownerId, ownerName, profile.optString("avatar_url").takeIf { it.isNotBlank() }))
         }
         return result
+    }
+
+    fun loadLiveChatMessages(roomKey: String): List<LiveChatItem> {
+        val encodedRoom = java.net.URLEncoder.encode(roomKey, "UTF-8")
+        val rows = fetchAuthedRows("live_chat_messages?room_key=eq.$encodedRoom&select=id,user_id,body,created_at&order=created_at.asc&limit=60")
+        val ids = (0 until rows.length()).map { rows.getJSONObject(it).optString("user_id") }.distinct()
+        val profiles = loadPublicProfiles(ids).associateBy { it.id }
+        return (0 until rows.length()).map { i ->
+            val row = rows.getJSONObject(i)
+            val userId = row.optString("user_id")
+            val profile = profiles[userId]
+            LiveChatItem(row.optString("id"), userId, row.optString("body"),
+                profile?.displayName ?: "مستخدم", profile?.avatarUrl, row.optString("created_at"))
+        }
+    }
+
+    fun sendLiveChatMessage(roomKey: String, body: String) {
+        val userId = currentUserId() ?: throw IOException("سجّل الدخول لإرسال تعليق")
+        val clean = body.trim()
+        if (clean.isBlank()) return
+        if (clean.length > 500) throw IOException("التعليق طويل جداً")
+        val payload = JSONObject().put("room_key", roomKey).put("user_id", userId).put("body", clean)
+        val request = authedRequest("$base/rest/v1/live_chat_messages")
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Prefer", "return=minimal")
+            .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("تعذر إرسال التعليق (${response.code})")
+        }
     }
 
     fun createLiveRoom(title: String, roomType: String): String {
