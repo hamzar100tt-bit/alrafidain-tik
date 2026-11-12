@@ -683,22 +683,22 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
             }
 
             // Eight voice seats in the same 4-by-2 order as the reference room.
-            LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp).height(205.dp),
-                verticalArrangement = Arrangement.spacedBy(13.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+            LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp).height(158.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                 items(8) { i ->
                     val profile = seatProfiles.getOrNull(i)
                     val id = seatIds.getOrNull(i)
                     val isSpeaking = id != null && activeSpeakers.contains(id)
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(Modifier.size(68.dp).clip(CircleShape)
+                        Box(Modifier.size(52.dp).clip(CircleShape)
                             .background(if (isSpeaking) Color(0xFF16B98D) else if (profile != null) Color(0xFF335F8E) else Color(0x554A91CE)),
                             contentAlignment = Alignment.Center) {
                             if (!profile?.avatarUrl.isNullOrBlank()) AsyncImage(model = profile?.avatarUrl, contentDescription = profile?.displayName,
                                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                            else Icon(if (profile == null) Icons.Default.Add else Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(37.dp))
-                            if (isSpeaking) Icon(Icons.Default.Mic, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).size(17.dp))
+                            else Icon(if (profile == null) Icons.Default.Add else Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(27.dp))
+                            if (isSpeaking) Icon(Icons.Default.Mic, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp).size(13.dp))
                         }
-                        Text(profile?.displayName ?: "مقعد ${i + 1}", color = Color.White, fontSize = 11.sp, maxLines = 1)
+                        Text(profile?.displayName ?: "مقعد ${i + 1}", color = Color.White, fontSize = 10.sp, maxLines = 1)
                     }
                 }
             }
