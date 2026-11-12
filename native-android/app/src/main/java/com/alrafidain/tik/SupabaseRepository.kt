@@ -424,6 +424,18 @@ class SupabaseRepository(private val context: Context) {
             row.optString("avatar_url").takeIf { it.isNotBlank() })
     }
 
+    fun loadPublicProfileStats(userId: String): TikProfileStats {
+        val fields = "id,caption,video_url,storage_path,user_id,media_type,profiles!videos_user_id_fkey(display_name,username,avatar_url)"
+        val posts = parseVideoRows(publicRows("videos?user_id=eq.$userId&select=$fields&order=created_at.desc&limit=100"))
+        val following = runCatching { fetchAuthedRows("follows?follower_id=eq.$userId&select=followed_id").length() }.getOrDefault(0)
+        val followers = runCatching { fetchAuthedRows("follows?followed_id=eq.$userId&select=follower_id").length() }.getOrDefault(0)
+        val likes = if (posts.isEmpty()) 0 else runCatching {
+            val ids = posts.joinToString(",") { it.id }
+            fetchAuthedRows("likes?video_id=in.($ids)&select=video_id&limit=1000").length()
+        }.getOrDefault(0)
+        return TikProfileStats(posts, following, followers, likes)
+    }
+
     fun loadPublicUserVideos(userId: String): List<TikVideo> {
         val fields = "id,caption,video_url,storage_path,user_id,media_type,profiles!videos_user_id_fkey(display_name,username,avatar_url)"
         return parseVideoRows(publicRows("videos?user_id=eq.$userId&select=$fields&order=created_at.desc&limit=60"))
