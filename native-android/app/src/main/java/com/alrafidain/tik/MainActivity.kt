@@ -442,18 +442,20 @@ private fun VideoLiveRoomScreen(
         onDispose { liveRoom.disconnect() }
     }
     LaunchedEffect(liveRoom) {
-        liveRoom.events.collect { event ->
-            when (event) {
-                is RoomEvent.TrackSubscribed -> {
-                    val track = event.track
-                    if (track is VideoTrack) remoteVideoTrack = track
+        liveRoom.events.collect(object : kotlinx.coroutines.flow.FlowCollector<RoomEvent> {
+            override suspend fun emit(event: RoomEvent) {
+                when (event) {
+                    is RoomEvent.TrackSubscribed -> {
+                        val track = event.track
+                        if (track is VideoTrack) remoteVideoTrack = track
+                    }
+                    is RoomEvent.TrackUnsubscribed -> {
+                        if (event.track == remoteVideoTrack) remoteVideoTrack = null
+                    }
+                    else -> Unit
                 }
-                is RoomEvent.TrackUnsubscribed -> {
-                    if (event.track == remoteVideoTrack) remoteVideoTrack = null
-                }
-                else -> Unit
             }
-        }
+        })
     }
     LaunchedEffect(roomName) {
         try {
