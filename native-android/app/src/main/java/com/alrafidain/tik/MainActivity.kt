@@ -169,7 +169,7 @@ private fun AlrafidainApp() {
                     Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Ink, modifier = Modifier.size(27.dp))
                 }
             }
-        } else if (selected != 0 && selected != 2 && selected != 5) Row(
+        } else if (selected != 0 && selected != 2 && selected != 4 && selected != 5) Row(
             Modifier.align(Alignment.TopCenter)
                 .fillMaxWidth()
                 .statusBarsPadding()
@@ -1217,6 +1217,7 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
     val username = profile?.optString("username").orEmpty()
     val bio = profile?.optString("bio").orEmpty()
     val avatar = profile?.optString("avatar_url")?.takeIf { it.isNotBlank() }
+    var avatarLoadFailed by remember(avatar) { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().background(Color.White).padding(bottom = 82.dp)) {
         Row(
@@ -1263,15 +1264,23 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                         ProfileStat(stats?.likes ?: 0, "تسجيلات الإعجاب")
                     }
                 }
-                if (!avatar.isNullOrBlank()) {
+                if (!avatar.isNullOrBlank() && !avatarLoadFailed) {
                     AsyncImage(
                         model = avatar,
-                        contentDescription = "الصورة الشخصية",
+                        contentDescription = "الصورة الشخصية - اضغط للتغيير",
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(112.dp).clip(CircleShape).background(Color(0xFFF1F1F3))
+                        onError = { avatarLoadFailed = true },
+                        modifier = Modifier.size(112.dp).clip(CircleShape)
+                            .background(Color(0xFFF1F1F3)).clickable { onEdit() }
                     )
                 } else {
-                    Icon(Icons.Default.AccountCircle, null, tint = Brand, modifier = Modifier.size(112.dp))
+                    Box(
+                        Modifier.size(112.dp).clip(CircleShape).background(Color(0xFFF1F1F3))
+                            .clickable { onEdit() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.AddAPhoto, "أضف صورة شخصية", tint = Brand, modifier = Modifier.size(42.dp))
+                    }
                 }
             }
             Text(
