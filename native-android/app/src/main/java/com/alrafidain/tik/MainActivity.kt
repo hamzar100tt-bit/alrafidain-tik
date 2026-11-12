@@ -465,6 +465,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
                     Text("إلغاء", color = Color(0xFFB9C9E0))
                 }
             }
+        return
     }
     if (showCreateVideoRoom) {
         AlertDialog(
