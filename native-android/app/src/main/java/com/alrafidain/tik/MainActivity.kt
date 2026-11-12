@@ -340,8 +340,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
         androidx.compose.ui.window.Dialog(
             onDismissRequest = { if (!creatingAudioRoom) showCreateAudioRoom = false },
             properties = androidx.compose.ui.window.DialogProperties(
-                usePlatformDefaultWidth = false,
-                decorFitsSystemWindows = false
+                usePlatformDefaultWidth = false
             )
         ) {
             val backgrounds = listOf("ملعب كرة القدم", "خلفية زرقاء", "غرفة ألعاب", "مدينة ليلية", "شاطئ الغروب", "مسجد ليلي")
