@@ -667,7 +667,7 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
         3 -> Brush.verticalGradient(listOf(Color(0xFF071B3D), Color(0xFF183C66), Color(0xFF030A19)))
         4 -> Brush.verticalGradient(listOf(Color(0xFFFFA45B), Color(0xFFB84F73), Color(0xFF253C70)))
         5 -> Brush.verticalGradient(listOf(Color(0xFF102A53), Color(0xFF28517A), Color(0xFF08192E)))
-        else -> Brush.verticalGradient(listOf(Color(0xFF062C58), Color(0xFF087C9B), Color(0xFF164A32)))
+        else -> Brush.verticalGradient(listOf(Color(0xFF070D35), Color(0xFF10134B), Color(0xFF24105A), Color(0xFF080D2D)))
     }
     Box(Modifier.fillMaxSize().background(sky)) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
@@ -735,15 +735,16 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
             }
 
             // Eight voice seats in the same 4-by-2 order as the reference room.
-            LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp).height(126.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+            LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(158.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                 items(8) { i ->
                     val profile = seatProfiles.getOrNull(i)
                     val id = seatIds.getOrNull(i)
                     val isSpeaking = id != null && activeSpeakers.contains(id)
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(Modifier.size(42.dp).clip(CircleShape)
-                            .background(if (isSpeaking) Color(0xFF16B98D) else if (profile != null) Color(0xFF335F8E) else Color(0x554A91CE))
+                        Box(Modifier.size(58.dp).clip(CircleShape)
+                            .border(2.dp, if (isSpeaking) Color(0xFF31F0D0) else Color(0xFFD05BFF), CircleShape)
+                            .background(if (isSpeaking) Color(0xFF16B98D) else if (profile != null) Color(0xFF25194F) else Color(0x553A2C79))
                             .clickable(enabled = id == null && connected && !connecting) {
                                 connecting = true
                                 scope.launch {
@@ -764,10 +765,10 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                             contentAlignment = Alignment.Center) {
                             if (!profile?.avatarUrl.isNullOrBlank()) AsyncImage(model = profile?.avatarUrl, contentDescription = profile?.displayName,
                                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                            else Icon(if (profile == null) Icons.Default.Add else Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                            else Icon(if (profile == null) Icons.Default.Add else Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(26.dp))
                             if (isSpeaking) Icon(Icons.Default.Mic, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp).size(13.dp))
                         }
-                        Text(profile?.displayName ?: "مقعد ${i + 1}", color = Color.White, fontSize = 9.sp, maxLines = 1)
+                        Text(profile?.displayName ?: "مقعد ${i + 1}", color = Color.White, fontSize = 11.sp, maxLines = 1)
                     }
                 }
             }
@@ -807,7 +808,8 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp)
                     .clip(RoundedCornerShape(32.dp))
-                    .background(Color(0xAA21113F))
+                    .border(1.5.dp, Color(0xFFB44BFF), RoundedCornerShape(32.dp))
+                    .background(Color(0xDD100B35))
                     .padding(horizontal = 5.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
