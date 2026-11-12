@@ -1,5 +1,8 @@
 package com.alrafidain.tik
 
+import android.app.Activity
+import android.app.PictureInPictureParams
+import android.util.Rational
 import android.os.Bundle
 import android.net.Uri
 import android.content.Intent
