@@ -477,113 +477,181 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
     var micEnabled by remember { mutableStateOf(false) }
     var canSpeak by remember { mutableStateOf(false) }
     var connecting by remember { mutableStateOf(true) }
-    var names by remember { mutableStateOf<List<String>>(emptyList()) }
-    var speakers by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var seatIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    var seatProfiles by remember { mutableStateOf<List<SupabaseRepository.DiscoverProfile>>(emptyList()) }
+    var activeSpeakers by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var host by remember { mutableStateOf<LiveRoomInfo?>(null) }
+    var viewerCount by remember { mutableStateOf(1) }
     var chatOpen by remember { mutableStateOf(true) }
     var draft by remember { mutableStateOf("") }
     var chat by remember { mutableStateOf(listOf("أهلاً وسهلاً بالجميع ❤️", "انضموا للمقاعد وشاركونا الحديث")) }
-    var gifts by remember { mutableStateOf(false) }
+    var giftsOpen by remember { mutableStateOf(false) }
+    var inviteOpen by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
+    var liked by remember { mutableStateOf(false) }
+
     fun refreshSeats() {
-        val list = mutableListOf<String>()
-        if (room.localParticipant.isMicrophoneEnabled) list.add(room.localParticipant.name?.takeIf { it.isNotBlank() } ?: "المضيف")
-        room.remoteParticipants.values.filter { it.isMicrophoneEnabled }.forEach { p -> list.add(p.name?.takeIf { it.isNotBlank() } ?: p.identity?.value ?: "مشارك") }
-        names = list.take(8)
+        val ids = mutableListOf<String>()
+        if (room.localParticipant.isMicrophoneEnabled) repository.currentUserId()?.let(ids::add)
+        room.remoteParticipants.values.filter { it.isMicrophoneEnabled }.forEach { p ->
+            p.identity?.value?.let(ids::add)
+        }
+        seatIds = ids.take(8)
+        viewerCount = 1 + room.remoteParticipants.size
+        scope.launch(Dispatchers.IO) {
+            runCatching { repository.loadPublicProfiles(ids) }.onSuccess { seatProfiles = it }
+        }
     }
+
     DisposableEffect(room) { onDispose { room.disconnect() } }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) scope.launch { try { room.localParticipant.setMicrophoneEnabled(true); micEnabled = true; refreshSeats() } catch (e: Exception) { error = e.message } }
-        else error = "اسمح للتطبيق باستخدام المايك."
+        if (granted) scope.launch {
+            try { room.localParticipant.setMicrophoneEnabled(true); micEnabled = true; refreshSeats() }
+            catch (e: Exception) { error = e.message ?: "تعذر تشغيل المايك" }
+        } else error = "اسمح للتطبيق باستخدام المايك."
     }
     LaunchedEffect(room) {
         room.events.collect { e ->
             when (e) {
-                is RoomEvent.ParticipantConnected, is RoomEvent.ParticipantDisconnected, is RoomEvent.TrackMuted, is RoomEvent.TrackUnmuted -> refreshSeats()
-                is RoomEvent.ActiveSpeakersChanged -> { speakers = e.speakers.mapNotNull { it.name?.takeIf(String::isNotBlank) ?: it.identity?.value }.toSet(); refreshSeats() }
+                is RoomEvent.ParticipantConnected, is RoomEvent.ParticipantDisconnected,
+                is RoomEvent.TrackMuted, is RoomEvent.TrackUnmuted -> refreshSeats()
+                is RoomEvent.ActiveSpeakersChanged -> {
+                    activeSpeakers = e.speakers.mapNotNull { it.identity?.value }.toSet()
+                    refreshSeats()
+                }
                 else -> Unit
             }
         }
     }
     LaunchedEffect(roomName) {
         try {
+            host = withContext(Dispatchers.IO) {
+                repository.loadLiveRooms().firstOrNull { it.roomKey == roomName }
+            }
             val c = withContext(Dispatchers.IO) { repository.requestLiveKitToken(roomName, "viewer") }
             canSpeak = c.role == "host" || c.role == "speaker"
             room.connect(c.serverUrl, c.participantToken)
-            connected = true; refreshSeats()
+            connected = true
             status = if (canSpeak) "أنت المضيف" else "متصل — مستمع"
+            viewerCount = 1 + room.remoteParticipants.size
             if (canSpeak) permission.launch(android.Manifest.permission.RECORD_AUDIO)
+            refreshSeats()
         } catch (e: Exception) { status = "تعذر الاتصال"; error = e.message ?: "فشل الاتصال بالغرفة" }
         finally { connecting = false }
     }
-    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF1677D7), Color(0xFF278FE8), Color(0xFF79C9F4), Color(0xFF174477))))) {
+
+    val sky = Brush.verticalGradient(listOf(Color(0xFF1479D9), Color(0xFF329DEB), Color(0xFF8AD4F7), Color(0xFF24558A)))
+    Box(Modifier.fillMaxSize().background(sky)) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 7.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.Default.Close, "خروج", tint = Color.White) }
-                IconButton(onClick = {}) { Icon(Icons.Default.Fullscreen, "تكبير", tint = Color.White) }
-                IconButton(onClick = {}) { Icon(Icons.Default.Refresh, "تحديث", tint = Color.White) }
-                Spacer(Modifier.weight(1f))
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("غرفة الرافدين", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
-                    Text(if (connected) "● متصل بالصوت" else status, color = Color.White, fontSize = 11.sp)
+            // Host strip: creator identity, follow/add, room actions and live stats.
+            Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 10.dp, top = 5.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.Default.Close, "إغلاق البث", tint = Color.White, modifier = Modifier.size(27.dp)) }
+                IconButton(onClick = { inviteOpen = true }) { Icon(Icons.Default.Share, "مشاركة البث", tint = Color.White) }
+                Column(Modifier.weight(1f).padding(start = 5.dp)) {
+                    Text(host?.ownerName ?: "صاحب البث", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1)
+                    Text(if (connected) "● بث مباشر" else status, color = Color.White.copy(alpha = .9f), fontSize = 11.sp)
                 }
-                Box(Modifier.padding(start = 8.dp).size(42.dp).background(Color(0xFF234B7B), CircleShape), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Headphones, null, tint = Color(0xFFFFD66B), modifier = Modifier.size(27.dp))
+                IconButton(onClick = { inviteOpen = true }, modifier = Modifier.size(42.dp).background(Color(0xFF17C9C6), CircleShape)) {
+                    Icon(Icons.Default.Add, "إضافة أو متابعة", tint = Color.White, modifier = Modifier.size(27.dp))
                 }
-            }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 17.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("125", color = Color.White, modifier = Modifier.background(Color(0x55304F7A), RoundedCornerShape(18.dp)).padding(horizontal = 13.dp, vertical = 6.dp))
-                Spacer(Modifier.width(8.dp))
-                repeat(3) { i -> Box(Modifier.padding(end = 5.dp).size(31.dp).background(listOf(Color(0xFFB7D8F2), Color(0xFF263B59), Color(0xFFE9B9A0))[i], CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Default.Person, null, tint = Color.White) } }
-                Spacer(Modifier.weight(1f))
-                Text("🏠 الغرفة الرئيسية", color = Color.White, modifier = Modifier.background(Color(0x55304F7A), RoundedCornerShape(18.dp)).padding(horizontal = 12.dp, vertical = 6.dp))
-            }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.size(67.dp).background(Color(0x554B9FE5), CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(37.dp)) }
-                    Text("دعوة", color = Color.White, fontSize = 11.sp)
+                Spacer(Modifier.width(7.dp))
+                Box(Modifier.size(42.dp).clip(CircleShape).background(Color(0xFF244F7D)), contentAlignment = Alignment.Center) {
+                    val avatar = host?.ownerAvatar
+                    if (!avatar.isNullOrBlank()) AsyncImage(model = avatar, contentDescription = "صورة صاحب البث", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    else Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(28.dp))
                 }
-                listOf("المضيف", "ضيف", "مشارك").forEachIndexed { i, label ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(Modifier.size(67.dp).background(listOf(Color(0xFFB7D8F2), Color(0xFF263B59), Color(0xFF477DAE))[i], CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(42.dp)) }
-                        Text(label, color = Color.White, fontSize = 11.sp)
+                Box {
+                    IconButton(onClick = { menuOpen = true }) { Icon(Icons.Default.MoreVert, "المزيد", tint = Color.White) }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(text = { Text("نسخ اسم الغرفة") }, onClick = { android.content.ClipData.newPlainText("room", roomName).also { context.getSystemService(android.content.Context.CLIPBOARD_SERVICE).let { svc -> (svc as android.content.ClipboardManager).setPrimaryClip(it) } }; menuOpen = false })
+                        DropdownMenuItem(text = { Text("مشاركة الغرفة") }, onClick = { inviteOpen = true; menuOpen = false })
                     }
                 }
             }
-            LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp).height(180.dp),
+            // Room counters and participant avatars.
+            Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.background(Color(0x55304F7A), RoundedCornerShape(20.dp)).padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    Icon(Icons.Default.Visibility, null, tint = Color.White, modifier = Modifier.size(15.dp))
+                    Text(" $viewerCount", color = Color.White, fontSize = 13.sp)
+                }
+                Spacer(Modifier.width(7.dp))
+                seatProfiles.take(3).forEach { profile ->
+                    Box(Modifier.padding(end = 5.dp).size(31.dp).clip(CircleShape).background(Color(0xFF416D9B)), contentAlignment = Alignment.Center) {
+                        if (!profile.avatarUrl.isNullOrBlank()) AsyncImage(model = profile.avatarUrl, contentDescription = profile.displayName, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                        else Icon(Icons.Default.Person, null, tint = Color.White)
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                Text("🏠 ${host?.title ?: "غرفة الرافدين"}", color = Color.White, fontSize = 12.sp,
+                    modifier = Modifier.background(Color(0x55304F7A), RoundedCornerShape(18.dp)).padding(horizontal = 11.dp, vertical = 6.dp), maxLines = 1)
+            }
+
+            // Eight voice seats in the same 4-by-2 order as the reference room.
+            LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp).height(205.dp),
                 verticalArrangement = Arrangement.spacedBy(13.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                 items(8) { i ->
-                    val person = names.getOrNull(i)
-                    val active = person != null && speakers.contains(person)
+                    val profile = seatProfiles.getOrNull(i)
+                    val id = seatIds.getOrNull(i)
+                    val isSpeaking = id != null && activeSpeakers.contains(id)
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(Modifier.size(57.dp).background(if (active) Color(0xFF18A77D) else if (person != null) Color(0xFF477EAF) else Color(0x554A91CE), CircleShape), contentAlignment = Alignment.Center) {
-                            Icon(if (person == null) Icons.Default.Add else Icons.Default.Mic, null, tint = Color.White, modifier = Modifier.size(29.dp))
+                        Box(Modifier.size(68.dp).clip(CircleShape)
+                            .background(if (isSpeaking) Color(0xFF16B98D) else if (profile != null) Color(0xFF335F8E) else Color(0x554A91CE)),
+                            contentAlignment = Alignment.Center) {
+                            if (!profile?.avatarUrl.isNullOrBlank()) AsyncImage(model = profile?.avatarUrl, contentDescription = profile?.displayName,
+                                contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                            else Icon(if (profile == null) Icons.Default.Add else Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(37.dp))
+                            if (isSpeaking) Icon(Icons.Default.Mic, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).size(17.dp))
                         }
-                        Text(person ?: "مقعد ${i + 1}", color = Color.White, fontSize = 11.sp, maxLines = 1)
+                        Text(profile?.displayName ?: "مقعد ${i + 1}", color = Color.White, fontSize = 11.sp, maxLines = 1)
                     }
                 }
             }
-            Spacer(Modifier.weight(1f))
-            if (chatOpen) Column(Modifier.fillMaxWidth().weight(1f, fill = false).padding(horizontal = 15.dp), verticalArrangement = Arrangement.Bottom) {
-                chat.takeLast(4).forEach { line -> Text(line, color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(vertical = 3.dp).background(Color(0x66304F7A), RoundedCornerShape(18.dp)).padding(horizontal = 12.dp, vertical = 8.dp)) }
-                error?.let { Text(it, color = Color(0xFFFFD0D8), fontSize = 12.sp) }
+
+            // Social-room conversation area.
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("الدردشة", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = { chatOpen = !chatOpen }) { Text(if (chatOpen) "إخفاء" else "إظهار", color = Color.White) }
+            }
+            if (chatOpen) {
+                Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 14.dp), verticalArrangement = Arrangement.Bottom) {
+                    chat.takeLast(5).forEach { line ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AccountCircle, null, tint = Color(0xFFD2E7F8), modifier = Modifier.size(25.dp))
+                            Text(line, color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(start = 7.dp)
+                                .background(Color(0x55304F7A), RoundedCornerShape(17.dp)).padding(horizontal = 11.dp, vertical = 7.dp))
+                        }
+                    }
+                    error?.let { Text(it, color = Color(0xFFFFD0D8), fontSize = 12.sp, modifier = Modifier.padding(vertical = 3.dp)) }
+                }
             } else Spacer(Modifier.weight(1f))
-            Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(value = draft, onValueChange = { draft = it }, singleLine = true, modifier = Modifier.weight(1f), placeholder = { Text("اكتب رسالة...") },
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color.White, unfocusedBorderColor = Color.White.copy(alpha = .5f), cursorColor = Color.White))
+
+            Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(value = draft, onValueChange = { draft = it }, singleLine = true, modifier = Modifier.weight(1f),
+                    placeholder = { Text("اكتب تعليقاً... ", color = Color.White.copy(alpha = .75f)) },
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color.White.copy(alpha = .7f), unfocusedBorderColor = Color.White.copy(alpha = .4f), cursorColor = Color.White))
                 IconButton(onClick = { if (draft.isNotBlank()) { chat = chat + draft.trim(); draft = "" } }) { Icon(Icons.Default.Send, "إرسال", tint = Color.White) }
             }
-            Row(Modifier.fillMaxWidth().background(Color(0xCC102E58)).padding(vertical = 5.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { gifts = !gifts }) { Icon(Icons.Default.CardGiftcard, "هدايا", tint = Color(0xFFFFD56A)) }
-                IconButton(onClick = { chatOpen = !chatOpen }) { Icon(Icons.Default.ChatBubble, "الدردشة", tint = Color.White) }
-                IconButton(onClick = {}) { Icon(Icons.Default.Favorite, "إعجاب", tint = Color(0xFFFF6A91)) }
+            Row(Modifier.fillMaxWidth().background(Color(0xCC102E58)).padding(horizontal = 5.dp, vertical = 5.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { giftsOpen = !giftsOpen }) { Icon(Icons.Default.CardGiftcard, "الهدايا", tint = Color(0xFFFFD56A), modifier = Modifier.size(26.dp)) }
+                IconButton(onClick = { inviteOpen = true }) { Icon(Icons.Default.GroupAdd, "إضافة أصدقاء", tint = Color.White, modifier = Modifier.size(26.dp)) }
+                IconButton(onClick = { liked = !liked }) { Icon(Icons.Default.Favorite, "إعجاب", tint = if (liked) Color(0xFFFF477E) else Color.White, modifier = Modifier.size(26.dp)) }
                 IconButton(enabled = connected && canSpeak && !connecting, onClick = {
                     if (!micEnabled) permission.launch(android.Manifest.permission.RECORD_AUDIO)
                     else scope.launch { try { room.localParticipant.setMicrophoneEnabled(false); micEnabled = false; refreshSeats() } catch (e: Exception) { error = e.message } }
-                }) { Icon(if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff, "المايك", tint = if (micEnabled) Color(0xFF64F0C1) else Color.White) }
-                IconButton(onClick = onBack) { Icon(Icons.Default.CallEnd, "إنهاء", tint = Color(0xFFFF5A78)) }
+                }) { Icon(if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff, "المايك", tint = if (micEnabled) Color(0xFF64F0C1) else Color.White, modifier = Modifier.size(26.dp)) }
+                IconButton(onClick = onBack) { Icon(Icons.Default.CallEnd, "إنهاء البث", tint = Color(0xFFFF5A78), modifier = Modifier.size(27.dp)) }
             }
-            if (gifts) Text("🎁 الهدايا قريباً", color = Color.White, modifier = Modifier.align(Alignment.CenterHorizontally).padding(3.dp))
+            if (giftsOpen) Text("🎁 الهدايا قريباً", color = Color.White, modifier = Modifier.align(Alignment.CenterHorizontally).padding(4.dp))
         }
     }
+    if (inviteOpen) AlertDialog(onDismissRequest = { inviteOpen = false }, title = { Text("دعوة إلى الغرفة") },
+        text = { Text("شارك اسم الغرفة مع أصدقائك: $roomName") },
+        confirmButton = { TextButton(onClick = { val clip = android.content.ClipData.newPlainText("room", roomName); (context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(clip); inviteOpen = false }) { Text("نسخ") } },
+        dismissButton = { TextButton(onClick = { inviteOpen = false }) { Text("إغلاق") } })
 }
 
 @Composable
