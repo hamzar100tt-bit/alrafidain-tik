@@ -480,6 +480,22 @@ private fun AudioLiveRoomScreen(
     var micEnabled by remember(roomName) { mutableStateOf(false) }
     var canSpeak by remember(roomName) { mutableStateOf(false) }
     var connecting by remember(roomName) { mutableStateOf(true) }
+    var micSeatNames by remember(roomName) { mutableStateOf<List<String>>(emptyList()) }
+    var activeSpeakerNames by remember(roomName) { mutableStateOf<Set<String>>(emptySet()) }
+
+    fun refreshMicSeats() {
+        val names = mutableListOf<String>()
+        if (room.localParticipant.isMicrophoneEnabled) {
+            names.add(room.localParticipant.name?.takeIf { it.isNotBlank() } ?: "المضيف")
+        }
+        room.remoteParticipants.values
+            .filter { it.isMicrophoneEnabled }
+            .forEach { participant ->
+                names.add(participant.name?.takeIf { it.isNotBlank() }
+                    ?: participant.identity?.value ?: "مشارك")
+            }
+        micSeatNames = names.take(8)
+    }
 
     DisposableEffect(room) {
         onDispose { room.disconnect() }
@@ -493,12 +509,32 @@ private fun AudioLiveRoomScreen(
                 try {
                     room.localParticipant.setMicrophoneEnabled(true)
                     micEnabled = true
+                    refreshMicSeats()
                 } catch (e: Exception) {
                     error = e.message ?: "تعذر تشغيل المايك"
                 }
             }
         } else {
             error = "اسمح للتطبيق باستخدام المايك حتى تتحدث داخل الغرفة."
+        }
+    }
+
+    LaunchedEffect(room) {
+        room.events.collect { event ->
+            when (event) {
+                is RoomEvent.ParticipantConnected,
+                is RoomEvent.ParticipantDisconnected,
+                is RoomEvent.TrackMuted,
+                is RoomEvent.TrackUnmuted -> refreshMicSeats()
+                is RoomEvent.ActiveSpeakersChanged -> {
+                    activeSpeakerNames = event.speakers.mapNotNull { participant ->
+                        participant.name?.takeIf { it.isNotBlank() }
+                            ?: participant.identity?.value
+                    }.toSet()
+                    refreshMicSeats()
+                }
+                else -> Unit
+            }
         }
     }
 
@@ -511,6 +547,7 @@ private fun AudioLiveRoomScreen(
             status = "جارٍ الاتصال بخادم الصوت..."
             room.connect(credentials.serverUrl, credentials.participantToken)
             connected = true
+            refreshMicSeats()
             status = if (canSpeak) "أنت داخل الغرفة كمضيف" else "أنت مستمع داخل الغرفة"
             if (canSpeak) {
                 micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
@@ -547,21 +584,23 @@ private fun AudioLiveRoomScreen(
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             items(8) { index ->
+                val occupant = micSeatNames.getOrNull(index)
+                val speaking = occupant != null && activeSpeakerNames.contains(occupant)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
                         Modifier.size(62.dp).background(
-                            if (index == 0 && canSpeak) Color(0xFF704A83) else Color(0xFF26384E),
+                            if (speaking) Color(0xFF188B69) else if (occupant != null) Color(0xFF704A83) else Color(0xFF26384E),
                             CircleShape
                         ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            if (index == 0 && micEnabled) Icons.Default.Mic else Icons.Default.Person,
+                            if (occupant != null) Icons.Default.Mic else Icons.Default.Person,
                             null, tint = Color.White, modifier = Modifier.size(30.dp)
                         )
                     }
-                    Text(if (index == 0 && canSpeak) "المضيف" else "مقعد ${index + 1}",
-                        color = Color.White, fontSize = 12.sp)
+                    Text(occupant ?: "مقعد ${index + 1}",
+                        color = Color.White, fontSize = 11.sp, maxLines = 1)
                 }
             }
         }
@@ -588,6 +627,7 @@ private fun AudioLiveRoomScreen(
                             try {
                                 room.localParticipant.setMicrophoneEnabled(false)
                                 micEnabled = false
+                                refreshMicSeats()
                             } catch (e: Exception) {
                                 error = e.message ?: "تعذر إيقاف المايك"
                             }
