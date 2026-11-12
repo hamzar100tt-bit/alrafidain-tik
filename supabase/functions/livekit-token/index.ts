@@ -89,7 +89,7 @@ Deno.serve(async (request: Request) => {
   });
 
   try {
-    const serverUrl = livekitUrl.replace(/^wss:\/\//i, "https://").replace(/^ws:\/\//i, "http://");
+    const serverUrl = livekitUrl.trim();
     return json({ serverUrl, participantToken: await token.toJwt(), room, role });
   } catch {
     return json({ error: "تعذر إنشاء تصريح البث." }, 500);
