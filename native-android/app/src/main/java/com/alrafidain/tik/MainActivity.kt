@@ -343,11 +343,38 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
                     Text("غرفة صوتية مع 8 مقاعد للمايكات", color = Muted, fontSize = 12.sp)
                     Spacer(Modifier.height(12.dp))
                     Text("اختار خلفية البث", fontWeight = FontWeight.Bold)
-                    val backgrounds = listOf("ملعب كرة القدم", "تدرج أزرق", "غرفة ألعاب", "مدينة ليلية", "شاطئ الغروب", "مسجد ليلي")
-                    backgrounds.forEachIndexed { index, label ->
-                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(if (selectedAudioBackground == index) Brand.copy(alpha = .18f) else Color.Transparent).clickable { selectedAudioBackground = index }.padding(vertical = 7.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = selectedAudioBackground == index, onClick = { selectedAudioBackground = index })
-                            Text(label, modifier = Modifier.padding(start = 8.dp))
+                    val backgrounds = listOf("ملعب كرة القدم", "خلفية زرقاء", "غرفة ألعاب", "مدينة ليلية", "شاطئ الغروب", "مسجد ليلي")
+                    val backgroundIcons = listOf(Icons.Default.Stadium, Icons.Default.Waves, Icons.Default.SportsEsports, Icons.Default.LocationCity, Icons.Default.BeachAccess, Icons.Default.Mosque)
+                    val backgroundBrushes = listOf(
+                        listOf(Color(0xFF062C58), Color(0xFF087C9B), Color(0xFF164A32)),
+                        listOf(Color(0xFF0066CC), Color(0xFF123A9C), Color(0xFF061B4A)),
+                        listOf(Color(0xFF35105D), Color(0xFF711D86), Color(0xFF120D2B)),
+                        listOf(Color(0xFF071B3D), Color(0xFF183C66), Color(0xFF030A19)),
+                        listOf(Color(0xFFFFA45B), Color(0xFFB84F73), Color(0xFF253C70)),
+                        listOf(Color(0xFF102A53), Color(0xFF28517A), Color(0xFF08192E))
+                    )
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier.fillMaxWidth().height(220.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(backgrounds.size) { index ->
+                            val chosen = selectedAudioBackground == index
+                            Column(
+                                Modifier.fillMaxWidth().height(100.dp).clip(RoundedCornerShape(13.dp))
+                                    .background(Brush.verticalGradient(backgroundBrushes[index]))
+                                    .then(if (chosen) Modifier.padding(2.dp).border(2.dp, Brand, RoundedCornerShape(12.dp)) else Modifier)
+                                    .clickable { selectedAudioBackground = index }
+                                    .padding(9.dp),
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(backgroundIcons[index], null, tint = Color.White, modifier = Modifier.size(25.dp))
+                                    if (chosen) Icon(Icons.Default.CheckCircle, "محدد", tint = Color.White)
+                                }
+                                Text(backgrounds[index], color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                     if (audioRoomError != null) Text(audioRoomError!!, color = MaterialTheme.colorScheme.error)
@@ -556,7 +583,7 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
         3 -> Brush.verticalGradient(listOf(Color(0xFF071B3D), Color(0xFF183C66), Color(0xFF030A19)))
         4 -> Brush.verticalGradient(listOf(Color(0xFFFFA45B), Color(0xFFB84F73), Color(0xFF253C70)))
         5 -> Brush.verticalGradient(listOf(Color(0xFF102A53), Color(0xFF28517A), Color(0xFF08192E)))
-        else -> Brush.verticalGradient(listOf(Color(0xFF1479D9), Color(0xFF329DEB), Color(0xFF8AD4F7), Color(0xFF24558A)))
+        else -> Brush.verticalGradient(listOf(Color(0xFF062C58), Color(0xFF087C9B), Color(0xFF164A32)))
     }
     Box(Modifier.fillMaxSize().background(sky)) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
