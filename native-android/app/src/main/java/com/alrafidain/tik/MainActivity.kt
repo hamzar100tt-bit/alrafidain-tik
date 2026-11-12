@@ -217,15 +217,21 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onStartVideoPost: ()
     var creatingRoom by remember { mutableStateOf(false) }
     var createRoomError by remember { mutableStateOf<String?>(null) }
     val liveScope = rememberCoroutineScope()
-    val rooms = listOf(
-        Triple("سوالف عراقية", "حمزة", "447"),
-        Triple("جلسة دردشة عامة", "نور", "295"),
-        Triple("غرفة الأصدقاء", "علي", "201"),
-        Triple("ألعاب وترفيه", "مصطفى", "136"),
-        Triple("شعر وقصائد", "حيدر", "120"),
-        Triple("موسيقى وطرب", "زينب", "98")
-    )
-    val shownRooms = rooms.filter { it.first.contains(searchText.trim(), ignoreCase = true) }
+    var rooms by remember { mutableStateOf<List<LiveRoomInfo>>(emptyList()) }
+    var roomsLoading by remember { mutableStateOf(true) }
+    var roomsError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        try {
+            rooms = withContext(Dispatchers.IO) { repository.loadLiveRooms() }
+            roomsError = null
+        } catch (e: Exception) {
+            roomsError = e.message ?: "تعذر تحميل الغرف المباشرة"
+        } finally { roomsLoading = false }
+    }
+    val shownRooms = rooms.filter { room ->
+        room.title.contains(searchText.trim(), ignoreCase = true) &&
+            (roomType == "جميع الغرف" || (roomType == "الصوتية" && room.roomType == "audio") || (roomType == "الفيديو" && room.roomType == "video"))
+    }
     if (openedVideoRoom != null) {
         VideoLiveRoomScreen(repository, roomName = openedVideoRoom!!, onBack = { openedVideoRoom = null }, onRequireLogin = onRequireLogin)
         return
@@ -353,24 +359,30 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onStartVideoPost: ()
             }
         }
         Text("غرف مباشرة الآن", color = Color(0xFFFFC04D), modifier = Modifier.padding(18.dp))
-        LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(shownRooms.size) { i ->
-                val room = shownRooms[i]
-                Column(Modifier.clip(RoundedCornerShape(16.dp)).background(Color(0xFF251B2B))
-                    .clickable { if (roomType == "الفيديو") openedVideoRoom = room.first else openedRoom = room.first }) {
-                    Box(Modifier.fillMaxWidth().height(130.dp)
-                        .background(listOf(Color(0xFF573C67), Color(0xFF17456A), Color(0xFF70483E))[i % 3],
-                            RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Groups, null, tint = Color.White, modifier = Modifier.size(54.dp))
-                        Text("● ${room.third}", color = Color.White, modifier = Modifier.align(Alignment.TopStart).padding(8.dp))
-                        Text("LIVE", color = Color.White, modifier = Modifier.align(Alignment.TopEnd).padding(7.dp)
-                            .clip(RoundedCornerShape(8.dp)).background(Brand).padding(6.dp), fontSize = 11.sp)
+        when {
+            roomsLoading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Brand) }
+            roomsError != null -> Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Text(roomsError!!, color = Color.White)
+                TextButton(onClick = { liveScope.launch { roomsLoading = true; try { rooms = withContext(Dispatchers.IO) { repository.loadLiveRooms() }; roomsError = null } catch (e: Exception) { roomsError = e.message } finally { roomsLoading = false } } }) { Text("إعادة المحاولة", color = Color.White) }
+            }
+            shownRooms.isEmpty() -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Text("ماكو غرف مباشرة حالياً", color = Color.LightGray)
+            }
+            else -> LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(shownRooms.size) { i ->
+                    val room = shownRooms[i]
+                    Column(Modifier.clip(RoundedCornerShape(16.dp)).background(Color(0xFF251B2B))
+                        .clickable { if (room.roomType == "video") openedVideoRoom = room.roomKey else openedRoom = room.title }) {
+                        Box(Modifier.fillMaxWidth().height(130.dp)
+                            .background(listOf(Color(0xFF573C67), Color(0xFF17456A), Color(0xFF70483E))[i % 3], RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+                            Icon(if (room.roomType == "video") Icons.Default.Videocam else Icons.Default.Groups, null, tint = Color.White, modifier = Modifier.size(54.dp))
+                            Text("LIVE", color = Color.White, modifier = Modifier.align(Alignment.TopEnd).padding(7.dp).clip(RoundedCornerShape(8.dp)).background(Brand).padding(6.dp), fontSize = 11.sp)
+                        }
+                        Text(room.title, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(8.dp))
+                        Text("المضيف: ${room.ownerName}", color = Color.LightGray, fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp, bottom = 8.dp))
                     }
-                    Text(room.first, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(8.dp))
-                    Text("المضيف: ${room.second}", color = Color.LightGray, fontSize = 11.sp,
-                        modifier = Modifier.padding(start = 8.dp, bottom = 8.dp))
                 }
             }
         }
