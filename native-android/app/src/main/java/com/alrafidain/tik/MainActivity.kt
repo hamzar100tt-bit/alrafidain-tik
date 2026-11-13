@@ -741,21 +741,25 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                         Box(Modifier.size(58.dp).clip(CircleShape)
                             .border(2.dp, if (isSpeaking) Color(0xFF31F0D0) else Color(0xFFD05BFF), CircleShape)
                             .background(if (isSpeaking) Color(0xFF16B98D) else if (profile != null) Color(0xFF25194F) else Color(0x553A2C79))
-                            .clickable(enabled = id == null && connected && !connecting) {
-                                connecting = true
-                                scope.launch {
-                                    try {
-                                        val credentials = withContext(Dispatchers.IO) { repository.joinLiveRoomSeat(roomName) }
-                                        room.disconnect()
-                                        room.connect(credentials.serverUrl, credentials.participantToken)
-                                        canSpeak = true
-                                        connected = true
-                                        status = "انضممت إلى المايك"
-                                        if (!micEnabled) permission.launch(android.Manifest.permission.RECORD_AUDIO)
-                                        refreshSeats()
-                                    } catch (e: Exception) {
-                                        error = e.message ?: "تعذر الانضمام للمقعد"
-                                    } finally { connecting = false }
+                            .clickable(enabled = id != null || (connected && !connecting)) {
+                                if (id != null) {
+                                    selectedChatUserId = id
+                                } else {
+                                    connecting = true
+                                    scope.launch {
+                                        try {
+                                            val credentials = withContext(Dispatchers.IO) { repository.joinLiveRoomSeat(roomName) }
+                                            room.disconnect()
+                                            room.connect(credentials.serverUrl, credentials.participantToken)
+                                            canSpeak = true
+                                            connected = true
+                                            status = "انضممت إلى المايك"
+                                            if (!micEnabled) permission.launch(android.Manifest.permission.RECORD_AUDIO)
+                                            refreshSeats()
+                                        } catch (e: Exception) {
+                                            error = e.message ?: "تعذر الانضمام للمقعد"
+                                        } finally { connecting = false }
+                                    }
                                 }
                             },
                             contentAlignment = Alignment.Center) {
@@ -1154,6 +1158,8 @@ private fun PublicCommentProfileScreen(repository: SupabaseRepository, userId: S
                     modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                 Text("@${profile?.username.orEmpty()}", color = Muted, fontSize = 14.sp,
                     modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                Text("ID: $userId", color = Color(0xFF9A9AA3), fontSize = 12.sp,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp), textAlign = TextAlign.Center)
                 Spacer(Modifier.height(20.dp))
                 Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
