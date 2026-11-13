@@ -76,6 +76,18 @@ class SupabaseRepository(private val context: Context) {
         return requestLiveKitToken(roomKey, "speaker")
     }
 
+    fun leaveLiveRoomSeat(roomKey: String) {
+        val userId = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
+        val rooms = publicRows("live_rooms?room_key=eq.$roomKey&is_live=eq.true&select=id&limit=1")
+        if (rooms.length() == 0) throw IOException("الغرفة غير موجودة")
+        val roomId = rooms.getJSONObject(0).optString("id")
+        val request = authedRequest("$base/rest/v1/live_room_speakers?room_id=eq.$roomId&user_id=eq.$userId")
+            .delete().build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("تعذر النزول من المايك (${response.code})")
+        }
+    }
+
     fun moderateLiveRoom(roomKey: String, targetUserId: String, action: String) {
         val payload = JSONObject().put("room", roomKey)
             .put("targetUserId", targetUserId).put("action", action)
