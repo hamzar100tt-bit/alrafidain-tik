@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Home, Compass, Users, PlusSquare, UserRound, Search, Heart, MessageCircle, Bookmark, Share2, Radio, Volume2, VolumeX, Play, Menu, X, LogOut, Send, Video, Camera, LoaderCircle } from "lucide-react";
+import { Home, Compass, Users, PlusSquare, UserRound, Search, Heart, MessageCircle, Bookmark, Share2, Radio, Volume2, VolumeX, Play, Menu, X, LogOut, Send, Video, Camera, LoaderCircle, Settings } from "lucide-react";
 import { supabase } from "./lib/supabase.js";
 import LiveStudio from "./LiveStudio.jsx";
-import { signIn, signUp, signOut, publishVideo, getFeed, addComment, getComments, toggleLike, toggleFollow, getFollowingFeed, getMyVideos, getProfile, getFollowState, getLikedVideoIds, getProfileStats, findProfileByUsername, getDirectMessages, sendDirectMessage, updateProfile, uploadProfileAvatar } from "./services/videoService.js";
+import { signIn, signUp, signOut, publishVideo, getFeed, addComment, getComments, toggleLike, toggleFollow, getFollowingFeed, getMyVideos, getProfile, getFollowState, getLikedVideoIds, getProfileStats, findProfileByUsername, getDirectMessages, sendDirectMessage, updateProfile, uploadProfileAvatar, getFollowers, getFollowing } from "./services/videoService.js";
 
 const demoVideos = [
   { id: "demo-1", user: "iraq_daily", name: "يوميات العراق 🇮🇶", caption: "جمال بلادنا ما ينتهي ❤️ #العراق #الرافدين", image: "https://images.unsplash.com/photo-1565008576549-57569a49371d?auto=format&fit=crop&w=900&q=85", avatar: "🇮🇶", demo: true },
@@ -79,6 +79,11 @@ function App() {
   const [profile, setProfile] = useState(null);
   const [profileStats, setProfileStats] = useState({ videos: 0, followers: 0, following: 0 });
   const [profileEditOpen, setProfileEditOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [followListOpen, setFollowListOpen] = useState(false);
+  const [followListType, setFollowListType] = useState("followers");
+  const [followList, setFollowList] = useState([]);
+  const [followListLoading, setFollowListLoading] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [profileUsername, setProfileUsername] = useState("");
@@ -188,7 +193,7 @@ function App() {
     } catch (e) { setError(e.message || "تعذر حفظ الملف الشخصي."); }
     finally { setBusy(false); }
   };
-  const handleAvatarChange = async (e) => {
+  const openFollowList = async (type) => {\n    if (!user) { openAuth(); return; }\n    setFollowListType(type); setFollowListOpen(true); setFollowList([]); setFollowListLoading(true); setError("");\n    try { setFollowList(type === "followers" ? await getFollowers(user.id) : await getFollowing(user.id)); }\n    catch (e) { setError(e.message || "تعذر تحميل قائمة الحسابات."); }\n    finally { setFollowListLoading(false); }\n  };\n\n  const handleAvatarChange = async (e) => {
     const selected = e.target.files?.[0];
     if (!selected || !user) return;
     setBusy(true); setError("");
@@ -293,7 +298,7 @@ function App() {
         </section>}
         <div className="feed-footer"><span><i/> {videos.length ? `فيديو ${Math.min(index + 1, videos.length)} من ${videos.length}` : "معاينات تجريبية"}</span><div className="dots">{shownVideos.map((v,i) => <button key={v.id} onClick={() => setIndex(i)} className={i === index ? "dot active-dot" : "dot"} aria-label={`فيديو ${i+1}`}/>)}</div></div>
         <div className="mobile-actions"><button onClick={() => go(-1)}>الفيديو السابق</button><button onClick={() => go(1)}>الفيديو التالي</button></div></>}
-        {active === "الملف الشخصي" && <section className="profile-page"><div className="profile-cover" aria-hidden="true"></div><div className="profile-main"><div className="profile-avatar">{profile?.avatar_url ? <img src={profile.avatar_url} alt="صورة الحساب"/> : "🇮🇶"}</div><div className="profile-heading"><div><h2>{profile?.display_name || profile?.username || "حسابي"}</h2><p>@{profile?.username || user?.email?.split("@")[0] || "user"}</p></div><button className="profile-edit-btn" onClick={() => setProfileEditOpen(true)}>تعديل الملف الشخصي</button></div><p className="profile-bio">{profile?.bio || "أهلاً بيك بحسابي على الرافدين تيك 🇮🇶"}</p><div className="profile-stats"><span><b>{profileStats.videos}</b> فيديو</span><span><b>{profileStats.followers}</b> متابع</span><span><b>{profileStats.following}</b> يتابع</span></div><div className="profile-content-tabs"><b>▦ فيديوهاتي</b><span>المفضلة</span></div>{videos.length ? <div className="profile-video-grid">{videos.map((v,i)=><button key={v.id} onClick={()=>{setActive("الرئيسية");setIndex(i)}}><VideoThumbnail src={v.videoUrl} alt={`معاينة فيديو ${i + 1}`}/><span>▶</span></button>)}</div> : <div className="profile-empty"><Video size={34}/><b>ما نشرت أي فيديو بعد</b><span>شارك أول فيديو وخلي الناس تشوف محتواك</span><button className="upload-btn" onClick={()=>setUploadOpen(true)}>＋ نشر أول فيديو</button></div>}</div></section>}
+        {active === "الملف الشخصي" && <section className="profile-page"><div className="profile-cover" aria-hidden="true"><button className="profile-settings-btn" aria-label="الإعدادات" onClick={() => setSettingsOpen(true)}><Settings size={21}/></button></div><div className="profile-main"><div className="profile-avatar">{profile?.avatar_url ? <img src={profile.avatar_url} alt="صورة الحساب"/> : "🇮🇶"}</div><div className="profile-heading"><div><h2>{profile?.display_name || profile?.username || "حسابي"}</h2><p>@{profile?.username || user?.email?.split("@")[0] || "user"}</p></div><button className="profile-edit-btn" onClick={() => setProfileEditOpen(true)}>تعديل الملف الشخصي</button></div><p className="profile-bio">{profile?.bio || "أهلاً بيك بحسابي على الرافدين تيك 🇮🇶"}</p><div className="profile-stats"><span><b>{profileStats.videos}</b> فيديو</span><button type="button" onClick={() => openFollowList("followers")}><b>{profileStats.followers}</b> متابع</button><button type="button" onClick={() => openFollowList("following")}><b>{profileStats.following}</b> يتابع</button></div><div className="profile-content-tabs"><b>▦ فيديوهاتي</b><span>المفضلة</span></div>{videos.length ? <div className="profile-video-grid">{videos.map((v,i)=><button key={v.id} onClick={()=>{setActive("الرئيسية");setIndex(i)}}><VideoThumbnail src={v.videoUrl} alt={`معاينة فيديو ${i + 1}`}/><span>▶</span></button>)}</div> : <div className="profile-empty"><Video size={34}/><b>ما نشرت أي فيديو بعد</b><span>شارك أول فيديو وخلي الناس تشوف محتواك</span><button className="upload-btn" onClick={()=>setUploadOpen(true)}>＋ نشر أول فيديو</button></div>}</div></section>}
       </main>
       <aside className="right-panel"><h3>حسابات مقترحة</h3><div className="community-card"><span>🇮🇶</span><b>صوتك يوصل</b><p>انشر إبداعك وخلي العالم يشوف جمال العراق.</p></div></aside>
     </div>
@@ -333,6 +338,10 @@ function App() {
         <button className="post-publish-btn" disabled={busy || !file} onClick={handleUpload}>{busy ? "جاري رفع الفيديو..." : "نشر الفيديو"}</button>
       </div>
     </section></div>}
+
+    {settingsOpen && <div className="modal-backdrop" onClick={() => setSettingsOpen(false)}><section className="modal settings-modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setSettingsOpen(false)}><X/></button><h2>الإعدادات</h2><button className="settings-option" onClick={() => { setSettingsOpen(false); setProfileEditOpen(true); }}>تعديل الملف الشخصي</button><button className="settings-option" onClick={() => { setSettingsOpen(false); openFollowList("followers"); }}>المتابعون</button><button className="settings-option" onClick={() => { setSettingsOpen(false); openFollowList("following"); }}>الحسابات التي أتابعها</button><button className="settings-option danger" onClick={async () => { setSettingsOpen(false); await signOut(); setUser(null); setActive("الرئيسية"); }}>تسجيل الخروج</button></section></div>}
+
+    {followListOpen && <div className="modal-backdrop" onClick={() => setFollowListOpen(false)}><section className="modal follow-list-modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setFollowListOpen(false)}><X/></button><h2>{followListType === "followers" ? "المتابعون" : "الحسابات التي أتابعها"}</h2>{followListLoading ? <p>جاري تحميل الحسابات…</p> : followList.length ? <div className="follow-list-items">{followList.map(person => <div className="follow-list-item" key={person.id}><span className="follow-list-avatar">{person.avatar_url ? <img src={person.avatar_url} alt=""/> : "🇮🇶"}</span><span><b>{person.display_name || person.username}</b><small>@{person.username}</small></span></div>)}</div> : <p>ماكو حسابات بهالقائمة حالياً.</p>}</section></div>}
 
     {profileEditOpen && <div className="modal-backdrop" onClick={() => setProfileEditOpen(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setProfileEditOpen(false)}><X/></button><h2>تعديل الملف الشخصي</h2><form onSubmit={saveProfile}><label className="avatar-upload-control">صورة الحساب<input ref={profileAvatarRef} type="file" accept="image/*" onChange={handleAvatarChange}/></label><input required minLength="3" maxLength="24" value={profileUsername} onChange={e => setProfileUsername(e.target.value)} placeholder="اسم المستخدم (إنكليزي)"/><input maxLength="60" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="الاسم الظاهر"/><textarea maxLength="160" value={bio} onChange={e => setBio(e.target.value)} placeholder="نبذة عنك"/><button className="login-btn modal-submit" disabled={busy}>{busy ? "حفظ..." : "حفظ التغييرات"}</button></form></section></div>}
     
