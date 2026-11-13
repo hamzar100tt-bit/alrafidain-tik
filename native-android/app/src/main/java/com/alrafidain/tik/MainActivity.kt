@@ -758,12 +758,6 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                     Text(" $viewerCount", color = Color.White, fontSize = 13.sp)
                 }
                 Spacer(Modifier.width(7.dp))
-                seatProfiles.take(3).forEach { profile ->
-                    Box(Modifier.padding(end = 5.dp).size(31.dp).clip(CircleShape).background(Color(0xFF416D9B)), contentAlignment = Alignment.Center) {
-                        if (!profile.avatarUrl.isNullOrBlank()) AsyncImage(model = profile.avatarUrl, contentDescription = profile.displayName, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                        else Icon(Icons.Default.Person, null, tint = Color.White)
-                    }
-                }
                 Spacer(Modifier.weight(1f))
                 Text("🏠 ${host?.title ?: "غرفة الرافدين"}", color = Color.White, fontSize = 12.sp,
                     modifier = Modifier.background(Color(0x55304F7A), RoundedCornerShape(18.dp)).padding(horizontal = 11.dp, vertical = 6.dp), maxLines = 1)
@@ -794,7 +788,14 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                                             canSpeak = true
                                             connected = true
                                             status = "انضممت إلى المايك"
-                                            if (!micEnabled) permission.launch(android.Manifest.permission.RECORD_AUDIO)
+                                            val hasMicPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                                                context, android.Manifest.permission.RECORD_AUDIO
+                                            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                            if (hasMicPermission) {
+                                                room.localParticipant.setMicrophoneEnabled(true)
+                                                micEnabled = true
+                                            } else permission.launch(android.Manifest.permission.RECORD_AUDIO)
+                                            kotlinx.coroutines.delay(350)
                                             refreshSeats()
                                         } catch (e: Exception) {
                                             error = e.message ?: "تعذر الانضمام للمقعد"
@@ -813,12 +814,7 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                 }
             }
 
-            // Social-room conversation area.
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("الدردشة", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = { chatOpen = !chatOpen }) { Text(if (chatOpen) "إخفاء" else "إظهار", color = Color.White) }
-            }
+            // Chat visibility is controlled from the bottom toolbar to keep mic seats clear.
             if (chatOpen) {
                 Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 14.dp), verticalArrangement = Arrangement.Bottom) {
                     chat.takeLast(5).forEach { message ->
@@ -882,7 +878,14 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                                     canSpeak = true
                                     connected = true
                                     status = "انضممت إلى المايك"
-                                    if (!micEnabled) permission.launch(android.Manifest.permission.RECORD_AUDIO)
+                                    val hasMicPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                                        context, android.Manifest.permission.RECORD_AUDIO
+                                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                    if (hasMicPermission) {
+                                        room.localParticipant.setMicrophoneEnabled(true)
+                                        micEnabled = true
+                                    } else permission.launch(android.Manifest.permission.RECORD_AUDIO)
+                                    kotlinx.coroutines.delay(350)
                                     refreshSeats()
                                 } catch (e: Exception) { error = e.message ?: "تعذر طلب الصعود للمايك" }
                                 finally { connecting = false }
