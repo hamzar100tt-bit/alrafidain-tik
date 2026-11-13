@@ -576,6 +576,9 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
     var chat by remember { mutableStateOf<List<LiveChatMessage>>(emptyList()) }
     var myChatProfile by remember { mutableStateOf<SupabaseRepository.DiscoverProfile?>(null) }
     var selectedChatUserId by remember { mutableStateOf<String?>(null) }
+    var selectedModerationUserId by remember { mutableStateOf<String?>(null) }
+    var moderationBusy by remember { mutableStateOf(false) }
+    var moderationMessage by remember { mutableStateOf<String?>(null) }
     var giftsOpen by remember { mutableStateOf(false) }
     var inviteOpen by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -838,7 +841,7 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                 Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
                     if (viewerProfiles.isEmpty()) Text("لا توجد حسابات ظاهرة حالياً")
                     viewerProfiles.forEach { viewer ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().clickable { selectedModerationUserId = viewer.id }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.size(38.dp).clip(CircleShape).background(Color(0xFFE4EAF3)), contentAlignment = Alignment.Center) {
                                 if (!viewer.avatarUrl.isNullOrBlank()) AsyncImage(model = viewer.avatarUrl, contentDescription = viewer.displayName, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                                 else Icon(Icons.Default.Person, null, tint = Brand)
@@ -856,6 +859,65 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
             properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
             PublicCommentProfileScreen(repository, profileUserId, onBack = { selectedChatUserId = null })
         }
+    }
+    if (menuOpen) AlertDialog(
+        onDismissRequest = { menuOpen = false },
+        title = { Text("قائمة البث") },
+        text = { Column {
+            TextButton(onClick = { menuOpen = false; viewersDialog = true }) { Text("عرض المشاهدين وإدارة الحسابات") }
+            TextButton(onClick = { menuOpen = false; inviteOpen = true }) { Text("دعوة صديق إلى الغرفة") }
+            TextButton(onClick = { menuOpen = false; chatOpen = !chatOpen }) { Text(if (chatOpen) "إخفاء الدردشة" else "إظهار الدردشة") }
+        } },
+        confirmButton = { TextButton(onClick = { menuOpen = false }) { Text("إغلاق") } }
+    )
+    if (giftsOpen) AlertDialog(
+        onDismissRequest = { giftsOpen = false },
+        title = { Text("الهدايا 🌹") },
+        text = { Text("واجهة الهدايا جاهزة للربط، لكن إرسال الهدايا ونظام العملات يحتاجان إضافة رصيد وسجل هدايا حتى لا تظهر كأنها أُرسلت وهي غير محفوظة.") },
+        confirmButton = { TextButton(onClick = { giftsOpen = false }) { Text("حسناً") } }
+    )
+    selectedModerationUserId?.let { targetId ->
+        val targetProfile = viewerProfiles.firstOrNull { it.id == targetId }
+        val isOwner = repository.currentUserId() == host?.ownerId
+        AlertDialog(
+            onDismissRequest = { if (!moderationBusy) selectedModerationUserId = null },
+            title = { Text("إدارة ${targetProfile?.displayName ?: "المشارك"}") },
+            text = {
+                Column {
+                    Text(if (isOwner) "اختر الإجراء المطلوب لهذا الحساب." else "يمكن للمضيف أو المشرف إدارة المشاركين.")
+                    moderationMessage?.let { Text(it, color = Brand, modifier = Modifier.padding(top = 8.dp)) }
+                }
+            },
+            confirmButton = {
+                Row {
+                    if (isOwner) TextButton(enabled = !moderationBusy, onClick = {
+                        moderationBusy = true
+                        scope.launch {
+                            try { withContext(Dispatchers.IO) { repository.moderateLiveRoom(roomName, targetId, "promote_admin") }; moderationMessage = "تم تعيينه مشرفاً" }
+                            catch (e: Exception) { moderationMessage = e.message ?: "تعذر تعيين المشرف" }
+                            finally { moderationBusy = false }
+                        }
+                    }) { Text("جعله مشرف") }
+                    TextButton(enabled = !moderationBusy, onClick = {
+                        moderationBusy = true
+                        scope.launch {
+                            try { withContext(Dispatchers.IO) { repository.moderateLiveRoom(roomName, targetId, "mute") }; moderationMessage = "تم كتم المشارك" }
+                            catch (e: Exception) { moderationMessage = e.message ?: "تعذر الكتم" }
+                            finally { moderationBusy = false }
+                        }
+                    }) { Text("كتم") }
+                    TextButton(enabled = !moderationBusy, onClick = {
+                        moderationBusy = true
+                        scope.launch {
+                            try { withContext(Dispatchers.IO) { repository.moderateLiveRoom(roomName, targetId, "kick") }; moderationMessage = "تم طرد المشارك"; selectedModerationUserId = null; refreshSeats() }
+                            catch (e: Exception) { moderationMessage = e.message ?: "تعذر الطرد" }
+                            finally { moderationBusy = false }
+                        }
+                    }) { Text("طرد") }
+                }
+            },
+            dismissButton = { TextButton(enabled = !moderationBusy, onClick = { selectedModerationUserId = null; moderationMessage = null }) { Text("إغلاق") } }
+        )
     }
     if (inviteOpen) AlertDialog(onDismissRequest = { inviteOpen = false }, title = { Text("دعوة إلى الغرفة") },
         text = { Text("شارك اسم الغرفة مع أصدقائك: $roomName") },
