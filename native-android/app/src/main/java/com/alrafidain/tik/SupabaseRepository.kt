@@ -403,6 +403,12 @@ class SupabaseRepository(private val context: Context) {
         return !already
     }
 
+    fun videoLikeCount(videoId: String): Int =
+        fetchAuthedRows("likes?video_id=eq.$videoId&select=video_id&limit=1000").length()
+
+    fun videoCommentCount(videoId: String): Int =
+        fetchAuthedRows("comments?video_id=eq.$videoId&select=id&limit=1000").length()
+
     fun toggleLike(videoId: String): Boolean = toggleRelation("likes", videoId)
     fun toggleSaved(videoId: String): Boolean = toggleRelation("saved_videos", videoId)
 
