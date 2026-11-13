@@ -76,6 +76,19 @@ class SupabaseRepository(private val context: Context) {
         return requestLiveKitToken(roomKey, "speaker")
     }
 
+    fun moderateLiveRoom(roomKey: String, targetUserId: String, action: String) {
+        val payload = JSONObject().put("room", roomKey)
+            .put("targetUserId", targetUserId).put("action", action)
+        val request = authedRequest("$base/functions/v1/live-room-moderation")
+            .addHeader("Content-Type", "application/json")
+            .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(body) }.getOrElse { JSONObject() }
+            if (!response.isSuccessful) throw IOException(json.optString("error").ifBlank { "تعذر تنفيذ الإجراء (${response.code})" })
+        }
+    }
+
     fun loadLiveChatMessages(roomKey: String): List<LiveChatItem> {
         val encodedRoom = java.net.URLEncoder.encode(roomKey, "UTF-8")
         val rows = fetchAuthedRows("live_chat_messages?room_key=eq.$encodedRoom&select=id,user_id,body,created_at&order=created_at.asc&limit=60")
