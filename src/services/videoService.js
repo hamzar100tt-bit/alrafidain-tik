@@ -225,3 +225,32 @@ export async function uploadProfileAvatar({ file, userId }) {
   }
   return data;
 }
+
+
+export async function getFollowers(userId) {
+  requireSupabase();
+  const { data: relations, error } = await supabase.from("follows")
+    .select("follower_id").eq("followed_id", userId).order("created_at", { ascending: false });
+  if (error) throw error;
+  const ids = [...new Set((relations || []).map(row => row.follower_id).filter(Boolean))];
+  if (!ids.length) return [];
+  const { data, error: profileError } = await supabase.from("profiles")
+    .select("id, username, display_name, avatar_url").in("id", ids);
+  if (profileError) throw profileError;
+  const byId = new Map((data || []).map(row => [row.id, row]));
+  return ids.map(id => byId.get(id)).filter(Boolean);
+}
+
+export async function getFollowing(userId) {
+  requireSupabase();
+  const { data: relations, error } = await supabase.from("follows")
+    .select("followed_id").eq("follower_id", userId).order("created_at", { ascending: false });
+  if (error) throw error;
+  const ids = [...new Set((relations || []).map(row => row.followed_id).filter(Boolean))];
+  if (!ids.length) return [];
+  const { data, error: profileError } = await supabase.from("profiles")
+    .select("id, username, display_name, avatar_url").in("id", ids);
+  if (profileError) throw profileError;
+  const byId = new Map((data || []).map(row => [row.id, row]));
+  return ids.map(id => byId.get(id)).filter(Boolean);
+}
