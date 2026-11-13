@@ -1555,79 +1555,135 @@ private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, activ
     val scope = rememberCoroutineScope()
     var liked by remember(video.id) { mutableStateOf(false) }
     var saved by remember(video.id) { mutableStateOf(false) }
+    var following by remember(video.userId) { mutableStateOf(false) }
     var commentsOpen by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
+    var followBusy by remember { mutableStateOf(false) }
+    var muted by remember(video.id) { mutableStateOf(false) }
+    var likeCount by remember(video.id) { mutableIntStateOf(0) }
+    var commentCount by remember(video.id) { mutableIntStateOf(0) }
     var actionError by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(video.id, signedIn) {
-        if (signedIn) withContext(Dispatchers.IO) { liked = repository.isLiked(video.id); saved = repository.isSaved(video.id) }
+        withContext(Dispatchers.IO) {
+            likeCount = runCatching { repository.videoLikeCount(video.id) }.getOrDefault(0)
+            commentCount = runCatching { repository.videoCommentCount(video.id) }.getOrDefault(0)
+            if (signedIn) {
+                liked = runCatching { repository.isLiked(video.id) }.getOrDefault(false)
+                saved = runCatching { repository.isSaved(video.id) }.getOrDefault(false)
+                following = runCatching { repository.isFollowing(video.userId) }.getOrDefault(false)
+            }
+        }
     }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (video.mediaType == "image") {
-            AsyncImage(model = video.videoUrl, contentDescription = video.caption, modifier = Modifier.fillMaxSize())
-        } else NativeVideoPlayer(video.videoUrl, active, replaySignal)
+            AsyncImage(model = video.videoUrl, contentDescription = video.caption,
+                contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        } else NativeVideoPlayer(video.videoUrl, active, replaySignal, muted)
         Column(
-            Modifier.align(Alignment.CenterEnd).padding(end = 10.dp, bottom = 18.dp),
+            Modifier.align(Alignment.CenterEnd).padding(end = 9.dp, bottom = 22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+            verticalArrangement = Arrangement.spacedBy(13.dp)
         ) {
+            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(42.dp).clip(CircleShape).background(Color(0xFF292929)).clickable {
+                    if (!signedIn) onLogin() else actionError = "افتح الحساب من اسم الناشر"
+                }, contentAlignment = Alignment.Center) {
+                    if (!video.creatorAvatar.isNullOrBlank()) AsyncImage(
+                        model = video.creatorAvatar, contentDescription = "صورة صاحب الحساب",
+                        contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()
+                    ) else Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(29.dp))
+                }
+                if (video.userId != repository.currentUserId()) {
+                    Box(Modifier.align(Alignment.BottomCenter).size(19.dp).clip(CircleShape)
+                        .background(if (following) Color(0xFF21C7B7) else Brand)
+                        .clickable(enabled = !followBusy) {
+                            if (!signedIn) onLogin() else scope.launch {
+                                followBusy = true
+                                try { following = withContext(Dispatchers.IO) { repository.toggleFollow(video.userId) } }
+                                catch (e: Exception) { actionError = e.message ?: "تعذرت المتابعة" }
+                                finally { followBusy = false }
+                            }
+                        }, contentAlignment = Alignment.Center) {
+                        Icon(if (following) Icons.Default.Check else Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    }
+                }
+            }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 IconButton(enabled = !busy, onClick = {
                     if (!signedIn) onLogin() else scope.launch {
                         busy = true
-                        try { liked = withContext(Dispatchers.IO) { repository.toggleLike(video.id) } }
-                        catch (e: Exception) { actionError = e.message ?: "تعذر تسجيل الإعجاب" }
+                        try {
+                            liked = withContext(Dispatchers.IO) { repository.toggleLike(video.id) }
+                            likeCount = withContext(Dispatchers.IO) { repository.videoLikeCount(video.id) }
+                        } catch (e: Exception) { actionError = e.message ?: "تعذر تسجيل الإعجاب" }
                         finally { busy = false }
                     }
                 }) {
                     Icon(if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "إعجاب", tint = if (liked) Brand else Color.White, modifier = Modifier.size(32.dp))
+                        "إعجاب", tint = if (liked) Brand else Color.White, modifier = Modifier.size(33.dp))
                 }
-                Text("إعجاب", color = Color.White, fontSize = 11.sp)
+                Text(if (likeCount >= 1000) String.format("%.1fK", likeCount / 1000f) else likeCount.toString(),
+                    color = Color.White, fontSize = 11.sp)
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 IconButton(onClick = { commentsOpen = true }) {
-                    Icon(Icons.Default.ChatBubbleOutline, contentDescription = "تعليق", tint = Color.White, modifier = Modifier.size(30.dp))
+                    Icon(Icons.Default.ChatBubbleOutline, "التعليقات", tint = Color.White, modifier = Modifier.size(30.dp))
                 }
-                Text("تعليق", color = Color.White, fontSize = 11.sp)
+                Text(if (commentCount >= 1000) String.format("%.1fK", commentCount / 1000f) else commentCount.toString(),
+                    color = Color.White, fontSize = 11.sp)
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 IconButton(onClick = {
-                    val send = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(Intent.EXTRA_TEXT, video.videoUrl)
-                    }
-                    context.startActivity(Intent.createChooser(send, "مشاركة الفيديو"))
+                    runCatching {
+                        val send = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, "شاهد هذا الفيديو على الرافدين تيك: ${video.videoUrl}")
+                        }
+                        context.startActivity(Intent.createChooser(send, "مشاركة الفيديو"))
+                    }.onFailure { actionError = "تعذرت مشاركة الفيديو" }
                 }) {
-                    Icon(Icons.Default.Share, contentDescription = "مشاركة", tint = Color.White, modifier = Modifier.size(30.dp))
+                    Icon(Icons.Default.Share, "مشاركة", tint = Color.White, modifier = Modifier.size(30.dp))
                 }
                 Text("مشاركة", color = Color.White, fontSize = 11.sp)
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                IconButton(enabled = !busy, onClick = {
-                    if (!signedIn) onLogin() else scope.launch {
-                        busy = true
-                        try { saved = withContext(Dispatchers.IO) { repository.toggleSaved(video.id) }; actionError = if (saved) "تم حفظ الفيديو" else "تم إلغاء الحفظ" }
-                        catch (e: Exception) { actionError = e.message ?: "تعذر حفظ الفيديو" }
-                        finally { busy = false }
-                    }
-                }) {
-                    Icon(if (saved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                        contentDescription = "حفظ", tint = if (saved) Brand else Color.White, modifier = Modifier.size(30.dp))
+                IconButton(onClick = { muted = !muted }) {
+                    Icon(if (muted) Icons.Default.VolumeOff else Icons.Default.MusicNote,
+                        "الصوت والموسيقى", tint = Color.White, modifier = Modifier.size(30.dp))
                 }
-                Text("حفظ", color = Color.White, fontSize = 11.sp)
+                Text(if (muted) "صامت" else "الصوت", color = Color.White, fontSize = 11.sp)
             }
         }
-        Column(Modifier.align(Alignment.BottomStart).padding(start = 16.dp, end = 84.dp, bottom = 22.dp)) {
-            Text(video.creatorName.ifBlank { "مستخدم" }, color = Color.White, fontWeight = FontWeight.Bold)
-            if (video.caption.isNotBlank()) Text(video.caption, color = Color.White, fontSize = 15.sp)
+        Column(Modifier.align(Alignment.BottomStart).padding(start = 14.dp, end = 78.dp, bottom = 20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("@${video.creatorName.ifBlank { "مستخدم" }}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                if (video.userId != repository.currentUserId()) {
+                    Text(if (following) " ✓" else "  متابعة +", color = Color.White, fontSize = 12.sp,
+                        modifier = Modifier.padding(start = 9.dp).clip(RoundedCornerShape(14.dp))
+                            .background(Color(0x55333333)).clickable(enabled = !followBusy) {
+                                if (!signedIn) onLogin() else scope.launch {
+                                    followBusy = true
+                                    try { following = withContext(Dispatchers.IO) { repository.toggleFollow(video.userId) } }
+                                    catch (e: Exception) { actionError = e.message ?: "تعذرت المتابعة" }
+                                    finally { followBusy = false }
+                                }
+                            }.padding(horizontal = 9.dp, vertical = 4.dp))
+                }
+            }
+            if (video.caption.isNotBlank()) Text(video.caption, color = Color.White, fontSize = 14.sp, maxLines = 3)
+            Text("♪ الصوت الأصلي · ${video.creatorName.ifBlank { "الرافدين تيك" }}",
+                color = Color.White.copy(alpha = .88f), fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp))
             actionError?.let { Text(it, color = Color.White, fontSize = 11.sp) }
         }
     }
-    if (commentsOpen) CommentDialog(video.id, repository, signedIn, onLogin, onDismiss = { commentsOpen = false })
+    if (commentsOpen) CommentDialog(video.id, repository, signedIn, onLogin, onDismiss = {
+        commentsOpen = false
+        scope.launch { commentCount = withContext(Dispatchers.IO) { repository.videoCommentCount(video.id) } }
+    })
 }
 
 @Composable
-private fun NativeVideoPlayer(url: String, active: Boolean, replaySignal: Int) {
+private fun NativeVideoPlayer(url: String, active: Boolean, replaySignal: Int, muted: Boolean) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val player = remember(url) {
@@ -1639,6 +1695,7 @@ private fun NativeVideoPlayer(url: String, active: Boolean, replaySignal: Int) {
     }
     var previousReplaySignal by remember(url) { mutableIntStateOf(replaySignal) }
     LaunchedEffect(active, replaySignal, player) {
+        player.volume = if (muted) 0f else 1f
         if (active && replaySignal != previousReplaySignal) player.seekTo(0)
         previousReplaySignal = replaySignal
         player.playWhenReady = active
