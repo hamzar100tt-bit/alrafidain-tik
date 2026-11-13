@@ -88,6 +88,32 @@ class SupabaseRepository(private val context: Context) {
         }
     }
 
+    fun sendLiveGift(roomKey: String, receiverId: String, giftKey: String, quantity: Int = 1) {
+        val payload = JSONObject().put("p_room_key", roomKey)
+            .put("p_receiver_id", receiverId).put("p_gift_key", giftKey).put("p_quantity", quantity)
+        val request = authedRequest("$base/rest/v1/rpc/send_live_gift")
+            .addHeader("Content-Type", "application/json")
+            .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IOException("تعذر إرسال الهدية (${response.code}): $body")
+        }
+    }
+
+    fun loadLiveGiftHistory(roomKey: String): List<String> {
+        val rooms = publicRows("live_rooms?room_key=eq.$roomKey&select=id&limit=1")
+        if (rooms.length() == 0) return emptyList()
+        val roomId = rooms.getJSONObject(0).optString("id")
+        val rows = fetchAuthedRows("live_gift_transactions?room_id=eq.$roomId&select=gift_key,quantity,created_at&order=created_at.desc&limit=30")
+        return (0 until rows.length()).map { i ->
+            val row = rows.getJSONObject(i)
+            val emoji = when (row.optString("gift_key")) {
+                "rose" -> "🌹"; "gift_box" -> "🎁"; "clap" -> "👏"; else -> "🎁"
+            }
+            "$emoji × ${row.optInt("quantity", 1)}"
+        }
+    }
+
     fun moderateLiveRoom(roomKey: String, targetUserId: String, action: String) {
         val payload = JSONObject().put("room", roomKey)
             .put("targetUserId", targetUserId).put("action", action)
