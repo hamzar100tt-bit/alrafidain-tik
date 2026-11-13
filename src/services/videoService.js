@@ -42,16 +42,22 @@ export async function publishVideo({ file, caption, userId }) {
   requireSupabase();
   if (!file) throw new Error("اختار فيديو من جهازك أولاً.");
   if (!userId) throw new Error("سجّل الدخول قبل نشر الفيديو.");
-  const extension = file.name.split(".").pop()?.toLowerCase() || "";
+  const fileName = String(file.name || "video").trim();
+  const nameExtension = fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "";
+  const mimeExtension = Object.entries(VIDEO_TYPES_BY_EXTENSION).find(([, mime]) => mime === file.type)?.[0];
+  const extension = VIDEO_TYPES_BY_EXTENSION[nameExtension] ? nameExtension : (mimeExtension || "");
   const expectedType = VIDEO_TYPES_BY_EXTENSION[extension];
-  if (!expectedType) throw new Error("الصيغ المدعومة حالياً: MP4 وWebM وMOV.");
+  if (!expectedType) throw new Error("الصيغ المدعومة حالياً: MP4 وWebM وMOV. اختار فيديو بهذه الصيغ.");
   if (file.type && file.type !== expectedType && !(extension === "mov" && file.type === "video/mp4")) {
-    throw new Error("نوع الملف لا يطابق امتداده. جرّب اختيار فيديو MP4 أو MOV أو WebM.");
+    throw new Error("نوع الفيديو غير مدعوم. اختار ملف MP4 أو MOV أو WebM.");
   }
-  if (!file.size || file.size > MAX_VIDEO_SIZE) throw new Error("حجم الفيديو يجب أن يكون أكبر من صفر وأقل من 100 ميغابايت.");
-  const path = `${userId}/${crypto.randomUUID()}.${extension}`;
+  if (!Number.isFinite(file.size) || file.size <= 0 || file.size > MAX_VIDEO_SIZE) {
+    throw new Error("حجم الفيديو لازم يكون أكبر من صفر وأقل من 100 ميغابايت.");
+  }
+  const safeId = globalThis.crypto?.randomUUID?.() || (Date.now() + "-" + Math.random().toString(36).slice(2, 10));
+  const path = userId + "/" + safeId + "." + extension;
   const { error: uploadError } = await supabase.storage.from("videos").upload(path, file, {
-    contentType: file.type || expectedType, upsert: false
+    contentType: expectedType, upsert: false
   });
   if (uploadError) throw uploadError;
   const { data: urlData } = supabase.storage.from("videos").getPublicUrl(path);
