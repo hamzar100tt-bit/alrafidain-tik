@@ -193,7 +193,15 @@ function App() {
     } catch (e) { setError(e.message || "تعذر حفظ الملف الشخصي."); }
     finally { setBusy(false); }
   };
-  const openFollowList = async (type) => {\n    if (!user) { openAuth(); return; }\n    setFollowListType(type); setFollowListOpen(true); setFollowList([]); setFollowListLoading(true); setError("");\n    try { setFollowList(type === "followers" ? await getFollowers(user.id) : await getFollowing(user.id)); }\n    catch (e) { setError(e.message || "تعذر تحميل قائمة الحسابات."); }\n    finally { setFollowListLoading(false); }\n  };\n\n  const handleAvatarChange = async (e) => {
+  const openFollowList = async (type) => {
+    if (!user) { openAuth(); return; }
+    setFollowListType(type); setFollowListOpen(true); setFollowList([]); setFollowListLoading(true); setError("");
+    try { setFollowList(type === "followers" ? await getFollowers(user.id) : await getFollowing(user.id)); }
+    catch (e) { setError(e.message || "تعذر تحميل قائمة الحسابات."); }
+    finally { setFollowListLoading(false); }
+  };
+
+  const handleAvatarChange = async (e) => {
     const selected = e.target.files?.[0];
     if (!selected || !user) return;
     setBusy(true); setError("");
