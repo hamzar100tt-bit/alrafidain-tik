@@ -580,6 +580,12 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
     var moderationBusy by remember { mutableStateOf(false) }
     var moderationMessage by remember { mutableStateOf<String?>(null) }
     var giftsOpen by remember { mutableStateOf(false) }
+    var quickGift by remember { mutableStateOf(false) }
+    var selectedGiftReceiverId by remember { mutableStateOf<String?>(null) }
+    var giftHistoryOpen by remember { mutableStateOf(false) }
+    var giftHistory by remember { mutableStateOf<List<String>>(emptyList()) }
+    var giftBusy by remember { mutableStateOf(false) }
+    var chatComposerOpen by remember { mutableStateOf(false) }
     var showAudioControls by remember { mutableStateOf(false) }
     var audioEffectsOpen by remember { mutableStateOf(false) }
     var inviteOpen by remember { mutableStateOf(false) }
@@ -817,11 +823,16 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("🎁", fontSize = 27.sp, modifier = Modifier.clickable { giftsOpen = true }.padding(horizontal = 7.dp, vertical = 5.dp))
-                Text("🌹", fontSize = 26.sp, modifier = Modifier.clickable { giftsOpen = true }.padding(horizontal = 7.dp, vertical = 5.dp))
-                Text("🏷️", fontSize = 25.sp, modifier = Modifier.clickable { menuOpen = true }.padding(horizontal = 7.dp, vertical = 5.dp))
+                Text("🎁", fontSize = 27.sp, modifier = Modifier.clickable { quickGift = false; giftsOpen = true }.padding(horizontal = 7.dp, vertical = 5.dp))
+                Text("🌹", fontSize = 26.sp, modifier = Modifier.clickable { quickGift = true; giftsOpen = true }.padding(horizontal = 7.dp, vertical = 5.dp))
+                Text("🏷️", fontSize = 25.sp, modifier = Modifier.clickable {
+                    scope.launch {
+                        giftHistory = runCatching { withContext(Dispatchers.IO) { repository.loadLiveGiftHistory(roomName) } }.getOrDefault(emptyList())
+                        giftHistoryOpen = true
+                    }
+                }.padding(horizontal = 7.dp, vertical = 5.dp))
                 IconButton(onClick = { menuOpen = true }) {
-                    Icon(Icons.Default.Menu, "القائمة", tint = Color.White, modifier = Modifier.size(29.dp))
+                    Icon(Icons.Default.Menu, "الخيارات الإضافية", tint = Color.White, modifier = Modifier.size(29.dp))
                 }
                 Text(
                     "الإنضمام ✋",
@@ -830,11 +841,26 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.clip(RoundedCornerShape(28.dp))
                         .background(Color(0x664A4D91))
-                        .clickable { inviteOpen = true }
+                        .clickable(enabled = connected && !connecting && !canSpeak) {
+                            connecting = true
+                            scope.launch {
+                                try {
+                                    val credentials = withContext(Dispatchers.IO) { repository.joinLiveRoomSeat(roomName) }
+                                    room.disconnect()
+                                    room.connect(credentials.serverUrl, credentials.participantToken)
+                                    canSpeak = true
+                                    connected = true
+                                    status = "انضممت إلى المايك"
+                                    if (!micEnabled) permission.launch(android.Manifest.permission.RECORD_AUDIO)
+                                    refreshSeats()
+                                } catch (e: Exception) { error = e.message ?: "تعذر طلب الصعود للمايك" }
+                                finally { connecting = false }
+                            }
+                        }
                         .padding(horizontal = 15.dp, vertical = 11.dp)
                 )
-                IconButton(onClick = { chatOpen = !chatOpen }) {
-                    Icon(Icons.Default.ChatBubbleOutline, "الدردشة", tint = Color.White, modifier = Modifier.size(27.dp))
+                IconButton(onClick = { chatOpen = true; chatComposerOpen = true }) {
+                    Icon(Icons.Default.ChatBubbleOutline, "كتابة تعليق أو دردشة", tint = Color.White, modifier = Modifier.size(27.dp))
                 }
             }
 
@@ -954,11 +980,110 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
             confirmButton = { TextButton(onClick = { audioEffectsOpen = false }) { Text("حسناً") } }
         )
     }
-    if (giftsOpen) AlertDialog(
-        onDismissRequest = { giftsOpen = false },
-        title = { Text("الهدايا 🌹") },
-        text = { Text("واجهة الهدايا جاهزة للربط، لكن إرسال الهدايا ونظام العملات يحتاجان إضافة رصيد وسجل هدايا حتى لا تظهر كأنها أُرسلت وهي غير محفوظة.") },
-        confirmButton = { TextButton(onClick = { giftsOpen = false }) { Text("حسناً") } }
+    if (chatComposerOpen) {
+        AlertDialog(
+            onDismissRequest = { chatComposerOpen = false },
+            title = { Text("الدردشة المباشرة") },
+            text = {
+                OutlinedTextField(
+                    value = draft, onValueChange = { draft = it },
+                    modifier = Modifier.fillMaxWidth(), label = { Text("اكتب تعليقك") },
+                    maxLines = 4
+                )
+            },
+            confirmButton = {
+                TextButton(enabled = draft.isNotBlank(), onClick = {
+                    val message = draft.trim()
+                    scope.launch {
+                        try {
+                            withContext(Dispatchers.IO) { repository.sendLiveChatMessage(roomName, message) }
+                            chat = withContext(Dispatchers.IO) { repository.loadLiveChatMessages(roomName) }
+                                .map { LiveChatMessage(it.userId, it.body, it.displayName, it.avatarUrl) }
+                            draft = ""
+                            chatComposerOpen = false
+                        } catch (e: Exception) { error = e.message ?: "تعذر إرسال التعليق" }
+                    }
+                }) { Text("إرسال") }
+            },
+            dismissButton = { TextButton(onClick = { chatComposerOpen = false }) { Text("إلغاء") } }
+        )
+    }
+    if (giftsOpen) {
+        AlertDialog(
+            onDismissRequest = { if (!giftBusy) giftsOpen = false },
+            title = { Text(if (quickGift) "إرسال وردة سريعة 🌹" else "إرسال هدية 🎁") },
+            text = {
+                Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+                    Text("اختر المستلم:")
+                    (viewerProfiles + seatProfiles).distinctBy { it.id }.filter { it.id != repository.currentUserId() }.forEach { person ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { selectedGiftReceiverId = person.id }
+                                .background(if (selectedGiftReceiverId == person.id) Color(0xFFEDE5FF) else Color.Transparent,
+                                    RoundedCornerShape(10.dp)).padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (!person.avatarUrl.isNullOrBlank()) AsyncImage(
+                                model = person.avatarUrl, contentDescription = person.displayName,
+                                modifier = Modifier.size(34.dp).clip(CircleShape), contentScale = ContentScale.Crop
+                            ) else Icon(Icons.Default.AccountCircle, null, tint = Brand)
+                            Text(person.displayName, modifier = Modifier.padding(start = 8.dp))
+                            Spacer(Modifier.weight(1f))
+                            if (selectedGiftReceiverId == person.id) Icon(Icons.Default.CheckCircle, null, tint = Brand)
+                        }
+                    }
+                    if ((viewerProfiles + seatProfiles).none { it.id != repository.currentUserId() }) {
+                        Text("لا يوجد مستلم ظاهر حالياً. انتظر دخول شخص إلى الغرفة.")
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        TextButton(enabled = !giftBusy && selectedGiftReceiverId != null, onClick = {
+                            giftBusy = true
+                            scope.launch {
+                                try {
+                                    withContext(Dispatchers.IO) { repository.sendLiveGift(roomName, selectedGiftReceiverId!!, "rose") }
+                                    giftsOpen = false
+                                    error = "تم إرسال الوردة 🌹"
+                                } catch (e: Exception) { error = e.message ?: "تعذر إرسال الوردة" }
+                                finally { giftBusy = false }
+                            }
+                        }) { Text("🌹 وردة") }
+                        if (!quickGift) TextButton(enabled = !giftBusy && selectedGiftReceiverId != null, onClick = {
+                            giftBusy = true
+                            scope.launch {
+                                try {
+                                    withContext(Dispatchers.IO) { repository.sendLiveGift(roomName, selectedGiftReceiverId!!, "gift_box") }
+                                    giftsOpen = false
+                                    error = "تم إرسال الهدية 🎁"
+                                } catch (e: Exception) { error = e.message ?: "تعذر إرسال الهدية" }
+                                finally { giftBusy = false }
+                            }
+                        }) { Text("🎁 صندوق") }
+                        if (!quickGift) TextButton(enabled = !giftBusy && selectedGiftReceiverId != null, onClick = {
+                            giftBusy = true
+                            scope.launch {
+                                try {
+                                    withContext(Dispatchers.IO) { repository.sendLiveGift(roomName, selectedGiftReceiverId!!, "clap") }
+                                    giftsOpen = false
+                                    error = "تم إرسال التصفيق 👏"
+                                } catch (e: Exception) { error = e.message ?: "تعذر إرسال الهدية" }
+                                finally { giftBusy = false }
+                            }
+                        }) { Text("👏 تصفيق") }
+                    }
+                    Text("الهدايا تُسجّل داخل البث؛ لا يوجد حالياً شحن عملات أو خصم رصيد.")
+                }
+            },
+            confirmButton = { TextButton(onClick = { giftsOpen = false }) { Text("إغلاق") } }
+        )
+    }
+    if (giftHistoryOpen) AlertDialog(
+        onDismissRequest = { giftHistoryOpen = false },
+        title = { Text("العروض والحقائب — سجل الهدايا") },
+        text = { Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
+            if (giftHistory.isEmpty()) Text("ماكو هدايا مسجلة بهذا البث بعد.")
+            giftHistory.forEach { Text(it, modifier = Modifier.padding(vertical = 5.dp), fontSize = 18.sp) }
+        } },
+        confirmButton = { TextButton(onClick = { giftHistoryOpen = false }) { Text("إغلاق") } }
     )
     selectedModerationUserId?.let { targetId ->
         val targetProfile = viewerProfiles.firstOrNull { it.id == targetId }
