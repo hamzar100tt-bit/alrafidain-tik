@@ -591,6 +591,8 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
     var inviteOpen by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var liked by remember { mutableStateOf(false) }
+    var isFollowingHost by remember { mutableStateOf(false) }
+    var followHostBusy by remember { mutableStateOf(false) }
 
     fun refreshSeats() {
         val ids = mutableListOf<String>()
@@ -605,6 +607,16 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
             runCatching { repository.loadPublicProfiles(ids) }.onSuccess { seatProfiles = it }
             runCatching { repository.loadPublicProfiles(allIds) }.onSuccess { viewerProfiles = it }
         }
+    }
+
+    LaunchedEffect(host?.ownerId) {
+        val ownerId = host?.ownerId
+        val me = repository.currentUserId()
+        if (!ownerId.isNullOrBlank() && ownerId != me) {
+            isFollowingHost = withContext(Dispatchers.IO) {
+                runCatching { repository.isFollowing(ownerId) }.getOrDefault(false)
+            }
+        } else isFollowingHost = false
     }
 
     DisposableEffect(room) { onDispose { room.disconnect() } }
@@ -704,8 +716,27 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                     Icon(Icons.Default.Share, "مشاركة البث", tint = Color.White, modifier = Modifier.size(25.dp))
                 }
                 Spacer(Modifier.width(4.dp))
-                IconButton(onClick = { inviteOpen = true }, modifier = Modifier.size(36.dp).background(Color(0xFF17C9C6), CircleShape)) {
-                    Icon(Icons.Default.Add, "إضافة أو دعوة", tint = Color.White, modifier = Modifier.size(29.dp))
+                IconButton(
+                    enabled = !followHostBusy && !host?.ownerId.isNullOrBlank() && host?.ownerId != repository.currentUserId(),
+                    onClick = {
+                        val ownerId = host?.ownerId ?: return@IconButton
+                        followHostBusy = true
+                        scope.launch {
+                            try {
+                                isFollowingHost = withContext(Dispatchers.IO) { repository.toggleFollow(ownerId) }
+                            } catch (e: Exception) {
+                                error = e.message ?: "تعذرت متابعة صاحب البث"
+                            } finally { followHostBusy = false }
+                        }
+                    },
+                    modifier = Modifier.size(29.dp).background(Color(0xFF17C9C6), CircleShape)
+                ) {
+                    Icon(
+                        if (isFollowingHost) Icons.Default.Check else Icons.Default.Add,
+                        if (isFollowingHost) "تتابع صاحب البث" else "متابعة صاحب البث",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
                 Column(Modifier.weight(1f).padding(start = 8.dp), horizontalAlignment = Alignment.End) {
                     Text(host?.ownerName ?: "صاحب البث", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
