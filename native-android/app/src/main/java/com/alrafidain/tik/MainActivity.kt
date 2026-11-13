@@ -580,6 +580,8 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
     var moderationBusy by remember { mutableStateOf(false) }
     var moderationMessage by remember { mutableStateOf<String?>(null) }
     var giftsOpen by remember { mutableStateOf(false) }
+    var showAudioControls by remember { mutableStateOf(false) }
+    var audioEffectsOpen by remember { mutableStateOf(false) }
     var inviteOpen by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var liked by remember { mutableStateOf(false) }
@@ -743,7 +745,8 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                             .background(if (isSpeaking) Color(0xFF16B98D) else if (profile != null) Color(0xFF25194F) else Color(0x553A2C79))
                             .clickable(enabled = id != null || (connected && !connecting)) {
                                 if (id != null) {
-                                    selectedChatUserId = id
+                                    if (id == repository.currentUserId()) showAudioControls = true
+                                    else selectedChatUserId = id
                                 } else {
                                     connecting = true
                                     scope.launch {
@@ -874,6 +877,83 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
         } },
         confirmButton = { TextButton(onClick = { menuOpen = false }) { Text("إغلاق") } }
     )
+    if (showAudioControls) {
+        AlertDialog(
+            onDismissRequest = { showAudioControls = false },
+            title = { Text("إعدادات المايك 🎙️") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("تحكم بمقعدك والصوت أثناء البث")
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    val enabled = !room.localParticipant.isMicrophoneEnabled
+                                    room.localParticipant.setMicrophoneEnabled(enabled)
+                                    micEnabled = enabled
+                                    refreshSeats()
+                                } catch (e: Exception) { error = e.message ?: "تعذر تغيير حالة المايك" }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(if (micEnabled) Icons.Default.MicOff else Icons.Default.Mic, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (micEnabled) "كتم المايك" else "تشغيل المايك")
+                    }
+                    OutlinedButton(onClick = { audioEffectsOpen = true }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Tune, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("مؤثرات الصوت والصدى")
+                    }
+                    Text("تفاعلات سريعة", fontWeight = FontWeight.Bold)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        listOf("😀", "❤️", "👏", "🔥", "🌹").forEach { reaction ->
+                            Text(reaction, fontSize = 25.sp, modifier = Modifier.clickable {
+                                scope.launch {
+                                    runCatching { withContext(Dispatchers.IO) { repository.sendLiveChatMessage(roomName, reaction) } }
+                                    showAudioControls = false
+                                }.let { }
+                            }.padding(5.dp))
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    room.localParticipant.setMicrophoneEnabled(false)
+                                    withContext(Dispatchers.IO) { repository.leaveLiveRoomSeat(roomName) }
+                                    room.disconnect()
+                                    val credentials = withContext(Dispatchers.IO) { repository.requestLiveKitToken(roomName, "viewer") }
+                                    room.connect(credentials.serverUrl, credentials.participantToken)
+                                    micEnabled = false
+                                    canSpeak = false
+                                    status = "نزلت من المايك"
+                                    showAudioControls = false
+                                    refreshSeats()
+                                } catch (e: Exception) { error = e.message ?: "تعذر النزول من المايك" }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Brand)
+                    ) {
+                        Icon(Icons.Default.CallEnd, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("النزول من المايك")
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showAudioControls = false }) { Text("إغلاق") } }
+        )
+    }
+    if (audioEffectsOpen) {
+        AlertDialog(
+            onDismissRequest = { audioEffectsOpen = false },
+            title = { Text("مؤثرات الصوت") },
+            text = { Text("خيارات دمج الصوت والصدى والإطارات الصوتية تحتاج محرك معالجة صوت إضافي. لم أفعل أزراراً شكلية حتى لا تتوقع أنها تغيّر صوتك فعلياً.") },
+            confirmButton = { TextButton(onClick = { audioEffectsOpen = false }) { Text("حسناً") } }
+        )
+    }
     if (giftsOpen) AlertDialog(
         onDismissRequest = { giftsOpen = false },
         title = { Text("الهدايا 🌹") },
