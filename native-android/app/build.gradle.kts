@@ -10,8 +10,8 @@ android {
         applicationId = "com.alrafidain.tik"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0-native"
+        versionCode = 3
+        versionName = "1.2.0-native"
         buildConfigField("String", "SUPABASE_URL", "\"https://gxzbgwgovtejjsmkouuv.supabase.co\"")
         buildConfigField("String", "SUPABASE_KEY", "\"sb_publishable_My_DP4QQei1tdT32rYLeGg_9XYinUWp\"")
     }
