@@ -35,10 +35,10 @@ export default function LiveStudio({ user, onClose }) {
 
   const connectRoom = async (event) => {
     event.preventDefault();
-    const serverUrl = import.meta.env.VITE_LIVEKIT_URL;
+    const configuredServerUrl = import.meta.env.VITE_LIVEKIT_URL;
     const tokenEndpoint = import.meta.env.VITE_LIVEKIT_TOKEN_ENDPOINT;
-    if (!serverUrl || !tokenEndpoint) {
-      setMessage("البث يحتاج إعداد LiveKit أولاً. أضف VITE_LIVEKIT_URL و VITE_LIVEKIT_TOKEN_ENDPOINT إلى إعدادات المشروع.");
+    if (!tokenEndpoint) {
+      setMessage("البث يحتاج إعداد رابط خدمة التصاريح VITE_LIVEKIT_TOKEN_ENDPOINT.");
       return;
     }
     const cleanRoom = roomName.trim();
@@ -57,7 +57,10 @@ export default function LiveStudio({ user, onClose }) {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "تعذر الحصول على تصريح الدخول.");
-      if (!payload.token) throw new Error("خادم التصاريح لم يرجع رمز دخول صالحاً.");
+      const liveToken = payload.participantToken || payload.token;
+      const serverUrl = payload.serverUrl || configuredServerUrl;
+      if (!serverUrl) throw new Error("خادم البث لم يرجع رابط LiveKit.");
+      if (!liveToken) throw new Error("خادم التصاريح لم يرجع رمز دخول صالحاً.");
 
       const room = new Room();
       roomRef.current = room;
@@ -75,7 +78,7 @@ export default function LiveStudio({ user, onClose }) {
         clearMedia();
         setStatus("idle");
       });
-      await room.connect(serverUrl, payload.token);
+      await room.connect(serverUrl, liveToken);
 
       if (mode === "host") {
         const tracks = await createLocalTracks({ audio: true, video: true });
