@@ -2064,6 +2064,11 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
     var extraPosts by remember { mutableStateOf<List<TikVideo>>(emptyList()) }
     var extraLoading by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
+    var settingsOpen by remember { mutableStateOf(false) }
+    var peopleType by remember { mutableStateOf<String?>(null) }
+    var people by remember { mutableStateOf<List<SupabaseRepository.DiscoverProfile>>(emptyList()) }
+    var peopleLoading by remember { mutableStateOf(false) }
+    var selectedPerson by remember { mutableStateOf<String?>(null) }
 
     fun load() {
         scope.launch {
@@ -2119,12 +2124,16 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                         Icon(Icons.Default.Menu, contentDescription = "القائمة", tint = Ink, modifier = Modifier.size(27.dp))
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(text = { Text("الإعدادات") }, leadingIcon = { Icon(Icons.Default.Settings, null) },
+                            onClick = { menuOpen = false; settingsOpen = true })
+                        DropdownMenuItem(text = { Text("تبديل الحساب") }, leadingIcon = { Icon(Icons.Default.SwitchAccount, null) },
+                            onClick = { menuOpen = false; settingsOpen = true })
                         DropdownMenuItem(text = { Text("تسجيل الخروج") }, leadingIcon = { Icon(Icons.Default.Logout, null) },
                             onClick = { menuOpen = false; onSignOut() })
                     }
                 }
-                IconButton(onClick = { /* friend discovery */ }) {
-                    Icon(Icons.Default.PersonAddAlt, contentDescription = "إضافة أصدقاء", tint = Ink, modifier = Modifier.size(27.dp))
+                IconButton(onClick = { settingsOpen = true }) {
+                    Icon(Icons.Default.PersonAddAlt, contentDescription = "الإعدادات", tint = Ink, modifier = Modifier.size(27.dp))
                 }
             }
         }
@@ -2144,8 +2153,8 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                     Text("@${username.ifBlank { "user" }}", fontSize = 14.sp, color = Muted)
                     Spacer(Modifier.height(22.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        ProfileStat(stats?.following ?: 0, "أتابعه")
-                        ProfileStat(stats?.followers ?: 0, "متابعين")
+                        ProfileStat(stats?.following ?: 0, "أتابعه", Modifier.clickable { peopleType = "following"; peopleLoading = true; scope.launch { people = withContext(Dispatchers.IO) { repository.loadFollowProfiles(repository.currentUserId().orEmpty(), false) }; peopleLoading = false } })
+                        ProfileStat(stats?.followers ?: 0, "متابعين", Modifier.clickable { peopleType = "followers"; peopleLoading = true; scope.launch { people = withContext(Dispatchers.IO) { repository.loadFollowProfiles(repository.currentUserId().orEmpty(), true) }; peopleLoading = false } })
                         ProfileStat(stats?.likes ?: 0, "تسجيلات الإعجاب")
                     }
                 }
@@ -2280,6 +2289,46 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
     }
 }
 
+
+    if (settingsOpen) AlertDialog(
+        onDismissRequest = { settingsOpen = false },
+        title = { Text("الإعدادات والحساب") },
+        text = { Column {
+            TextButton(onClick = { settingsOpen = false; onEdit() }) { Text("تعديل الملف الشخصي") }
+            TextButton(onClick = { settingsOpen = false; onSignOut() }) { Text("تبديل الحساب / تسجيل الخروج") }
+        } },
+        confirmButton = { TextButton(onClick = { settingsOpen = false }) { Text("إغلاق") } }
+    )
+    if (peopleType != null) AlertDialog(
+        onDismissRequest = { peopleType = null },
+        title = { Text(if (peopleType == "followers") "المتابعون" else "أتابعه") },
+        text = { Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+            if (peopleLoading) CircularProgressIndicator()
+            else if (people.isEmpty()) Text("القائمة فارغة حالياً")
+            people.forEach { person ->
+                Row(Modifier.fillMaxWidth().clickable { selectedPerson = person.id }.padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    if (!person.avatarUrl.isNullOrBlank()) AsyncImage(model = person.avatarUrl, contentDescription = person.displayName,
+                        modifier = Modifier.size(42.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+                    else Icon(Icons.Default.AccountCircle, null, modifier = Modifier.size(42.dp), tint = Muted)
+                    Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                        Text(person.displayName, color = Ink, fontWeight = FontWeight.Bold)
+                        Text("@${person.username}", color = Muted, fontSize = 12.sp)
+                    }
+                    Text("عرض", color = Brand, fontSize = 12.sp)
+                }
+                HorizontalDivider(color = Color(0xFFEFEFEF))
+            }
+        } },
+        confirmButton = { TextButton(onClick = { peopleType = null }) { Text("إغلاق") } }
+    )
+    selectedPerson?.let { personId ->
+        AlertDialog(onDismissRequest = { selectedPerson = null },
+            title = { Text("فتح الحساب") },
+            text = { Text("اضغط متابعة أو افتح صفحة الحساب من قائمة الحسابات.") },
+            confirmButton = { TextButton(onClick = { selectedPerson = null }) { Text("حسناً") } }
+        )
+    }
 @Composable
 private fun VideoPostThumbnail(
     videoUrl: String,
@@ -2314,8 +2363,8 @@ private fun VideoPostThumbnail(
 }
 
 @Composable
-private fun ProfileStat(value: Int, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun ProfileStat(value: Int, label: String, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(value.toString(), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Ink)
         Text(label, fontSize = 11.sp, color = Muted, maxLines = 1)
     }
