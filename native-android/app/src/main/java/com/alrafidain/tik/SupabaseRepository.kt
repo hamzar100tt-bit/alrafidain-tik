@@ -61,17 +61,18 @@ class SupabaseRepository(private val context: Context) {
     }
 
     fun joinLiveRoomSeat(roomKey: String): LiveKitCredentials {
-        val userId = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
-        val rooms = publicRows("live_rooms?room_key=eq.$roomKey&is_live=eq.true&select=id&limit=1")
-        if (rooms.length() == 0) throw IOException("الغرفة غير موجودة أو انتهى البث")
-        val roomId = rooms.getJSONObject(0).optString("id")
-        val payload = JSONObject().put("room_id", roomId).put("user_id", userId)
-        val request = authedRequest("$base/rest/v1/live_room_speakers")
+        if (currentUserId().isNullOrBlank()) throw IOException("سجّل الدخول أولاً")
+        val payload = JSONObject().put("p_room_key", roomKey)
+        val request = authedRequest("$base/rest/v1/rpc/join_live_room_speaker")
             .addHeader("Content-Type", "application/json")
-            .addHeader("Prefer", "resolution=merge-duplicates,return=minimal")
             .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
         client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw IOException("تعذر حجز المقعد (${response.code}). تأكد من إعداد جدول مقاعد البث.")
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                val message = runCatching { JSONObject(body).optString("message") }.getOrNull()
+                throw IOException(message?.takeIf { it.isNotBlank() }
+                    ?: "تعذر حجز المقعد (${response.code})")
+            }
         }
         return requestLiveKitToken(roomKey, "speaker")
     }
