@@ -1981,6 +1981,10 @@ private fun UploadScreen(repository: SupabaseRepository, onBack: () -> Unit, onU
     var selectedFilter by remember { mutableStateOf("طبيعي") }
 
     fun upload(uri: Uri, isPhoto: Boolean) {
+        if (!repository.hasSession()) {
+            message = "حتى تنشر صورة أو فيديو، سجّل الدخول أولاً"
+            return
+        }
         scope.launch {
             uploading = true
             message = if (isPhoto) "جاري رفع الصورة..." else "جاري رفع الفيديو..."
