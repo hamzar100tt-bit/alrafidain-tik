@@ -11,7 +11,7 @@ import org.json.JSONObject
 import java.io.IOException
 import java.util.UUID
 
-data class TikVideo(val id: String, val caption: String, val videoUrl: String, val userId: String, val creatorName: String = "", val creatorAvatar: String? = null, val mediaType: String = "video")
+data class TikVideo(val id: String, val caption: String, val videoUrl: String, val userId: String, val creatorName: String = "", val creatorAvatar: String? = null, val mediaType: String = "video", val visibility: String = "public")
 data class TikComment(val body: String, val displayName: String, val username: String, val avatarUrl: String?, val userId: String = "")
 data class TikProfileStats(val posts: List<TikVideo>, val following: Int, val followers: Int, val likes: Int)
 data class TikNotification(val id: String, val actorName: String, val actorUsername: String, val kind: String, val createdAt: String, val videoId: String?)
@@ -216,7 +216,7 @@ class SupabaseRepository(private val context: Context) {
     fun loadVideos(): List<TikVideo> {
         val token = accessToken ?: key
         val request = Request.Builder()
-            .url("$base/rest/v1/videos?select=id,caption,video_url,storage_path,user_id,media_type,profiles!videos_user_id_fkey(display_name,username,avatar_url)&order=created_at.desc&limit=30")
+            .url("$base/rest/v1/videos?select=id,caption,video_url,storage_path,user_id,media_type,visibility,profiles!videos_user_id_fkey(display_name,username,avatar_url)&order=created_at.desc&limit=30")
             .addHeader("apikey", key).addHeader("Authorization", "Bearer $token").get().build()
         client.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
@@ -232,7 +232,7 @@ class SupabaseRepository(private val context: Context) {
                     item.optJSONObject("profiles")?.optString("display_name")?.takeIf { it.isNotBlank() }
                         ?: item.optJSONObject("profiles")?.optString("username").orEmpty(),
                     item.optJSONObject("profiles")?.optString("avatar_url")?.takeIf { it.isNotBlank() },
-                    item.optString("media_type", "video"))
+                    item.optString("media_type", "video"), item.optString("visibility", "public"))
             }
         }
     }
@@ -402,6 +402,40 @@ class SupabaseRepository(private val context: Context) {
             if (!response.isSuccessful) throw IOException("تعذر تحديث المتابعة (${response.code})")
         }
         return !already
+    }
+
+    fun recordVideoView(videoId: String): Int {
+        val viewerKey = currentUserId() ?: prefs.getString("anonymous_viewer_key", null)
+            ?: UUID.randomUUID().toString().also { prefs.edit().putString("anonymous_viewer_key", it).apply() }
+        val payload = JSONObject().put("p_video_id", videoId).put("p_viewer_key", viewerKey)
+        val request = Request.Builder().url("$base/rest/v1/rpc/record_video_view")
+            .addHeader("apikey", key).addHeader("Authorization", "Bearer ${accessToken ?: key}")
+            .addHeader("Content-Type", "application/json")
+            .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IOException("تعذر تسجيل المشاهدة (${response.code})")
+            return body.trim().trim('"').toIntOrNull() ?: 0
+        }
+    }
+
+    fun deleteVideo(videoId: String) {
+        val userId = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
+        val request = authedRequest("$base/rest/v1/videos?id=eq.$videoId&user_id=eq.$userId").delete().build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("تعذر حذف الفيديو (${response.code})")
+        }
+    }
+
+    fun updateVideoPrivacy(videoId: String, visibility: String) {
+        if (visibility !in setOf("public", "private")) throw IOException("إعداد خصوصية غير صالح")
+        val userId = currentUserId() ?: throw IOException("سجّل الدخول أولاً")
+        val request = authedRequest("$base/rest/v1/videos?id=eq.$videoId&user_id=eq.$userId")
+            .addHeader("Content-Type", "application/json").addHeader("Prefer", "return=minimal")
+            .patch(JSONObject().put("visibility", visibility).toString().toRequestBody("application/json".toMediaType())).build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("تعذر تحديث الخصوصية (${response.code})")
+        }
     }
 
     fun videoLikeCount(videoId: String): Int =
