@@ -2053,6 +2053,7 @@ private fun ProfileScreen(repository: SupabaseRepository, onSignOut: () -> Unit)
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit, onSignOut: () -> Unit) {
     val scope = rememberCoroutineScope()
