@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Home, Compass, Users, PlusSquare, UserRound, Search, Heart, MessageCircle, Bookmark, Share2, Radio, Volume2, VolumeX, Play, Menu, X, LogOut, Send, Video, Camera, LoaderCircle } from "lucide-react";
 import { supabase } from "./lib/supabase.js";
 import LiveStudio from "./LiveStudio.jsx";
+import AdminPanel from "./AdminPanel.jsx";
 import { signIn, signUp, signOut, publishVideo, getFeed, addComment, getComments, toggleLike, toggleFollow, getFollowingFeed, getMyVideos, getProfile, getFollowState, getLikedVideoIds, getProfileStats, findProfileByUsername, getDirectMessages, sendDirectMessage, updateProfile, uploadProfileAvatar } from "./services/videoService.js";
 
 const demoVideos = [
@@ -83,6 +84,8 @@ function App() {
   const [bio, setBio] = useState("");
   const [profileUsername, setProfileUsername] = useState("");
   const [liveOpen, setLiveOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const profileAvatarRef = useRef(null);
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
   const videoRef = useRef(null);
@@ -130,6 +133,14 @@ function App() {
   }, []);
 
   useEffect(() => { loadFeed(active, user); setIndex(0); }, [active, user]);
+
+  useEffect(() => {
+    let alive = true;
+    if (!user) { setIsSuperAdmin(false); return () => { alive = false; }; }
+    supabase.from("admin_roles").select("role").eq("user_id", user.id).maybeSingle()
+      .then(({ data, error }) => { if (alive) setIsSuperAdmin(!error && data?.role === "super_admin"); });
+    return () => { alive = false; };
+  }, [user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -266,6 +277,7 @@ function App() {
     <div className="layout">
       <aside className={`sidebar ${mobileMenu ? "open" : ""}`}>
         <div className="side-links">{nav.map(({label, icon: Icon}) => <button key={label} className={`nav-item ${active === label ? "selected" : ""}`} onClick={() => {setActive(label); setMobileMenu(false); if(label === "رفع فيديو") user ? setUploadOpen(true) : openAuth();}}><Icon size={21}/><span>{label}</span></button>)}</div>
+        {isSuperAdmin && <button className="nav-item" onClick={() => { setAdminOpen(true); setMobileMenu(false); }}><Users size={21}/><span>لوحة الإدارة</span></button>}
         <div className="side-note"><b>مجتمع الرافدين</b><p>اكتشف صناع المحتوى العراقيين وشارك لحظاتك مع الجميع.</p><small>© 2026 الرافدين تيك</small></div>
       </aside>
       <main className={`main-content ${active === "الملف الشخصي" ? "profile-view" : ""}`}>
@@ -301,6 +313,7 @@ function App() {
     <nav className="app-bottom-nav"><button className={active === "الرئيسية" ? "active" : ""} onClick={() => setActive("الرئيسية")}><Home/><span>الرئيسية</span></button><button className={active === "اكتشف" ? "active" : ""} onClick={() => setActive("اكتشف")}><Compass/><span>اكتشف</span></button><button className="nav-create" onClick={() => user ? setUploadOpen(true) : openAuth()}><PlusSquare/><span>نشر</span></button><button onClick={() => user ? setLiveOpen(true) : openAuth()}><Radio/><span>بث</span></button><button className={active === "المتابَعون" ? "active" : ""} onClick={() => setActive("المتابَعون")}><Users/><span>أتابع</span></button><button className={active === "الملف الشخصي" ? "active" : ""} onClick={() => user ? setActive("الملف الشخصي") : openAuth()}><UserRound/><span>حسابي</span></button></nav>
 
     {liveOpen && <LiveStudio user={user} onClose={() => setLiveOpen(false)}/>}
+    {adminOpen && isSuperAdmin && <AdminPanel user={user} onClose={() => setAdminOpen(false)}/>}
     {authOpen && <div className="modal-backdrop" onClick={() => setAuthOpen(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setAuthOpen(false)}><X/></button><h2>{authMode === "signup" ? "إنشاء حساب جديد" : "تسجيل الدخول"}</h2><form onSubmit={handleAuth}>
       {authMode === "signup" && <input required minLength="3" maxLength="24" value={username} onChange={e => setUsername(e.target.value)} placeholder="اسم المستخدم"/>}
       <input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="البريد الإلكتروني"/>
