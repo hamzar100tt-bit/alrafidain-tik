@@ -497,6 +497,24 @@ class SupabaseRepository(private val context: Context) {
             row.optString("avatar_url").takeIf { it.isNotBlank() })
     }
 
+    fun loadFollowProfiles(userId: String, followers: Boolean): List<DiscoverProfile> {
+        val rows = if (followers) {
+            publicRows("follows?followed_id=eq.$userId&select=profiles!follows_follower_id_fkey(id,username,display_name,avatar_url)&limit=500")
+        } else {
+            publicRows("follows?follower_id=eq.$userId&select=profiles!follows_followed_id_fkey(id,username,display_name,avatar_url)&limit=500")
+        }
+        val relation = if (followers) "profiles" else "profiles"
+        return (0 until rows.length()).mapNotNull { i ->
+            val profile = rows.getJSONObject(i).optJSONObject(relation) ?: return@mapNotNull null
+            DiscoverProfile(
+                profile.optString("id"),
+                profile.optString("username"),
+                profile.optString("display_name").ifBlank { profile.optString("username") },
+                profile.optString("avatar_url").takeIf { it.isNotBlank() }
+            )
+        }
+    }
+
     fun loadPublicProfileStats(userId: String): TikProfileStats {
         val fields = "id,caption,video_url,storage_path,user_id,media_type,profiles!videos_user_id_fkey(display_name,username,avatar_url)"
         val posts = parseVideoRows(publicRows("videos?user_id=eq.$userId&select=$fields&order=created_at.desc&limit=100"))
