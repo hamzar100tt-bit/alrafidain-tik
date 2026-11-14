@@ -3,6 +3,15 @@ import { Room, RoomEvent, createLocalTracks } from "livekit-client";
 import { Radio, Video, VideoOff, Mic, MicOff, PhoneOff, Eye } from "lucide-react";
 import { supabase } from "./lib/supabase.js";
 
+const liveBackgrounds = [
+  { id: "midnight", label: "نيون أزرق", value: "radial-gradient(circle at 50% 20%, #153a73 0%, #090d20 58%, #05060c 100%)" },
+  { id: "purple", label: "بنفسجي", value: "radial-gradient(circle at 50% 15%, #592080 0%, #1c1036 55%, #090711 100%)" },
+  { id: "gold", label: "ذهبي", value: "radial-gradient(circle at 50% 15%, #76501b 0%, #21170c 55%, #080706 100%)" },
+  { id: "rose", label: "وردي", value: "radial-gradient(circle at 50% 15%, #782b50 0%, #26101f 55%, #09070b 100%)" },
+  { id: "teal", label: "فيروزي", value: "radial-gradient(circle at 50% 15%, #145b63 0%, #0d252d 55%, #05090d 100%)" },
+  { id: "plain", label: "أسود", value: "linear-gradient(145deg, #17171d, #050506)" }
+];
+
 export default function LiveStudio({ user, onClose }) {
   const [roomName, setRoomName] = useState("");
   const [mode, setMode] = useState("host");
@@ -10,6 +19,7 @@ export default function LiveStudio({ user, onClose }) {
   const [message, setMessage] = useState("");
   const [cameraOn, setCameraOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
+  const [selectedBackground, setSelectedBackground] = useState("midnight");
   const roomRef = useRef(null);
   const videoRef = useRef(null);
   const audioElementsRef = useRef([]);
@@ -120,7 +130,10 @@ export default function LiveStudio({ user, onClose }) {
       <button className="modal-close" onClick={onClose}>×</button>
       <h2><Radio size={21}/> البث المباشر</h2>
       {status === "live" ? <>
-        <div className="live-preview"><video ref={videoRef} autoPlay playsInline muted={mode === "host"}/><span className="live-indicator">● مباشر</span></div>
+        <div className="live-preview" style={{ background: liveBackgrounds.find(item => item.id === selectedBackground)?.value || liveBackgrounds[0].value, minHeight: 260, borderRadius: 18, overflow: "hidden", position: "relative" }}><video ref={videoRef} autoPlay playsInline muted={mode === "host"}/><span className="live-indicator">● مباشر</span></div>
+        <div className="live-background-picker" aria-label="اختيار خلفية البث" style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 9, margin: "14px 0" }}>
+          {liveBackgrounds.map(item => <button key={item.id} type="button" onClick={() => setSelectedBackground(item.id)} aria-pressed={selectedBackground === item.id} style={{ minHeight: 58, borderRadius: 12, border: selectedBackground === item.id ? "2px solid #ff3157" : "1px solid #555", background: item.value, color: "#fff", fontWeight: 800, boxShadow: selectedBackground === item.id ? "0 0 0 2px #ff315755" : "none" }}>{item.label}{selectedBackground === item.id ? " ✓" : ""}</button>)}
+        </div>
         <p className="live-room-name">{mode === "host" ? "أنت تبث الآن في:" : "تشاهد البث في:"} {roomName}</p>
         <div className="live-controls">
           {mode === "host" && <>
