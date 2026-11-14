@@ -2327,6 +2327,8 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
             PublicCommentProfileScreen(repository, personId, onBack = { selectedPerson = null })
         }
     }
+}
+
 @Composable
 private fun VideoPostThumbnail(
     videoUrl: String,
