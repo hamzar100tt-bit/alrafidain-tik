@@ -87,6 +87,13 @@ fun NativeCameraScreen(
     var soundName by remember { mutableStateOf("") }
     var soundPlaying by remember { mutableStateOf(false) }
     var soundPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var showMusicLibrary by remember { mutableStateOf(false) }
+    var musicQuery by remember { mutableStateOf("") }
+    var musicTracks by remember { mutableStateOf<List<OpenMusicTrack>>(emptyList()) }
+    var musicLoading by remember { mutableStateOf(false) }
+    var musicError by remember { mutableStateOf<String?>(null) }
+    var selectedMusicCredit by remember { mutableStateOf("") }
+    var selectedMusicLicense by remember { mutableStateOf("") }
 
     val soundPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -105,6 +112,78 @@ fun NativeCameraScreen(
                 status = "تم اختيار الصوت: $soundName"
             } catch (e: Exception) { status = e.message ?: "تعذر فتح ملف الصوت" }
         }
+    }
+
+    if (showMusicLibrary) {
+        AlertDialog(
+            onDismissRequest = { showMusicLibrary = false },
+            title = { Text("مكتبة الموسيقى المجانية") },
+            text = {
+                Column(Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
+                    OutlinedTextField(
+                        value = musicQuery, onValueChange = { musicQuery = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        placeholder = { Text("ابحث عن موسيقى أو فنان") },
+                        trailingIcon = {
+                            IconButton(enabled = !musicLoading, onClick = {
+                                scope.launch {
+                                    musicLoading = true; musicError = null
+                                    try { musicTracks = withContext(Dispatchers.IO) { OpenMusicLibrary.search(musicQuery.ifBlank { "instrumental" }) } }
+                                    catch (e: Exception) { musicError = e.message ?: "تعذر البحث" }
+                                    finally { musicLoading = false }
+                                }
+                            }) { Icon(Icons.Default.Search, "بحث") }
+                        }
+                    )
+                    Text("مقاطع مرخّصة CC0 وCC BY وCC BY-SA فقط", fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(vertical = 6.dp))
+                    if (musicLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    musicError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    androidx.compose.foundation.lazy.LazyColumn(Modifier.weight(1f, fill = false)) {
+                        items(musicTracks.size) { index ->
+                            val track = musicTracks[index]
+                            Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+                                Text(track.title, fontWeight = FontWeight.Bold)
+                                Text("الفنان: ${track.creator} · ${track.license} ${track.licenseVersion}", fontSize = 11.sp, color = Color.Gray)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    TextButton(onClick = {
+                                        try {
+                                            soundPlayer?.release()
+                                            val player = MediaPlayer()
+                                            player.setDataSource(track.url)
+                                            player.setOnPreparedListener { it.start(); soundPlaying = true }
+                                            player.setOnCompletionListener { soundPlaying = false; it.seekTo(0) }
+                                            player.prepareAsync()
+                                            soundPlayer = player
+                                        } catch (e: Exception) { musicError = "تعذرت معاينة هذا المقطع" }
+                                    }) { Text("استماع") }
+                                    TextButton(onClick = {
+                                        scope.launch {
+                                            musicLoading = true; musicError = null
+                                            try {
+                                                val file = java.io.File(context.cacheDir, "music_${track.id}.mp3")
+                                                withContext(Dispatchers.IO) { OpenMusicLibrary.download(track, file) }
+                                                soundPlayer?.release()
+                                                chosenSound = Uri.fromFile(file)
+                                                soundName = track.title
+                                                selectedMusicCredit = track.attribution.ifBlank { "${track.title} — ${track.creator}" }
+                                                selectedMusicLicense = "${track.license} ${track.licenseVersion}"
+                                                showMusicLibrary = false
+                                                status = "تم اختيار الموسيقى المرخّصة"
+                                            } catch (e: Exception) { musicError = e.message ?: "تعذر تنزيل المقطع" }
+                                            finally { musicLoading = false }
+                                        }
+                                    }) { Text("استخدام الصوت", color = CameraBrand) }
+                                }
+                                HorizontalDivider()
+                            }
+                        }
+                    }
+                    TextButton(onClick = { soundPicker.launch("audio/*") }) { Text("اختيار صوت من الجهاز بدلاً من ذلك") }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showMusicLibrary = false }) { Text("إغلاق") } }
+        )
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -199,7 +278,7 @@ fun NativeCameraScreen(
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically) {
                             IconButton(onClick = onBack) { Icon(Icons.Default.Close, "إغلاق", tint = Color.White) }
-                            TextButton(onClick = { soundPicker.launch("audio/*") }) {
+                            TextButton(onClick = { showMusicLibrary = true }) {
                                 Text(if (soundName.isBlank()) "♫ إضافة صوت" else "♫ ${soundName.take(18)}", color = Color.White, modifier = Modifier
                                     .background(Color(0xAA222222), RoundedCornerShape(30.dp)).padding(horizontal = 18.dp, vertical = 10.dp))
                             }
@@ -380,6 +459,7 @@ fun NativeCameraScreen(
                                 TextButton(onClick = { soundPlayer?.release(); soundPlayer = null; chosenSound = null; soundName = ""; soundPlaying = false }) { Text("إزالة", color = Color.White) }
                             }
                             Text("سيُضاف الصوت المختار إلى الفيديو عند تجهيزه للنشر", color = Color.White, fontSize = 10.sp)
+                            if (selectedMusicCredit.isNotBlank()) Text("حقوق الصوت: $selectedMusicCredit · $selectedMusicLicense", color = Color.LightGray, fontSize = 9.sp)
                         }
                         if (busy) CircularProgressIndicator(color = CameraBrand, modifier = Modifier.padding(8.dp))
                         if (status.isNotBlank()) Text(status, color = Color.White, fontSize = 12.sp)
