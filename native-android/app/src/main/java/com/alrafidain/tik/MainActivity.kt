@@ -567,6 +567,7 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
     var seatIds by remember { mutableStateOf<List<String>>(emptyList()) }
     var seatProfiles by remember { mutableStateOf<List<SupabaseRepository.DiscoverProfile>>(emptyList()) }
     var activeSpeakers by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var lastLoadedProfileIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var host by remember { mutableStateOf<LiveRoomInfo?>(null) }
     var viewerCount by remember { mutableStateOf(1) }
     var viewerProfiles by remember { mutableStateOf<List<SupabaseRepository.DiscoverProfile>>(emptyList()) }
@@ -595,17 +596,26 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
     var followHostBusy by remember { mutableStateOf(false) }
 
     fun refreshSeats() {
+        val me = repository.currentUserId()
         val ids = mutableListOf<String>()
-        if (room.localParticipant.isMicrophoneEnabled) repository.currentUserId()?.let(ids::add)
-        room.remoteParticipants.values.filter { it.isMicrophoneEnabled }.forEach { p ->
-            p.identity?.value?.let(ids::add)
+        // Keep the host in seat 1 even while their microphone is muted or permission is pending.
+        if (me != null && (me == host?.ownerId || room.localParticipant.isMicrophoneEnabled)) ids.add(me)
+        room.remoteParticipants.values.filter { it.isMicrophoneEnabled }.forEach { participant ->
+            participant.identity?.value?.let { if (it !in ids) ids.add(it) }
         }
-        seatIds = ids.take(8)
+        val nextSeatIds = ids.take(8)
+        seatIds = nextSeatIds
         viewerCount = 1 + room.remoteParticipants.size
-        val allIds = (listOfNotNull(repository.currentUserId()) + room.remoteParticipants.values.mapNotNull { it.identity?.value }).distinct()
-        scope.launch(Dispatchers.IO) {
-            runCatching { repository.loadPublicProfiles(ids) }.onSuccess { seatProfiles = it }
-            runCatching { repository.loadPublicProfiles(allIds) }.onSuccess { viewerProfiles = it }
+        val allIds = (listOfNotNull(me) + room.remoteParticipants.values.mapNotNull { it.identity?.value }).distinct()
+        val profileIds = (nextSeatIds + allIds).toSet()
+        // Active-speaker events can fire often; avoid repeating Supabase profile requests
+        // unless the set of people in the room actually changes.
+        if (profileIds != lastLoadedProfileIds) {
+            lastLoadedProfileIds = profileIds
+            scope.launch(Dispatchers.IO) {
+                runCatching { repository.loadPublicProfiles(nextSeatIds) }.onSuccess { seatProfiles = it }
+                runCatching { repository.loadPublicProfiles(allIds) }.onSuccess { viewerProfiles = it }
+            }
         }
     }
 
@@ -767,8 +777,8 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
             LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(158.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                 items(8) { i ->
-                    val profile = seatProfiles.getOrNull(i)
                     val id = seatIds.getOrNull(i)
+                    val profile = id?.let { userId -> seatProfiles.firstOrNull { it.id == userId } }
                     val isSpeaking = id != null && activeSpeakers.contains(id)
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(Modifier.size(58.dp).clip(CircleShape)
