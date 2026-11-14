@@ -1578,7 +1578,7 @@ private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, activ
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var viewCount by remember(video.id) { mutableIntStateOf(0) }
     var menuBusy by remember { mutableStateOf(false) }
-    LaunchedEffect(video.id, signedIn) {
+    LaunchedEffect(video.id, signedIn, active) {
         withContext(Dispatchers.IO) {
             likeCount = runCatching { repository.videoLikeCount(video.id) }.getOrDefault(0)
             commentCount = runCatching { repository.videoCommentCount(video.id) }.getOrDefault(0)
