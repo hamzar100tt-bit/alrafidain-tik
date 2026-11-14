@@ -244,13 +244,8 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
     var selectedAudioBackground by remember { mutableIntStateOf(0) }
     var creatingAudioRoom by remember { mutableStateOf(false) }
     var audioRoomError by remember { mutableStateOf<String?>(null) }
-    var roomType by remember { mutableStateOf("جميع الغرف") }
     var searchOpen by remember { mutableStateOf(false) }
     var searchText by remember { mutableStateOf("") }
-    var showCreateVideoRoom by remember { mutableStateOf(false) }
-    var newRoomTitle by remember { mutableStateOf("بث الرافدين تيك") }
-    var creatingRoom by remember { mutableStateOf(false) }
-    var createRoomError by remember { mutableStateOf<String?>(null) }
     val liveScope = rememberCoroutineScope()
     var rooms by remember { mutableStateOf<List<LiveRoomInfo>>(emptyList()) }
     var roomsLoading by remember { mutableStateOf(true) }
@@ -263,10 +258,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
             roomsError = e.message ?: "تعذر تحميل الغرف المباشرة"
         } finally { roomsLoading = false }
     }
-    val shownRooms = rooms.filter { room ->
-        room.title.contains(searchText.trim(), ignoreCase = true) &&
-            (roomType == "جميع الغرف" || (roomType == "الصوتية" && room.roomType == "audio") || (roomType == "الفيديو" && room.roomType == "video"))
-    }
+    val shownRooms = rooms.filter { room -> room.roomType == "audio" && room.title.contains(searchText.trim(), ignoreCase = true) }
     if (openedAudioRoom != null) {
         AudioLiveRoomScreen(repository, roomName = openedAudioRoom!!, backgroundStyle = selectedAudioBackground, onBack = { openedAudioRoom = null })
         return
@@ -462,35 +454,6 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
             }
         return
     }
-    if (showCreateVideoRoom) {
-        AlertDialog(
-            onDismissRequest = { if (!creatingRoom) showCreateVideoRoom = false },
-            title = { Text("إنشاء بث فيديو مباشر") },
-            text = {
-                Column {
-                    OutlinedTextField(value = newRoomTitle, onValueChange = { newRoomTitle = it },
-                        singleLine = true, label = { Text("اسم البث") })
-                    if (createRoomError != null) Text(createRoomError!!, color = MaterialTheme.colorScheme.error)
-                }
-            },
-            confirmButton = {
-                TextButton(enabled = !creatingRoom && newRoomTitle.isNotBlank(), onClick = {
-                    creatingRoom = true
-                    createRoomError = null
-                    liveScope.launch {
-                        try {
-                            val roomKey = withContext(Dispatchers.IO) { repository.createLiveRoom(newRoomTitle, "video") }
-                            showCreateVideoRoom = false
-                            openedVideoRoom = roomKey
-                        } catch (e: Exception) {
-                            createRoomError = e.message ?: "تعذر إنشاء البث"
-                        } finally { creatingRoom = false }
-                    }
-                }) { Text(if (creatingRoom) "جارٍ الإنشاء..." else "ابدأ البث") }
-            },
-            dismissButton = { TextButton(enabled = !creatingRoom, onClick = { showCreateVideoRoom = false }) { Text("إلغاء") } }
-        )
-    }
     Column(Modifier.fillMaxSize().background(Color(0xFF09070D)).statusBarsPadding().padding(bottom = 78.dp)) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
@@ -509,14 +472,13 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
                 trailingIcon = { IconButton(onClick = { searchText = "" }) { Icon(Icons.Default.Close, "مسح") } })
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp).clip(RoundedCornerShape(26.dp))
-            .background(Color(0xFF211D29)).padding(4.dp)) {
-            listOf("جميع الغرف", "الصوتية", "الفيديو").forEach { tab ->
-                Box(Modifier.weight(1f).clip(RoundedCornerShape(22.dp))
-                    .background(if (roomType == tab) Color(0xFFB23BE0) else Color.Transparent)
-                    .clickable { roomType = tab }.padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
-                    Text(tab, color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            }
+            .background(Color(0xFF211D29)).padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Headphones, null, tint = Color(0xFFD65BFF), modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(10.dp))
+            Text("الغرف الصوتية", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+            Spacer(Modifier.weight(1f))
+            Text("${shownRooms.size} غرفة", color = Color(0xFFC9B5D4), fontSize = 12.sp)
         }
         Text("غرف مباشرة الآن", color = Color(0xFFFFC04D), modifier = Modifier.padding(18.dp))
         when {
@@ -546,18 +508,12 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
                 }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { showCreateAudioRoom = true }, modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9226C5))) {
-                Icon(Icons.Default.Headphones, null); Text("ابدأ بث صوتي", maxLines = 1)
-            }
-            Button(onClick = { showCreateVideoRoom = true }, modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = Brand)) {
-                Icon(Icons.Default.Videocam, null); Text("ابدأ بث فيديو", maxLines = 1)
-            }
-        }
-        TextButton(onClick = onStartVideoPost, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-            Text("نشر فيديو عادي", color = Color.LightGray)
+        Button(onClick = { showCreateAudioRoom = true }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).height(54.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9226C5)),
+            shape = RoundedCornerShape(28.dp)) {
+            Icon(Icons.Default.Headphones, null)
+            Spacer(Modifier.width(8.dp))
+            Text("ابدأ بث صوتي", maxLines = 1, fontWeight = FontWeight.Bold)
         }
     }
 }
