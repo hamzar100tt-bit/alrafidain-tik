@@ -1553,14 +1553,14 @@ private fun FeedScreen(
                 modifier = Modifier.fillMaxSize(),
                 key = { index -> videos[index].id }
             ) { page ->
-                VideoFeedPage(video = videos[page], repository = repository, active = pagerState.currentPage == page, replaySignal = replaySignal, signedIn = signedIn, onLogin = onLogin)
+                VideoFeedPage(video = videos[page], repository = repository, active = pagerState.currentPage == page, replaySignal = replaySignal, signedIn = signedIn, onLogin = onLogin, onVideoDeleted = onRefresh)
             }
         }
     }
 }
 
 @Composable
-private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, active: Boolean, replaySignal: Int, signedIn: Boolean, onLogin: () -> Unit) {
+private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, active: Boolean, replaySignal: Int, signedIn: Boolean, onLogin: () -> Unit, onVideoDeleted: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var liked by remember(video.id) { mutableStateOf(false) }
@@ -1573,6 +1573,11 @@ private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, activ
     var likeCount by remember(video.id) { mutableIntStateOf(0) }
     var commentCount by remember(video.id) { mutableIntStateOf(0) }
     var actionError by remember { mutableStateOf<String?>(null) }
+    var showMoreMenu by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showPrivacyDialog by remember { mutableStateOf(false) }
+    var viewCount by remember(video.id) { mutableIntStateOf(0) }
+    var menuBusy by remember { mutableStateOf(false) }
     LaunchedEffect(video.id, signedIn) {
         withContext(Dispatchers.IO) {
             likeCount = runCatching { repository.videoLikeCount(video.id) }.getOrDefault(0)
@@ -1663,6 +1668,83 @@ private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, activ
                 }
                 Text(if (muted) "صامت" else "الصوت", color = Color.White, fontSize = 11.sp)
             }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box {
+                    IconButton(onClick = { showMoreMenu = true }) {
+                        Icon(Icons.Default.MoreHoriz, "خيارات الفيديو", tint = Color.White, modifier = Modifier.size(31.dp))
+                    }
+                    DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                        DropdownMenuItem(text = { Text("نسخ رابط الفيديو") }, leadingIcon = { Icon(Icons.Default.Link, null) }, onClick = {
+                            showMoreMenu = false
+                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("رابط الفيديو", video.videoUrl))
+                            actionError = "تم نسخ رابط الفيديو"
+                        })
+                        if (video.userId == repository.currentUserId()) {
+                            DropdownMenuItem(text = { Text("إعدادات الخصوصية") }, leadingIcon = { Icon(Icons.Default.Lock, null) }, onClick = {
+                                showMoreMenu = false
+                                showPrivacyDialog = true
+                            })
+                            DropdownMenuItem(text = { Text("مسح الفيديو", color = Brand) }, leadingIcon = { Icon(Icons.Default.Delete, null, tint = Brand) }, onClick = {
+                                showMoreMenu = false
+                                showDeleteConfirm = true
+                            })
+                        }
+                    }
+                }
+            }
+        }
+        if (showDeleteConfirm) {
+            AlertDialog(
+                onDismissRequest = { if (!menuBusy) showDeleteConfirm = false },
+                title = { Text("مسح الفيديو؟") },
+                text = { Text("راح ينحذف الفيديو نهائياً وما يگدر أحد يشوفه.") },
+                confirmButton = {
+                    TextButton(enabled = !menuBusy, onClick = {
+                        scope.launch {
+                            menuBusy = true
+                            try {
+                                withContext(Dispatchers.IO) { repository.deleteVideo(video.id) }
+                                showDeleteConfirm = false
+                                onVideoDeleted()
+                            } catch (e: Exception) { actionError = e.message ?: "تعذر حذف الفيديو" }
+                            finally { menuBusy = false }
+                        }
+                    }) { Text(if (menuBusy) "جارٍ الحذف..." else "مسح", color = Brand) }
+                },
+                dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("إلغاء") } }
+            )
+        }
+        if (showPrivacyDialog) {
+            AlertDialog(
+                onDismissRequest = { showPrivacyDialog = false },
+                title = { Text("إعدادات الخصوصية") },
+                text = {
+                    Column {
+                        Text("منو يگدر يشوف هذا الفيديو؟")
+                        Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = video.visibility == "public", onClick = {
+                                scope.launch {
+                                    try { withContext(Dispatchers.IO) { repository.updateVideoPrivacy(video.id, "public") }; showPrivacyDialog = false; onVideoDeleted() }
+                                    catch (e: Exception) { actionError = e.message ?: "تعذر تحديث الخصوصية" }
+                                }
+                            })
+                            Text("عام — كل الناس")
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = video.visibility == "private", onClick = {
+                                scope.launch {
+                                    try { withContext(Dispatchers.IO) { repository.updateVideoPrivacy(video.id, "private") }; showPrivacyDialog = false; onVideoDeleted() }
+                                    catch (e: Exception) { actionError = e.message ?: "تعذر تحديث الخصوصية" }
+                                }
+                            })
+                            Text("خاص — أنا فقط")
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showPrivacyDialog = false }) { Text("إغلاق") } }
+            )
         }
         Column(Modifier.align(Alignment.BottomStart).padding(start = 14.dp, end = 78.dp, bottom = 20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1681,6 +1763,11 @@ private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, activ
                 }
             }
             if (video.caption.isNotBlank()) Text(video.caption, color = Color.White, fontSize = 14.sp, maxLines = 3)
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                Icon(Icons.Default.PlayArrow, null, tint = Color.White.copy(alpha = .9f), modifier = Modifier.size(15.dp))
+                Text(if (viewCount >= 1000) String.format("%.1fK", viewCount / 1000f) + " مشاهدة" else "$viewCount مشاهدة",
+                    color = Color.White.copy(alpha = .9f), fontSize = 12.sp)
+            }
             Text("♪ الصوت الأصلي · ${video.creatorName.ifBlank { "الرافدين تيك" }}",
                 color = Color.White.copy(alpha = .88f), fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp))
             actionError?.let { Text(it, color = Color.White, fontSize = 11.sp) }
