@@ -739,13 +739,13 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                             } finally { followHostBusy = false }
                         }
                     },
-                    modifier = Modifier.size(29.dp).background(Color(0xFF17C9C6), CircleShape)
+                    modifier = Modifier.size(22.dp).background(Color(0xFF17C9C6), CircleShape)
                 ) {
                     Icon(
                         if (isFollowingHost) Icons.Default.Check else Icons.Default.Add,
                         if (isFollowingHost) "تتابع صاحب البث" else "متابعة صاحب البث",
                         tint = Color.White,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(13.dp)
                     )
                 }
                 Column(Modifier.weight(1f).padding(start = 8.dp), horizontalAlignment = Alignment.End) {
