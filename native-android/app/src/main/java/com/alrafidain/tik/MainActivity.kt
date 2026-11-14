@@ -2287,8 +2287,6 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
             }
         }
     }
-}
-
 
     if (settingsOpen) AlertDialog(
         onDismissRequest = { settingsOpen = false },
