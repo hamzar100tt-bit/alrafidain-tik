@@ -211,7 +211,7 @@ fun NativeCameraScreen(
             scope.launch {
                 try {
                     val editedUri = if (chosenSound != null || filter != "طبيعي") exportEditedVideo(context, uri, chosenSound, filter) else uri
-                    val result = withContext(Dispatchers.IO) { repository.uploadVideo(editedUri, caption) }
+                    val result = withContext(Dispatchers.IO) { repository.uploadVideo(editedUri, if (selectedMusicCredit.isNotBlank()) "$caption\n\nالصوت: $selectedMusicCredit · $selectedMusicLicense" else caption) }
                     status = result
                     onUploaded()
                 } catch (e: Exception) { status = e.message ?: "تعذر نشر الفيديو" }
