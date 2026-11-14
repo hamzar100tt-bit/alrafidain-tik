@@ -2323,11 +2323,9 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
         confirmButton = { TextButton(onClick = { peopleType = null }) { Text("إغلاق") } }
     )
     selectedPerson?.let { personId ->
-        AlertDialog(onDismissRequest = { selectedPerson = null },
-            title = { Text("فتح الحساب") },
-            text = { Text("اضغط متابعة أو افتح صفحة الحساب من قائمة الحسابات.") },
-            confirmButton = { TextButton(onClick = { selectedPerson = null }) { Text("حسناً") } }
-        )
+        ModalBottomSheet(onDismissRequest = { selectedPerson = null }, containerColor = Color.White) {
+            PublicCommentProfileScreen(repository, personId, onBack = { selectedPerson = null })
+        }
     }
 @Composable
 private fun VideoPostThumbnail(
