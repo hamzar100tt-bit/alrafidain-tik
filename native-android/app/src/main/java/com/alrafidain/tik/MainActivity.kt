@@ -156,9 +156,17 @@ private fun AlrafidainApp() {
             3 -> if (signedIn) MessagesScreen(repository) else GuestGate { showAuth = true }
             4 -> if (signedIn) ProfileScreen(repository, onSignOut = { repository.signOut(); signedIn = false; selected = 0 }) else GuestGate { showAuth = true }
             5 -> if (signedIn) NativeCameraScreen(repository, onBack = { selected = 2 }, onUploaded = { refreshFeed(); selected = 0 }) else GuestGate { showAuth = true }
+            6 -> UploadScreen(repository, onBack = { selected = 0 }, onUploaded = { refreshFeed(); selected = 0 })
         }
 
         if (selected == 0) {
+            IconButton(
+                onClick = { selected = 6 },
+                modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 10.dp, top = 6.dp)
+                    .size(46.dp).background(Color.Black.copy(alpha = .28f), CircleShape)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "إضافة فيديو أو صورة", tint = Color.White, modifier = Modifier.size(34.dp))
+            }
             IconButton(
                 onClick = { if (signedIn) showNotifications = true else showAuth = true },
                 modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 10.dp, top = 6.dp)
@@ -197,7 +205,7 @@ private fun AlrafidainApp() {
             )
         }
 
-        if (selected != 2) {
+        if (selected != 2 && selected != 6) {
             NavigationBar(
                 modifier = Modifier.align(Alignment.BottomCenter)
                     .navigationBarsPadding()
