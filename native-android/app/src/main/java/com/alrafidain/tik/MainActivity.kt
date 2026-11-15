@@ -88,6 +88,11 @@ private data class LiveChatMessage(val userId: String, val text: String, val dis
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val savedCrash = java.io.File(filesDir, "last_crash.txt")
+        if (savedCrash.exists()) {
+            setContent { CrashReportScreen(savedCrash.readText()) }
+            return
+        }
         window.statusBarColor = android.graphics.Color.TRANSPARENT
         window.navigationBarColor = android.graphics.Color.BLACK
         window.decorView.systemUiVisibility =
