@@ -863,7 +863,12 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                             connecting = true
                             scope.launch {
                                 try {
-                                    val credentials = withContext(Dispatchers.IO) { repository.joinLiveRoomSeat(roomName) }
+                                    val credentials = withContext(Dispatchers.IO) {
+                                        val occupied = repository.loadLiveRoomSpeakers(roomName).keys
+                                        val firstFreeSeat = (2..8).firstOrNull { it !in occupied }
+                                            ?: throw IllegalStateException("كل المقاعد مشغولة حالياً")
+                                        repository.joinLiveRoomSeat(roomName, firstFreeSeat)
+                                    }
                                     room.disconnect()
                                     room.connect(credentials.serverUrl, credentials.participantToken)
                                     canSpeak = true
