@@ -1454,14 +1454,36 @@ private fun PublicCommentProfileScreen(repository: SupabaseRepository, userId: S
                 HorizontalDivider(color = Color(0xFFEAEAEA))
                 Text("المنشورات", color = Ink, fontWeight = FontWeight.Bold, fontSize = 17.sp,
                     modifier = Modifier.fillMaxWidth().padding(15.dp))
-                stats?.posts.orEmpty().forEach { video ->
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(if (video.mediaType == "image") Icons.Default.Image else Icons.Default.PlayCircle,
-                            null, tint = Brand, modifier = Modifier.size(32.dp))
-                        Text(video.caption.ifBlank { "منشور بدون وصف" }, color = Ink,
-                            modifier = Modifier.padding(start = 10.dp).weight(1f), maxLines = 2)
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 900.dp),
+                    userScrollEnabled = false,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    items(stats?.posts.orEmpty().size) { index ->
+                        val post = stats?.posts.orEmpty()[index]
+                        Box(
+                            Modifier.fillMaxWidth().aspectRatio(0.78f).background(Color(0xFFF0F0F2))
+                        ) {
+                            if (post.mediaType == "image" && post.videoUrl.isNotBlank()) {
+                                AsyncImage(
+                                    model = post.videoUrl,
+                                    contentDescription = post.caption,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Box(Modifier.fillMaxSize().background(Color(0xFF171923)), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.PlayCircleFilled, null, tint = Color.White, modifier = Modifier.size(38.dp))
+                                }
+                            }
+                            if (post.mediaType != "image") {
+                                Icon(Icons.Default.PlayArrow, "فيديو", tint = Color.White,
+                                    modifier = Modifier.align(Alignment.BottomEnd).padding(7.dp))
+                            }
+                        }
                     }
-                    HorizontalDivider(color = Color(0xFFEFEFEF))
                 }
                 if (stats?.posts.isNullOrEmpty()) Text("ماكو منشورات بعد", color = Muted,
                     modifier = Modifier.fillMaxWidth().padding(24.dp), textAlign = TextAlign.Center)
