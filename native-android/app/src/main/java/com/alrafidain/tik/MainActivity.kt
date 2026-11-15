@@ -763,10 +763,11 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                         Box(Modifier.size(58.dp).clip(CircleShape)
                             .border(2.dp, if (isSpeaking) Color(0xFF31F0D0) else Color(0xFFD05BFF), CircleShape)
                             .background(if (isSpeaking) Color(0xFF16B98D) else if (profile != null) Color(0xFF25194F) else Color(0x553A2C79))
-                            .clickable(enabled = i > 0 && connected && !connecting && (id == null || id == repository.currentUserId())) {
-                                if (id == repository.currentUserId()) {
-                                    showAudioControls = true
-                                } else {
+                            .clickable(enabled = id != null || (i > 0 && connected && !connecting)) {
+                                if (id != null) {
+                                    if (id == repository.currentUserId()) showAudioControls = true
+                                    else selectedChatUserId = id
+                                } else if (i > 0) {
                                     connecting = true
                                     scope.launch {
                                         try {
