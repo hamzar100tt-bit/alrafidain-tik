@@ -1627,6 +1627,9 @@ private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, activ
         withContext(Dispatchers.IO) {
             likeCount = runCatching { repository.videoLikeCount(video.id) }.getOrDefault(0)
             commentCount = runCatching { repository.videoCommentCount(video.id) }.getOrDefault(0)
+            if (active) {
+                viewCount = runCatching { repository.recordVideoView(video.id) }.getOrDefault(viewCount)
+            }
             if (signedIn) {
                 liked = runCatching { repository.isLiked(video.id) }.getOrDefault(false)
                 saved = runCatching { repository.isSaved(video.id) }.getOrDefault(false)
