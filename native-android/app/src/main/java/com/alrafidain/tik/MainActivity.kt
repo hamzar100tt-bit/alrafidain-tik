@@ -121,6 +121,7 @@ private fun AlrafidainApp() {
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    var liveRoomExpanded by remember { mutableStateOf(false) }
 
     fun refreshFeed() {
         scope.launch {
@@ -162,7 +163,7 @@ private fun AlrafidainApp() {
         } else when (selected) {
             0 -> FeedScreen(videos, loading, error, ::refreshFeed, replaySignal, repository, signedIn) { showAuth = true }
             1 -> DiscoverScreen(repository)
-            2 -> LiveRoomsScreen(repository, onBack = { selected = 0 }, onStartVideoPost = { if (signedIn) selected = 5 else showAuth = true }, onRequireLogin = { showAuth = true })
+            2 -> LiveRoomsScreen(repository, onBack = { selected = 0 }, onStartVideoPost = { if (signedIn) selected = 5 else showAuth = true }, onRequireLogin = { showAuth = true }, onRoomExpanded = { liveRoomExpanded = it })
             3 -> if (signedIn) MessagesScreen(repository) else GuestGate { showAuth = true }
             4 -> if (signedIn) ProfileScreen(repository, onSignOut = { repository.signOut(); signedIn = false; selected = 0 }) else GuestGate { showAuth = true }
             5 -> if (signedIn) NativeCameraScreen(repository, onBack = { selected = 2 }, onUploaded = { refreshFeed(); selected = 0 }) else GuestGate { showAuth = true }
@@ -207,15 +208,10 @@ private fun AlrafidainApp() {
             IconButton(onClick = { if (signedIn) showNotifications = true else showAuth = true }) {
                 Icon(Icons.Default.Notifications, contentDescription = "الإشعارات", tint = Ink)
             }
-            Text(
-                "الرافدين تيك",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Brand
-            )
+            Text("R", fontSize = 30.sp, fontWeight = FontWeight.Black, color = Color(0xFFD7A64A))
         }
 
-        if (selected != 2 && selected != 6) {
+        if (selected != 6 && !(selected == 2 && liveRoomExpanded)) {
             NavigationBar(
                 modifier = Modifier.align(Alignment.BottomCenter)
                     .navigationBarsPadding()
@@ -245,7 +241,7 @@ private fun AlrafidainApp() {
 }
 
 @Composable
-private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, onStartVideoPost: () -> Unit, onRequireLogin: () -> Unit) {
+private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, onStartVideoPost: () -> Unit, onRequireLogin: () -> Unit, onRoomExpanded: (Boolean) -> Unit) {
     var openedRoom by remember { mutableStateOf<String?>(null) }
     var openedVideoRoom by remember { mutableStateOf<String?>(null) }
     var openedAudioRoom by remember { mutableStateOf<String?>(null) }
@@ -270,11 +266,11 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
     }
     val shownRooms = rooms.filter { room -> room.roomType == "audio" && room.title.contains(searchText.trim(), ignoreCase = true) }
     if (openedAudioRoom != null) {
-        AudioLiveRoomScreen(repository, roomName = openedAudioRoom!!, backgroundStyle = selectedAudioBackground, onBack = { openedAudioRoom = null })
+        AudioLiveRoomScreen(repository, roomName = openedAudioRoom!!, backgroundStyle = selectedAudioBackground, onBack = { openedAudioRoom = null; onRoomExpanded(false) })
         return
     }
     if (openedVideoRoom != null) {
-        VideoLiveRoomScreen(repository, roomName = openedVideoRoom!!, onBack = { openedVideoRoom = null }, onRequireLogin = onRequireLogin)
+        VideoLiveRoomScreen(repository, roomName = openedVideoRoom!!, onBack = { openedVideoRoom = null; onRoomExpanded(false) }, onRequireLogin = onRequireLogin)
         return
     }
     if (openedRoom != null) {
@@ -451,6 +447,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
                             try {
                                 val roomKey = withContext(Dispatchers.IO) { repository.createLiveRoom(audioRoomTitle, "audio") }
                                 showCreateAudioRoom = false
+                                onRoomExpanded(true)
                                 openedAudioRoom = roomKey
                             } catch (e: Exception) {
                                 audioRoomError = e.message ?: "تعذر إنشاء الغرفة الصوتية"
