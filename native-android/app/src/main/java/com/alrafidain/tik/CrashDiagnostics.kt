@@ -4,7 +4,6 @@ import android.app.Application
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -61,16 +60,6 @@ fun CrashReportScreen(report: String) {
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("نسخ سجل الخطأ") }
-                Button(
-                    onClick = {
-                        File(context.filesDir, "last_crash.txt").delete()
-                        val intent = Intent(context, MainActivity::class.java).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                        }
-                        context.startActivity(intent)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("مسح السجل وفتح التطبيق") }
                 Text(report, style = MaterialTheme.typography.bodySmall)
             }
         }
