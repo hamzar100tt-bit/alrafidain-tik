@@ -968,29 +968,31 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                             }.padding(5.dp))
                         }
                     }
-                    OutlinedButton(
-                        onClick = {
-                            scope.launch {
-                                try {
-                                    room.localParticipant.setMicrophoneEnabled(false)
-                                    withContext(Dispatchers.IO) { repository.leaveLiveRoomSeat(roomName) }
-                                    room.disconnect()
-                                    val credentials = withContext(Dispatchers.IO) { repository.requestLiveKitToken(roomName, "viewer") }
-                                    room.connect(credentials.serverUrl, credentials.participantToken)
-                                    micEnabled = false
-                                    canSpeak = false
-                                    status = "نزلت من المايك"
-                                    showAudioControls = false
-                                    refreshSeats()
-                                } catch (e: Exception) { error = e.message ?: "تعذر النزول من المايك" }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Brand)
-                    ) {
-                        Icon(Icons.Default.CallEnd, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("النزول من المايك")
+                    if (host?.ownerId != repository.currentUserId()) {
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    try {
+                                        room.localParticipant.setMicrophoneEnabled(false)
+                                        withContext(Dispatchers.IO) { repository.leaveLiveRoomSeat(roomName) }
+                                        room.disconnect()
+                                        val credentials = withContext(Dispatchers.IO) { repository.requestLiveKitToken(roomName, "viewer") }
+                                        room.connect(credentials.serverUrl, credentials.participantToken)
+                                        micEnabled = false
+                                        canSpeak = false
+                                        status = "نزلت من المايك"
+                                        showAudioControls = false
+                                        refreshSeats()
+                                    } catch (e: Exception) { error = e.message ?: "تعذر النزول من المايك" }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Brand)
+                        ) {
+                            Icon(Icons.Default.CallEnd, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("النزول من المايك")
+                        }
                     }
                 }
             },
