@@ -60,9 +60,24 @@ class SupabaseRepository(private val context: Context) {
         return result
     }
 
-    fun joinLiveRoomSeat(roomKey: String): LiveKitCredentials {
+    fun loadLiveRoomSpeakers(roomKey: String): Map<Int, String> {
+        val encodedRoom = java.net.URLEncoder.encode(roomKey, "UTF-8")
+        val rooms = publicRows("live_rooms?room_key=eq.$encodedRoom&is_live=eq.true&select=id&limit=1")
+        if (rooms.length() == 0) return emptyMap()
+        val roomId = rooms.getJSONObject(0).optString("id")
+        val rows = publicRows("live_room_speakers?room_id=eq.$roomId&select=seat_number,user_id&order=seat_number.asc")
+        return (0 until rows.length()).mapNotNull { index ->
+            val row = rows.getJSONObject(index)
+            val seat = row.optInt("seat_number", 0)
+            val userId = row.optString("user_id")
+            if (seat in 2..8 && userId.isNotBlank()) seat to userId else null
+        }.toMap()
+    }
+
+    fun joinLiveRoomSeat(roomKey: String, seatNumber: Int): LiveKitCredentials {
         if (currentUserId().isNullOrBlank()) throw IOException("سجّل الدخول أولاً")
-        val payload = JSONObject().put("p_room_key", roomKey)
+        if (seatNumber !in 2..8) throw IOException("هذا المقعد مخصص لصاحب البث أو رقم المقعد غير صحيح")
+        val payload = JSONObject().put("p_room_key", roomKey).put("p_seat_number", seatNumber)
         val request = authedRequest("$base/rest/v1/rpc/join_live_room_speaker")
             .addHeader("Content-Type", "application/json")
             .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
@@ -70,8 +85,7 @@ class SupabaseRepository(private val context: Context) {
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 val message = runCatching { JSONObject(body).optString("message") }.getOrNull()
-                throw IOException(message?.takeIf { it.isNotBlank() }
-                    ?: "تعذر حجز المقعد (${response.code})")
+                throw IOException(message?.takeIf { it.isNotBlank() } ?: "تعذر حجز المقعد (\${response.code})")
             }
         }
         return requestLiveKitToken(roomKey, "speaker")
