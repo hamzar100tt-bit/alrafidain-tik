@@ -528,7 +528,7 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
     var micEnabled by remember { mutableStateOf(false) }
     var canSpeak by remember { mutableStateOf(false) }
     var connecting by remember { mutableStateOf(true) }
-    var seatIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    var seatIds by remember { mutableStateOf<List<String?>>(List(8) { null }) }
     var seatProfiles by remember { mutableStateOf<List<SupabaseRepository.DiscoverProfile>>(emptyList()) }
     var activeSpeakers by remember { mutableStateOf<Set<String>>(emptySet()) }
     var lastLoadedProfileIds by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -561,24 +561,27 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
 
     fun refreshSeats() {
         val me = repository.currentUserId()
-        val ids = mutableListOf<String>()
-        // Keep the host in seat 1 even while their microphone is muted or permission is pending.
-        if (me != null && (me == host?.ownerId || room.localParticipant.isMicrophoneEnabled)) ids.add(me)
-        room.remoteParticipants.values.filter { it.isMicrophoneEnabled }.forEach { participant ->
-            participant.identity?.value?.let { if (it !in ids) ids.add(it) }
-        }
-        val nextSeatIds = ids.take(8)
-        seatIds = nextSeatIds
         viewerCount = 1 + room.remoteParticipants.size
-        val allIds = (listOfNotNull(me) + room.remoteParticipants.values.mapNotNull { it.identity?.value }).distinct()
-        val profileIds = (nextSeatIds + allIds).toSet()
-        // Active-speaker events can fire often; avoid repeating Supabase profile requests
-        // unless the set of people in the room actually changes.
-        if (profileIds != lastLoadedProfileIds) {
-            lastLoadedProfileIds = profileIds
-            scope.launch(Dispatchers.IO) {
-                runCatching { repository.loadPublicProfiles(nextSeatIds) }.onSuccess { seatProfiles = it }
-                runCatching { repository.loadPublicProfiles(allIds) }.onSuccess { viewerProfiles = it }
+        scope.launch {
+            val assignments = withContext(Dispatchers.IO) {
+                runCatching { repository.loadLiveRoomSpeakers(roomName) }.getOrDefault(emptyMap())
+            }
+            val slots = MutableList<String?>(8) { null }
+            host?.ownerId?.takeIf { it.isNotBlank() }?.let { slots[0] = it }
+            assignments.forEach { (seatNumber, userId) ->
+                if (seatNumber in 2..8) slots[seatNumber - 1] = userId
+            }
+            if (slots[0] == null && me != null && canSpeak && host?.ownerId == me) slots[0] = me
+            seatIds = slots
+            val seatUsers = slots.filterNotNull()
+            val allIds = (listOfNotNull(me) + room.remoteParticipants.values.mapNotNull { it.identity?.value }).distinct()
+            val profileIds = (seatUsers + allIds).toSet()
+            if (profileIds != lastLoadedProfileIds) {
+                lastLoadedProfileIds = profileIds
+                withContext(Dispatchers.IO) {
+                    runCatching { repository.loadPublicProfiles(seatUsers) }.onSuccess { seatProfiles = it }
+                    runCatching { repository.loadPublicProfiles(allIds) }.onSuccess { viewerProfiles = it }
+                }
             }
         }
     }
@@ -652,14 +655,26 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
     }
 
     val sky = when (backgroundStyle) {
+        0 -> Brush.verticalGradient(listOf(Color(0xFF062C58), Color(0xFF087C9B), Color(0xFF164A32)))
         1 -> Brush.verticalGradient(listOf(Color(0xFF0066CC), Color(0xFF123A9C), Color(0xFF061B4A)))
         2 -> Brush.verticalGradient(listOf(Color(0xFF35105D), Color(0xFF711D86), Color(0xFF120D2B)))
         3 -> Brush.verticalGradient(listOf(Color(0xFF071B3D), Color(0xFF183C66), Color(0xFF030A19)))
         4 -> Brush.verticalGradient(listOf(Color(0xFFFFA45B), Color(0xFFB84F73), Color(0xFF253C70)))
         5 -> Brush.verticalGradient(listOf(Color(0xFF102A53), Color(0xFF28517A), Color(0xFF08192E)))
-        else -> Brush.verticalGradient(listOf(Color(0xFF070D35), Color(0xFF10134B), Color(0xFF24105A), Color(0xFF080D2D)))
+        else -> Brush.verticalGradient(listOf(Color(0xFF070D35), Color(0xFF10134B), Color(0xFF24105A)))
     }
     Box(Modifier.fillMaxSize().background(sky)) {
+        val backgroundPainter = when (backgroundStyle) {
+            0 -> androidx.compose.ui.res.painterResource(R.drawable.live_bg_stadium)
+            1 -> androidx.compose.ui.res.painterResource(R.drawable.live_bg_blue)
+            2 -> androidx.compose.ui.res.painterResource(R.drawable.live_bg_gaming)
+            else -> null
+        }
+        if (backgroundPainter != null) {
+            Image(painter = backgroundPainter, contentDescription = "خلفية البث المختارة",
+                contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.24f)))
+        }
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             // Live room header: close, PiP minimize, share, add/invite, host name + account ID.
             Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
@@ -748,20 +763,21 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                         Box(Modifier.size(58.dp).clip(CircleShape)
                             .border(2.dp, if (isSpeaking) Color(0xFF31F0D0) else Color(0xFFD05BFF), CircleShape)
                             .background(if (isSpeaking) Color(0xFF16B98D) else if (profile != null) Color(0xFF25194F) else Color(0x553A2C79))
-                            .clickable(enabled = id != null || (connected && !connecting)) {
-                                if (id != null) {
-                                    if (id == repository.currentUserId()) showAudioControls = true
-                                    else selectedChatUserId = id
+                            .clickable(enabled = i > 0 && connected && !connecting && (id == null || id == repository.currentUserId())) {
+                                if (id == repository.currentUserId()) {
+                                    showAudioControls = true
                                 } else {
                                     connecting = true
                                     scope.launch {
                                         try {
-                                            val credentials = withContext(Dispatchers.IO) { repository.joinLiveRoomSeat(roomName) }
+                                            val credentials = withContext(Dispatchers.IO) {
+                                                repository.joinLiveRoomSeat(roomName, i + 1)
+                                            }
                                             room.disconnect()
                                             room.connect(credentials.serverUrl, credentials.participantToken)
                                             canSpeak = true
                                             connected = true
-                                            status = "انضممت إلى المايك"
+                                            status = "انضممت إلى المقعد \${i + 1}"
                                             val hasMicPermission = androidx.core.content.ContextCompat.checkSelfPermission(
                                                 context, android.Manifest.permission.RECORD_AUDIO
                                             ) == android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -769,10 +785,10 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                                                 room.localParticipant.setMicrophoneEnabled(true)
                                                 micEnabled = true
                                             } else permission.launch(android.Manifest.permission.RECORD_AUDIO)
-                                            kotlinx.coroutines.delay(350)
+                                            delay(350)
                                             refreshSeats()
                                         } catch (e: Exception) {
-                                            error = e.message ?: "تعذر الانضمام للمقعد"
+                                            error = e.message ?: "تعذر الانضمام للمقعد \${i + 1}"
                                         } finally { connecting = false }
                                     }
                                 }
