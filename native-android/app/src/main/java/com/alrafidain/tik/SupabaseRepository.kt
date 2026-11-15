@@ -48,16 +48,16 @@ class SupabaseRepository(private val context: Context) {
     }
     fun loadLiveRooms(): List<LiveRoomInfo> {
         val rows = publicRows("live_rooms?is_live=eq.true&select=id,title,room_key,room_type,owner_id,created_at&order=created_at.desc&limit=50")
-        val result = ArrayList<LiveRoomInfo>()
-        for (i in 0 until rows.length()) {
-            val row = rows.getJSONObject(i)
+        val roomRows = (0 until rows.length()).map { rows.getJSONObject(it) }
+        val ownerIds = roomRows.map { it.optString("owner_id") }.filter { it.isNotBlank() }.distinct()
+        val profiles = runCatching { loadPublicProfiles(ownerIds).associateBy { it.id } }.getOrDefault(emptyMap())
+        return roomRows.map { row ->
             val ownerId = row.optString("owner_id")
-            val profileRows = publicRows("profiles?id=eq.$ownerId&select=display_name,username,avatar_url&limit=1")
-            val profile = if (profileRows.length() > 0) profileRows.getJSONObject(0) else JSONObject()
-            val ownerName = profile.optString("display_name").ifBlank { profile.optString("username").ifBlank { "مستخدم" } }
-            result.add(LiveRoomInfo(row.optString("id"), row.optString("title").ifBlank { "بث مباشر" }, row.optString("room_key"), row.optString("room_type"), ownerId, ownerName, profile.optString("avatar_url").takeIf { it.isNotBlank() }))
+            val profile = profiles[ownerId]
+            val ownerName = profile?.displayName?.ifBlank { profile.username }?.ifBlank { "مستخدم" } ?: "مستخدم"
+            LiveRoomInfo(row.optString("id"), row.optString("title").ifBlank { "بث مباشر" },
+                row.optString("room_key"), row.optString("room_type"), ownerId, ownerName, profile?.avatarUrl)
         }
-        return result
     }
 
     fun loadLiveRoomSpeakers(roomKey: String): Map<Int, String> {
