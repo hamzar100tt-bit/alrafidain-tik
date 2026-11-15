@@ -644,24 +644,30 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
 
     LaunchedEffect(roomName) {
         try {
-            myChatProfile = withContext(Dispatchers.IO) {
-                val me = repository.currentUserId()
-                val profile = repository.loadProfile()
-                if (me.isNullOrBlank()) null else SupabaseRepository.DiscoverProfile(
-                    me, profile.optString("username"),
-                    profile.optString("display_name").ifBlank { profile.optString("username").ifBlank { "مستخدم" } },
-                    profile.optString("avatar_url").takeIf { it.isNotBlank() }
-                )
-            }
-            host = withContext(Dispatchers.IO) {
+            // Get the LiveKit token first; room metadata and the local profile load alongside it.
+            val tokenTask = async(Dispatchers.IO) { repository.requestLiveKitToken(roomName, "viewer") }
+            val hostTask = async(Dispatchers.IO) {
                 repository.loadLiveRooms().firstOrNull { it.roomKey == roomName }
             }
-            val c = withContext(Dispatchers.IO) { repository.requestLiveKitToken(roomName, "viewer") }
+            val profileTask = async(Dispatchers.IO) {
+                val me = repository.currentUserId()
+                if (me.isNullOrBlank()) null else runCatching {
+                    val profile = repository.loadProfile()
+                    SupabaseRepository.DiscoverProfile(
+                        me, profile.optString("username"),
+                        profile.optString("display_name").ifBlank { profile.optString("username").ifBlank { "مستخدم" } },
+                        profile.optString("avatar_url").takeIf { it.isNotBlank() }
+                    )
+                }.getOrNull()
+            }
+            val c = tokenTask.await()
             canSpeak = c.role == "host" || c.role == "speaker"
             room.connect(c.serverUrl, c.participantToken)
             connected = true
             status = if (canSpeak) "أنت المضيف" else "متصل — مستمع"
             viewerCount = 1 + room.remoteParticipants.size
+            host = hostTask.await()
+            myChatProfile = profileTask.await()
             if (canSpeak) permission.launch(android.Manifest.permission.RECORD_AUDIO)
             refreshSeats()
         } catch (e: Exception) { status = "تعذر الاتصال"; error = e.message ?: "فشل الاتصال بالغرفة" }
