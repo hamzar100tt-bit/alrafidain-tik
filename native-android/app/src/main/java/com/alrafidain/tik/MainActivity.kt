@@ -2256,19 +2256,19 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
     val avatar = profile?.optString("avatar_url")?.takeIf { it.isNotBlank() }
     var avatarLoadFailed by remember(avatar) { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize().background(Color.White).padding(bottom = 82.dp)) {
+    Column(Modifier.fillMaxSize().background(Color(0xFF09070A)).padding(bottom = 82.dp)) {
         Row(
             Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "تعديل الملف الشخصي", tint = Ink, modifier = Modifier.size(27.dp))
+                Icon(Icons.Default.Edit, contentDescription = "تعديل الملف الشخصي", tint = Color.White, modifier = Modifier.size(27.dp))
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box {
                     IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Default.Menu, contentDescription = "القائمة", tint = Ink, modifier = Modifier.size(27.dp))
+                        Icon(Icons.Default.Menu, contentDescription = "القائمة", tint = Color.White, modifier = Modifier.size(27.dp))
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(text = { Text("الإعدادات") }, leadingIcon = { Icon(Icons.Default.Settings, null) },
@@ -2280,7 +2280,7 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                     }
                 }
                 IconButton(onClick = { settingsOpen = true }) {
-                    Icon(Icons.Default.PersonAddAlt, contentDescription = "الإعدادات", tint = Ink, modifier = Modifier.size(27.dp))
+                    Icon(Icons.Default.PersonAddAlt, contentDescription = "الإعدادات", tint = Color.White, modifier = Modifier.size(27.dp))
                 }
             }
         }
@@ -2296,7 +2296,7 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                 horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                    Text(displayName, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, color = Ink, maxLines = 1)
+                    Text(displayName, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 1)
                     Text("@${username.ifBlank { "user" }}", fontSize = 14.sp, color = Muted)
                     Spacer(Modifier.height(22.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -2312,11 +2312,11 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                         contentScale = ContentScale.Crop,
                         onError = { avatarLoadFailed = true },
                         modifier = Modifier.size(112.dp).clip(CircleShape)
-                            .background(Color(0xFFF1F1F3)).clickable { onEdit() }
+                            .background(Color(0xFF211B24)).clickable { onEdit() }
                     )
                 } else {
                     Box(
-                        Modifier.size(112.dp).clip(CircleShape).background(Color(0xFFF1F1F3))
+                        Modifier.size(112.dp).clip(CircleShape).background(Color(0xFF211B24))
                             .clickable { onEdit() },
                         contentAlignment = Alignment.Center
                     ) {
@@ -2328,7 +2328,7 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                 bio.ifBlank { "أضف نبذة عنك حتى يعرفك الناس" },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 13.dp),
                 fontSize = 15.sp,
-                color = if (bio.isBlank()) Muted else Ink,
+                color = if (bio.isBlank()) Color(0xFF8F8794) else Color.White,
                 textAlign = TextAlign.Start
             )
 
@@ -2341,13 +2341,13 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                 tabs.forEachIndexed { index, icon ->
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         IconButton(onClick = { selectedTab = index }) {
-                            Icon(icon, contentDescription = null, tint = if (selectedTab == index) Ink else Muted, modifier = Modifier.size(28.dp))
+                            Icon(icon, contentDescription = null, tint = if (selectedTab == index) Color(0xFFD7A64A) else Color(0xFF8F8794), modifier = Modifier.size(28.dp))
                         }
                         Box(Modifier.width(42.dp).height(3.dp).background(if (selectedTab == index) Ink else Color.Transparent, RoundedCornerShape(2.dp)))
                     }
                 }
             }
-            HorizontalDivider(color = Color(0xFFECECEC))
+            HorizontalDivider(color = Color(0xFF332B35))
             when {
                 error != null -> Box(Modifier.weight(1f).fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -2375,7 +2375,7 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                         ) {
                             items(extraPosts.size, key = { index -> extraPosts[index].id }) { index ->
                                 val post = extraPosts[index]
-                                Box(Modifier.fillMaxWidth().aspectRatio(0.72f).background(Color(0xFF181818))) {
+                                Box(Modifier.fillMaxWidth().aspectRatio(0.72f).background(Color(0xFF211B24))) {
                                     if (post.mediaType == "image") {
                                         AsyncImage(model = post.videoUrl, contentDescription = post.caption,
                                             contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
@@ -2404,7 +2404,7 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                 ) {
                     items(stats!!.posts.size, key = { index -> stats!!.posts[index].id }) { index ->
                         val post = stats!!.posts[index]
-                        Box(Modifier.fillMaxWidth().aspectRatio(0.72f).background(Color(0xFF181818))) {
+                        Box(Modifier.fillMaxWidth().aspectRatio(0.72f).background(Color(0xFF211B24))) {
                             if (post.mediaType == "image") {
                                 AsyncImage(model = post.videoUrl, contentDescription = post.caption,
                                     contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
