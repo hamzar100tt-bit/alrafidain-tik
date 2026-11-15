@@ -817,7 +817,10 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                             else Icon(if (profile == null) Icons.Default.Add else Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(26.dp))
                             if (isSpeaking) Icon(Icons.Default.Mic, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp).size(13.dp))
                         }
-                        Text(profile?.displayName ?: "مقعد ${i + 1}", color = Color.White, fontSize = 11.sp, maxLines = 1)
+                        val seatLabel = profile?.displayName?.trim()?.takeIf { it.isNotEmpty() }
+                            ?: profile?.username?.trim()?.takeIf { it.isNotEmpty() }
+                            ?: "مقعد ${i + 1}"
+                        Text(seatLabel, color = Color.White, fontSize = 12.sp, maxLines = 1, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
