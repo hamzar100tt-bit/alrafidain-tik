@@ -912,6 +912,49 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
             }
 
         }
+        if (chatComposerOpen) {
+            Row(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .background(Color(0xF21A1425))
+                    .navigationBarsPadding()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("اكتب تعليقك مباشرة...") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(26.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFFB44BFF), unfocusedBorderColor = Color(0xFF76658A),
+                        cursorColor = Color.White, focusedPlaceholderColor = Color.LightGray,
+                        unfocusedPlaceholderColor = Color.LightGray
+                    )
+                )
+                IconButton(
+                    enabled = draft.isNotBlank(),
+                    onClick = {
+                        val message = draft.trim()
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) { repository.sendLiveChatMessage(roomName, message) }
+                                chat = withContext(Dispatchers.IO) { repository.loadLiveChatMessages(roomName) }
+                                    .map { LiveChatMessage(it.userId, it.body, it.displayName, it.avatarUrl) }
+                                draft = ""
+                            } catch (e: Exception) { error = e.message ?: "تعذر إرسال التعليق" }
+                        }
+                    }
+                ) {
+                    Icon(Icons.Default.Send, "إرسال التعليق", tint = if (draft.isBlank()) Color.Gray else Color(0xFFD65BFF))
+                }
+                IconButton(onClick = { chatComposerOpen = false }) {
+                    Icon(Icons.Default.Close, "إغلاق الكتابة", tint = Color.White)
+                }
+            }
+        }
     }
     if (viewersDialog) {
         AlertDialog(
@@ -1027,34 +1070,6 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
             title = { Text("مؤثرات الصوت") },
             text = { Text("خيارات دمج الصوت والصدى والإطارات الصوتية تحتاج محرك معالجة صوت إضافي. لم أفعل أزراراً شكلية حتى لا تتوقع أنها تغيّر صوتك فعلياً.") },
             confirmButton = { TextButton(onClick = { audioEffectsOpen = false }) { Text("حسناً") } }
-        )
-    }
-    if (chatComposerOpen) {
-        AlertDialog(
-            onDismissRequest = { chatComposerOpen = false },
-            title = { Text("الدردشة المباشرة") },
-            text = {
-                OutlinedTextField(
-                    value = draft, onValueChange = { draft = it },
-                    modifier = Modifier.fillMaxWidth(), label = { Text("اكتب تعليقك") },
-                    maxLines = 4
-                )
-            },
-            confirmButton = {
-                TextButton(enabled = draft.isNotBlank(), onClick = {
-                    val message = draft.trim()
-                    scope.launch {
-                        try {
-                            withContext(Dispatchers.IO) { repository.sendLiveChatMessage(roomName, message) }
-                            chat = withContext(Dispatchers.IO) { repository.loadLiveChatMessages(roomName) }
-                                .map { LiveChatMessage(it.userId, it.body, it.displayName, it.avatarUrl) }
-                            draft = ""
-                            chatComposerOpen = false
-                        } catch (e: Exception) { error = e.message ?: "تعذر إرسال التعليق" }
-                    }
-                }) { Text("إرسال") }
-            },
-            dismissButton = { TextButton(onClick = { chatComposerOpen = false }) { Text("إلغاء") } }
         )
     }
     if (giftsOpen) {
