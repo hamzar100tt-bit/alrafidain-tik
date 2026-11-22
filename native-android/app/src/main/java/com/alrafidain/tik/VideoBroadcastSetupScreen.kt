@@ -89,7 +89,7 @@ fun VideoBroadcastSetupScreen(
         }
     }
 
-    val filterTint = when (selectedFilter) {
+    val filterBase = when (selectedFilter) {
         "ناعم" -> Color(0x22F5C5B8)
         "دافئ" -> Color(0x33FF9A42)
         "ذهبي" -> Color(0x33DCA52E)
@@ -100,6 +100,7 @@ fun VideoBroadcastSetupScreen(
         "أبيض وأسود" -> Color(0x55777777)
         else -> Color.Transparent
     }
+    val filterTint = filterBase.copy(alpha = (filterBase.alpha * (beautyLevel / 100f)).coerceIn(0f, 1f))
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (cameraGranted) {
