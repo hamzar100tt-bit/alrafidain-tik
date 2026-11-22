@@ -2077,6 +2077,7 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
     var extraPosts by remember { mutableStateOf<List<TikVideo>>(emptyList()) }
     var extraLoading by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
+    var topupInfoOpen by remember { mutableStateOf(false) }
 
     fun load() {
         scope.launch {
@@ -2181,6 +2182,31 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                     }
                 }
             }
+            OutlinedButton(
+                onClick = { topupInfoOpen = true },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp)
+            ) {
+                Icon(Icons.Default.AccountBalanceWallet, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("شحن العملات")
+            }
+            if (topupInfoOpen) {
+                AlertDialog(
+                    onDismissRequest = { topupInfoOpen = false },
+                    title = { Text("شحن عملات الرافدين تيك") },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("طريقة التحويل: سوبر كي")
+                            Text("رقم الاستلام: 07723756476", fontWeight = FontWeight.Bold)
+                            Text("حوّل المبلغ ثم احتفظ بصورة وصل التحويل. لا تُضاف العملات إلا بعد مراجعة الإدارة وتأكيد الاستلام.")
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { topupInfoOpen = false }) { Text("حسناً") }
+                    }
+                )
+            }
+
             val accountLevel = (profile?.optInt("account_level", 1) ?: 1).coerceIn(1, 100)
             val levelPoints = (profile?.optLong("level_points", 0L) ?: 0L).coerceAtLeast(0L)
             val coinBalance = (profile?.optLong("coin_balance", 0L) ?: 0L).coerceAtLeast(0L)
