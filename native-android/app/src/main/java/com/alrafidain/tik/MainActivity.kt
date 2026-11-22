@@ -682,9 +682,22 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
         3 -> Brush.verticalGradient(listOf(Color(0xFF071B3D), Color(0xFF183C66), Color(0xFF030A19)))
         4 -> Brush.verticalGradient(listOf(Color(0xFFFFA45B), Color(0xFFB84F73), Color(0xFF253C70)))
         5 -> Brush.verticalGradient(listOf(Color(0xFF102A53), Color(0xFF28517A), Color(0xFF08192E)))
-        else -> Brush.verticalGradient(listOf(Color(0xFF070D35), Color(0xFF10134B), Color(0xFF24105A), Color(0xFF080D2D)))
+        else -> Brush.verticalGradient(listOf(Color(0xFF35105D), Color(0xFF260B4B), Color(0xFF16082F), Color(0xFF0D0620)))
     }
     Box(Modifier.fillMaxSize().background(sky)) {
+        // إضاءة زخرفية ثابتة تعطي إحساس المسرح البنفسجي دون التأثير على الصوت أو اللمس.
+        Box(Modifier.fillMaxSize()) {
+            Box(Modifier.align(Alignment.TopCenter).padding(top = 185.dp).size(270.dp)
+                .background(Brush.radialGradient(listOf(Color(0x885D21A8), Color.Transparent)), CircleShape))
+            Box(Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = 115.dp)
+                .size(125.dp).background(Brush.radialGradient(listOf(Color(0x665D21A8), Color.Transparent)), CircleShape))
+            Icon(Icons.Default.MusicNote, null, tint = Color(0xFFB66BFF).copy(alpha = .22f),
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = 28.dp).size(42.dp))
+            Icon(Icons.Default.MusicNote, null, tint = Color(0xFFD08AFF).copy(alpha = .20f),
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 34.dp, top = 110.dp).size(34.dp))
+            Icon(Icons.Default.Mic, null, tint = Color(0xFFCE9AFF).copy(alpha = .16f),
+                modifier = Modifier.align(Alignment.BottomStart).padding(start = 30.dp, bottom = 105.dp).size(92.dp))
+        }
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             // Live room header: close, PiP minimize, share, add/invite, host name + account ID.
             Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
