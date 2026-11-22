@@ -2179,6 +2179,33 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                     }
                 }
             }
+            val accountLevel = (profile?.optInt("account_level", 1) ?: 1).coerceIn(1, 100)
+            val levelPoints = (profile?.optLong("level_points", 0L) ?: 0L).coerceAtLeast(0L)
+            val coinBalance = (profile?.optLong("coin_balance", 0L) ?: 0L).coerceAtLeast(0L)
+            val pointsIntoLevel = (levelPoints % 1000L).toInt()
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp)
+                    .background(Color(0xFFF7F1FF), RoundedCornerShape(16.dp)).padding(14.dp)
+            ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("🪙 $coinBalance عملة", color = Color(0xFF7A35B5), fontWeight = FontWeight.Bold)
+                    Text("المستوى LV $accountLevel", color = Color(0xFF7A35B5), fontWeight = FontWeight.ExtraBold)
+                }
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { pointsIntoLevel / 1000f },
+                    modifier = Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(8.dp)),
+                    color = Brand,
+                    trackColor = Color(0xFFE6D9F2)
+                )
+                Text(
+                    "$pointsIntoLevel / 1000 نقطة للمستوى التالي",
+                    modifier = Modifier.align(Alignment.End).padding(top = 5.dp),
+                    color = Muted,
+                    fontSize = 11.sp
+                )
+            }
+
             Text(
                 bio.ifBlank { "أضف نبذة عنك حتى يعرفك الناس" },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 13.dp),
