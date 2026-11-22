@@ -1565,7 +1565,10 @@ private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, activ
     var likeCount by remember(video.id) { mutableIntStateOf(0) }
     var commentCount by remember(video.id) { mutableIntStateOf(0) }
     var actionError by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(video.id, signedIn) {
+    LaunchedEffect(video.id, signedIn, active) {
+        // Pager pre-composes nearby pages. Do not send database requests for pages
+        // the user is not watching yet.
+        if (!active) return@LaunchedEffect
         withContext(Dispatchers.IO) {
             likeCount = runCatching { repository.videoLikeCount(video.id) }.getOrDefault(0)
             commentCount = runCatching { repository.videoCommentCount(video.id) }.getOrDefault(0)
@@ -1692,7 +1695,8 @@ private fun NativeVideoPlayer(url: String, active: Boolean, replaySignal: Int, m
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(url))
             repeatMode = ExoPlayer.REPEAT_MODE_ONE
-            prepare()
+            // Prepare only when this page becomes active; avoid buffering every
+            // off-screen pager page at the same time.
         }
     }
     var previousReplaySignal by remember(url) { mutableIntStateOf(replaySignal) }
@@ -1700,8 +1704,13 @@ private fun NativeVideoPlayer(url: String, active: Boolean, replaySignal: Int, m
         player.volume = if (muted) 0f else 1f
         if (active && replaySignal != previousReplaySignal) player.seekTo(0)
         previousReplaySignal = replaySignal
-        player.playWhenReady = active
-        if (!active) player.pause()
+        if (active) {
+            if (player.playbackState == ExoPlayer.STATE_IDLE) player.prepare()
+            player.playWhenReady = true
+        } else {
+            player.playWhenReady = false
+            player.pause()
+        }
     }
     DisposableEffect(player, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
