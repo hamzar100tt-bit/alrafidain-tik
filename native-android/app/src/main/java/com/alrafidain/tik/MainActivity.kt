@@ -2366,41 +2366,68 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                 animationSpec = infiniteRepeatable(tween(1500), RepeatMode.Reverse),
                 label = "dragon_float"
             )
-            // Redesigned profile hero: avatar, identity and animated dragon are kept inside this page only.
+            // Dragon-themed profile header inspired by the supplied references.
             Box(
-                Modifier.fillMaxWidth().height(218.dp)
-                    .background(Brush.linearGradient(listOf(Color(0xFF160B20), Color(0xFF501321), Color(0xFF1B1028))))
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                Modifier.fillMaxWidth().height(252.dp)
+                    .background(Brush.linearGradient(listOf(Color(0xFF100B18), Color(0xFF4A1728), Color(0xFF20102D))))
+                    .padding(horizontal = 14.dp, vertical = 12.dp)
             ) {
+                Box(Modifier.fillMaxSize().background(
+                    Brush.radialGradient(listOf(Color(0x55FFD36B), Color.Transparent), radius = 520f)
+                ))
                 Text("DRAGON • LV 90", color = Color(0xFFFFD27A), fontSize = 12.sp,
                     fontWeight = FontWeight.ExtraBold, modifier = Modifier.align(Alignment.TopStart))
                 Column(
-                    Modifier.align(Alignment.CenterEnd).width(104.dp),
+                    Modifier.align(Alignment.CenterEnd).width(100.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("🐉", fontSize = 68.sp, modifier = Modifier.graphicsLayer {
+                    Text("🐉", fontSize = 66.sp, modifier = Modifier.graphicsLayer {
                         translationY = dragonOffset * 1.5f
                     })
-                    Text("🔥", fontSize = 27.sp, modifier = Modifier.graphicsLayer { alpha = fireAlpha })
+                    Text("🔥", fontSize = 26.sp, modifier = Modifier.graphicsLayer { alpha = fireAlpha })
+                    Text("حارس الرافدين", color = Color(0xFFFFD98A), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
                 Column(
-                    Modifier.align(Alignment.Center).padding(horizontal = 108.dp, vertical = 12.dp).fillMaxWidth(),
+                    Modifier.align(Alignment.Center).padding(start = 112.dp, end = 94.dp, top = 18.dp, bottom = 8.dp).fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(displayName, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold,
+                    Text(displayName, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold,
                         color = Color.White, maxLines = 1)
-                    Text("@${username.ifBlank { "user" }}", fontSize = 14.sp, color = Color(0xFFE8D9E6), maxLines = 1)
+                    Text("@${username.ifBlank { "user" }}", fontSize = 13.sp, color = Color(0xFFE8D9E6), maxLines = 1)
                     Spacer(Modifier.height(14.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                         ProfileStat(stats?.likes ?: 0, "الإعجابات")
                         ProfileStat(stats?.followers ?: 0, "المتابعون")
                         ProfileStat(stats?.following ?: 0, "أتابع")
                     }
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("👑", fontSize = 17.sp)
+                        Spacer(Modifier.width(5.dp))
+                        Text("الأسد الذهبي", color = Color(0xFFFFD98A), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
-                Box(Modifier.size(122.dp).align(Alignment.CenterStart).clickable { onEdit() }, contentAlignment = Alignment.Center) {
-                    Box(Modifier.size(112.dp).clip(CircleShape)
-                        .background(Brush.sweepGradient(listOf(Color(0xFFFFE9A0), Color(0xFFB56A19), Color(0xFFFFF4C2), Color(0xFF8E3D13))))
-                        .padding(5.dp).clip(CircleShape).background(Color(0xFF21151B)), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.size(124.dp).align(Alignment.CenterStart).clickable { onEdit() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        Modifier.size(116.dp)
+                            .background(Brush.sweepGradient(listOf(
+                                Color(0xFFFFF1B8), Color(0xFFB56A19), Color(0xFFFFD76C),
+                                Color(0xFF7C3B16), Color(0xFFFFF1B8)
+                            )), CircleShape)
+                            .padding(5.dp)
+                            .border(2.dp, Color(0xFFFFE9A0), CircleShape)
+                            .padding(3.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF21151B)),
+                        contentAlignment = Alignment.Center
+                    ) {
                         if (!avatar.isNullOrBlank() && !avatarLoadFailed) {
                             AsyncImage(model = avatar, contentDescription = "الصورة الشخصية - اضغط للتغيير",
                                 contentScale = ContentScale.Crop, onError = { avatarLoadFailed = true },
@@ -2408,13 +2435,23 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                         } else Icon(Icons.Default.AddAPhoto, "أضف صورة شخصية", tint = Color.White, modifier = Modifier.size(34.dp))
                     }
                     if (profileFrame == "lion") {
-                        Text("🦁", fontSize = 30.sp, modifier = Modifier.align(Alignment.TopStart).offset(x = (-2).dp, y = (-5).dp))
-                        Box(Modifier.size(118.dp).border(3.dp, Color(0xFFFFD36B), CircleShape))
+                        Text("🦁", fontSize = 29.sp,
+                            modifier = Modifier.align(Alignment.TopStart).offset(x = (-2).dp, y = (-4).dp))
+                        Box(Modifier.size(122.dp).border(3.dp, Color(0xFFFFD36B), CircleShape))
+                    }
+                    Box(
+                        Modifier.align(Alignment.BottomCenter).offset(y = 8.dp)
+                            .size(34.dp)
+                            .background(Brush.linearGradient(listOf(Color(0xFFFFE9A0), Color(0xFF9B5716))), CircleShape)
+                            .border(2.dp, Color(0xFF4A1728), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Mic, contentDescription = "شارة الميكروفون", tint = Color(0xFF4A1728), modifier = Modifier.size(19.dp))
                     }
                 }
-                IconButton(onClick = onEdit, modifier = Modifier.align(Alignment.TopEnd).size(36.dp)
+                IconButton(onClick = onEdit, modifier = Modifier.align(Alignment.TopEnd).size(34.dp)
                     .background(Color.White.copy(alpha = 0.12f), CircleShape)) {
-                    Icon(Icons.Default.Edit, "تعديل الملف الشخصي", tint = Color.White, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Edit, "تعديل الملف الشخصي", tint = Color.White, modifier = Modifier.size(17.dp))
                 }
             }
             OutlinedButton(
