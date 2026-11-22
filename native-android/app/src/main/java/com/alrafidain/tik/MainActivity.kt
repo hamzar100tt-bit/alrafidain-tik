@@ -234,6 +234,7 @@ private fun AlrafidainApp() {
 private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, onStartVideoPost: () -> Unit, onRequireLogin: () -> Unit) {
     var openedRoom by remember { mutableStateOf<String?>(null) }
     var openedVideoRoom by remember { mutableStateOf<String?>(null) }
+    var openedVideoRoomAsHost by remember { mutableStateOf(false) }
     var openedAudioRoom by remember { mutableStateOf<String?>(null) }
     var showCreateAudioRoom by remember { mutableStateOf(false) }
     var audioRoomTitle by remember { mutableStateOf("غرفة الرافدين الصوتية") }
@@ -268,7 +269,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
         return
     }
     if (openedVideoRoom != null) {
-        VideoLiveRoomScreen(repository, roomName = openedVideoRoom!!, onBack = { openedVideoRoom = null }, onRequireLogin = onRequireLogin)
+        VideoLiveRoomScreen(repository, roomName = openedVideoRoom!!, isHost = openedVideoRoomAsHost, onBack = { openedVideoRoom = null; openedVideoRoomAsHost = false }, onRequireLogin = onRequireLogin)
         return
     }
     if (openedRoom != null) {
@@ -469,6 +470,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
                     try {
                         val roomKey = withContext(Dispatchers.IO) { repository.createLiveRoom(title, "video") }
                         showCreateVideoRoom = false
+                        openedVideoRoomAsHost = true
                         openedVideoRoom = roomKey
                     } catch (e: Exception) {
                         createRoomError = e.message ?: "تعذر إنشاء البث"
@@ -1168,6 +1170,7 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
 private fun VideoLiveRoomScreen(
     repository: SupabaseRepository,
     roomName: String,
+    isHost: Boolean,
     onBack: () -> Unit,
     onRequireLogin: () -> Unit
 ) {
@@ -1219,12 +1222,15 @@ private fun VideoLiveRoomScreen(
     LaunchedEffect(roomName) {
         try {
             connectionState = "جارٍ جلب تصريح الدخول..."
-            val auth = withContext(Dispatchers.IO) { repository.requestLiveKitToken(roomName, "viewer") }
+            val auth = withContext(Dispatchers.IO) { repository.requestLiveKitToken(roomName, if (isHost) "host" else "viewer") }
             credentials = auth
             connectionState = "جارٍ الاتصال بخادم البث..."
             liveRoom.connect(auth.serverUrl, auth.participantToken)
             connected = true
             connectionState = "متصل بالغرفة"
+            if (isHost) {
+                permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA, android.Manifest.permission.RECORD_AUDIO))
+            }
         } catch (e: Exception) {
             connectionState = "فشل الاتصال"
             connectionError = e.message ?: "تعذر الاتصال بالغرفة"
