@@ -459,33 +459,25 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
         return
     }
     if (showCreateVideoRoom) {
-        AlertDialog(
-            onDismissRequest = { if (!creatingRoom) showCreateVideoRoom = false },
-            title = { Text("إنشاء بث فيديو مباشر") },
-            text = {
-                Column {
-                    OutlinedTextField(value = newRoomTitle, onValueChange = { newRoomTitle = it },
-                        singleLine = true, label = { Text("اسم البث") })
-                    if (createRoomError != null) Text(createRoomError!!, color = MaterialTheme.colorScheme.error)
+        VideoBroadcastSetupScreen(
+            onClose = { if (!creatingRoom) showCreateVideoRoom = false },
+            creating = creatingRoom,
+            onStart = { title ->
+                creatingRoom = true
+                createRoomError = null
+                liveScope.launch {
+                    try {
+                        val roomKey = withContext(Dispatchers.IO) { repository.createLiveRoom(title, "video") }
+                        showCreateVideoRoom = false
+                        openedVideoRoom = roomKey
+                    } catch (e: Exception) {
+                        createRoomError = e.message ?: "تعذر إنشاء البث"
+                    } finally { creatingRoom = false }
                 }
             },
-            confirmButton = {
-                TextButton(enabled = !creatingRoom && newRoomTitle.isNotBlank(), onClick = {
-                    creatingRoom = true
-                    createRoomError = null
-                    liveScope.launch {
-                        try {
-                            val roomKey = withContext(Dispatchers.IO) { repository.createLiveRoom(newRoomTitle, "video") }
-                            showCreateVideoRoom = false
-                            openedVideoRoom = roomKey
-                        } catch (e: Exception) {
-                            createRoomError = e.message ?: "تعذر إنشاء البث"
-                        } finally { creatingRoom = false }
-                    }
-                }) { Text(if (creatingRoom) "جارٍ الإنشاء..." else "ابدأ البث") }
-            },
-            dismissButton = { TextButton(enabled = !creatingRoom, onClick = { showCreateVideoRoom = false }) { Text("إلغاء") } }
+            errorMessage = createRoomError
         )
+        return
     }
     Column(Modifier.fillMaxSize().background(Color(0xFF09070D)).statusBarsPadding().padding(bottom = 78.dp)) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
