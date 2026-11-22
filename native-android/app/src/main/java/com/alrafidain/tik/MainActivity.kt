@@ -1082,7 +1082,7 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                                 } catch (e: Exception) { error = e.message ?: "تعذر إرسال الوردة" }
                                 finally { giftBusy = false }
                             }
-                        }) { Text("🌹 وردة") }
+                        }) { Text("🌹 وردة · 10 عملات") }
                         if (!quickGift) TextButton(enabled = !giftBusy && selectedGiftReceiverId != null, onClick = {
                             giftBusy = true
                             scope.launch {
@@ -1093,7 +1093,7 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                                 } catch (e: Exception) { error = e.message ?: "تعذر إرسال الهدية" }
                                 finally { giftBusy = false }
                             }
-                        }) { Text("🎁 صندوق") }
+                        }) { Text("🎁 صندوق · 25 عملة") }
                         if (!quickGift) TextButton(enabled = !giftBusy && selectedGiftReceiverId != null, onClick = {
                             giftBusy = true
                             scope.launch {
@@ -1104,9 +1104,9 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                                 } catch (e: Exception) { error = e.message ?: "تعذر إرسال الهدية" }
                                 finally { giftBusy = false }
                             }
-                        }) { Text("👏 تصفيق") }
+                        }) { Text("👏 تصفيق · 5 عملات") }
                     }
-                    Text("الهدايا تُسجّل داخل البث؛ لا يوجد حالياً شحن عملات أو خصم رصيد.")
+                    Text("رصيد العملات يُخصم عند إرسال الهدية، وتُضاف نقاط دعم لمستواك.")
                 }
             },
             confirmButton = { TextButton(onClick = { giftsOpen = false }) { Text("إغلاق") } }
@@ -1399,6 +1399,8 @@ private fun PublicCommentProfileScreen(repository: SupabaseRepository, userId: S
                     modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                 Text("@${profile?.username.orEmpty()}", color = Muted, fontSize = 14.sp,
                     modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                Text("⭐ المستوى LV ${profile?.accountLevel ?: 1}", color = Color(0xFF8A3FC2), fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                 Text("ID: $userId", color = Color(0xFF9A9AA3), fontSize = 12.sp,
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp), textAlign = TextAlign.Center)
                 Spacer(Modifier.height(20.dp))
