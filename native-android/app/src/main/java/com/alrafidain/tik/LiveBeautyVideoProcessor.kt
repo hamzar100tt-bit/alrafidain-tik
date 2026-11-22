@@ -1,6 +1,6 @@
 package com.alrafidain.tik
 
-import org.webrtc.JavaI420Buffer
+import livekit.org.webrtc.JavaI420Buffer
 import org.webrtc.VideoFrame
 import org.webrtc.VideoProcessor
 import org.webrtc.VideoSink
