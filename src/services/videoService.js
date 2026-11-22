@@ -233,30 +233,39 @@ export async function uploadProfileAvatar({ file, userId }) {
 }
 
 
-export async function getFollowers(userId) {
+async function getFollowProfiles(userId, direction) {
   requireSupabase();
-  const { data: relations, error } = await supabase.from("follows")
-    .select("follower_id").eq("followed_id", userId).order("created_at", { ascending: false });
-  if (error) throw error;
-  const ids = [...new Set((relations || []).map(row => row.follower_id).filter(Boolean))];
-  if (!ids.length) return [];
-  const { data, error: profileError } = await supabase.from("profiles")
-    .select("id, username, display_name, avatar_url").in("id", ids);
-  if (profileError) throw profileError;
-  const byId = new Map((data || []).map(row => [row.id, row]));
-  return ids.map(id => byId.get(id)).filter(Boolean);
+  const relationColumn = direction === "followers" ? "follower_id" : "followed_id";
+  const filterColumn = direction === "followers" ? "followed_id" : "follower_id";
+  const pageSize = 500;
+  const profileBatchSize = 200;
+  const ids = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase.from("follows")
+      .select(relationColumn).eq(filterColumn, userId)
+      .order("created_at", { ascending: false }).range(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = (data || []).map(row => row[relationColumn]).filter(Boolean);
+    ids.push(...page);
+    if (page.length < pageSize) break;
+  }
+  const uniqueIds = [...new Set(ids)];
+  if (!uniqueIds.length) return [];
+  const profilesById = new Map();
+  for (let index = 0; index < uniqueIds.length; index += profileBatchSize) {
+    const batch = uniqueIds.slice(index, index + profileBatchSize);
+    const { data, error } = await supabase.from("profiles")
+      .select("id, username, display_name, avatar_url").in("id", batch);
+    if (error) throw error;
+    for (const profile of data || []) profilesById.set(profile.id, profile);
+  }
+  return uniqueIds.map(id => profilesById.get(id)).filter(Boolean);
+}
+
+export async function getFollowers(userId) {
+  return getFollowProfiles(userId, "followers");
 }
 
 export async function getFollowing(userId) {
-  requireSupabase();
-  const { data: relations, error } = await supabase.from("follows")
-    .select("followed_id").eq("follower_id", userId).order("created_at", { ascending: false });
-  if (error) throw error;
-  const ids = [...new Set((relations || []).map(row => row.followed_id).filter(Boolean))];
-  if (!ids.length) return [];
-  const { data, error: profileError } = await supabase.from("profiles")
-    .select("id, username, display_name, avatar_url").in("id", ids);
-  if (profileError) throw profileError;
-  const byId = new Map((data || []).map(row => [row.id, row]));
-  return ids.map(id => byId.get(id)).filter(Boolean);
+  return getFollowProfiles(userId, "following");
 }
