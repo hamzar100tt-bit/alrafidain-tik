@@ -38,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.animation.core.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -2351,37 +2352,65 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                 CircularProgressIndicator(color = Brand)
             }
         } else {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 3.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                    Text(displayName, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, color = Ink, maxLines = 1)
-                    Text("@${username.ifBlank { "user" }}", fontSize = 14.sp, color = Muted)
-                    Spacer(Modifier.height(8.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        ProfileStat(stats?.following ?: 0, "أتابعه")
-                        ProfileStat(stats?.followers ?: 0, "متابعين")
-                        ProfileStat(stats?.likes ?: 0, "تسجيلات الإعجاب")
-                    }
+            val profileFrame = profile?.optString("profile_frame", "none")
+            val dragonBackground = profile?.optString("profile_background", "default") == "fire_dragon"
+            val fireMotion = rememberInfiniteTransition(label = "dragon_fire")
+            val fireAlpha by fireMotion.animateFloat(
+                initialValue = 0.55f, targetValue = 1f,
+                animationSpec = infiniteRepeatable(tween(650), RepeatMode.Reverse),
+                label = "fire_alpha"
+            )
+            val dragonOffset by fireMotion.animateFloat(
+                initialValue = -3f, targetValue = 5f,
+                animationSpec = infiniteRepeatable(tween(1500), RepeatMode.Reverse),
+                label = "dragon_float"
+            )
+            Box(Modifier.fillMaxWidth().height(154.dp)) {
+                if (dragonBackground) {
+                    Box(Modifier.fillMaxSize().background(
+                        Brush.linearGradient(listOf(Color(0xFF100B20), Color(0xFF4A1018), Color(0xFF160B24)))
+                    ))
+                    Text("🐉", fontSize = 76.sp, modifier = Modifier.align(Alignment.CenterStart)
+                        .offset(x = 12.dp, y = dragonOffset.dp))
+                    Text("🔥", fontSize = 36.sp, modifier = Modifier.align(Alignment.CenterStart)
+                        .offset(x = 82.dp, y = 15.dp).graphicsLayer { alpha = fireAlpha })
+                    Text("🔥", fontSize = 25.sp, modifier = Modifier.align(Alignment.BottomStart)
+                        .offset(x = 55.dp, y = (-5).dp).graphicsLayer { alpha = 1.1f - fireAlpha / 3f })
+                    Text("DRAGON • LV 90", color = Color(0xFFFFC46B), fontSize = 10.sp,
+                        fontWeight = FontWeight.ExtraBold, modifier = Modifier.align(Alignment.TopEnd).padding(10.dp))
                 }
-                if (!avatar.isNullOrBlank() && !avatarLoadFailed) {
-                    AsyncImage(
-                        model = avatar,
-                        contentDescription = "الصورة الشخصية - اضغط للتغيير",
-                        contentScale = ContentScale.Crop,
-                        onError = { avatarLoadFailed = true },
-                        modifier = Modifier.size(112.dp).clip(CircleShape)
-                            .background(Color(0xFFF1F1F3)).clickable { onEdit() }
-                    )
-                } else {
-                    Box(
-                        Modifier.size(112.dp).clip(CircleShape).background(Color(0xFFF1F1F3))
-                            .clickable { onEdit() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.AddAPhoto, "أضف صورة شخصية", tint = Brand, modifier = Modifier.size(34.dp))
+                Row(
+                    Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(horizontal = 18.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                        Text(displayName, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold,
+                            color = if (dragonBackground) Color.White else Ink, maxLines = 1)
+                        Text("@${username.ifBlank { "user" }}", fontSize = 14.sp,
+                            color = if (dragonBackground) Color(0xFFE8D9E6) else Muted)
+                        Spacer(Modifier.height(8.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            ProfileStat(stats?.following ?: 0, "أتابعه")
+                            ProfileStat(stats?.followers ?: 0, "متابعين")
+                            ProfileStat(stats?.likes ?: 0, "تسجيلات الإعجاب")
+                        }
+                    }
+                    Box(Modifier.size(120.dp).clickable { onEdit() }, contentAlignment = Alignment.Center) {
+                        Box(Modifier.size(112.dp).clip(CircleShape)
+                            .background(Brush.sweepGradient(listOf(Color(0xFFFFD56A), Color(0xFFB56A19), Color(0xFFFFF0A8), Color(0xFF8E3D13))))
+                            .padding(5.dp).clip(CircleShape).background(Color(0xFF21151B)), contentAlignment = Alignment.Center) {
+                            if (!avatar.isNullOrBlank() && !avatarLoadFailed) {
+                                AsyncImage(model = avatar, contentDescription = "الصورة الشخصية - اضغط للتغيير",
+                                    contentScale = ContentScale.Crop, onError = { avatarLoadFailed = true },
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape))
+                            } else Icon(Icons.Default.AddAPhoto, "أضف صورة شخصية", tint = Color.White, modifier = Modifier.size(34.dp))
+                        }
+                        if (profileFrame == "lion") {
+                            Text("🦁", fontSize = 31.sp, modifier = Modifier.align(Alignment.TopEnd)
+                                .offset(x = 1.dp, y = (-1).dp))
+                            Box(Modifier.size(116.dp).border(2.dp, Color(0xFFFFD36B), CircleShape))
+                        }
                     }
                 }
             }
