@@ -12,10 +12,14 @@ import kotlin.math.min
  * It smooths luminance slightly while preserving chroma and frame timing.
  * This is a skin-softening base effect, not AI face reshaping.
  */
-class LiveBeautyVideoProcessor(
-    @Volatile var smoothing: Float = 0.28f,
-    @Volatile var brightness: Float = 0.02f
-) : VideoProcessor {
+object LiveBeautySettings {
+    @Volatile var smoothing: Float = 0.30f
+    @Volatile var brightness: Float = 0.015f
+    @Volatile var warmth: Float = 0f
+    @Volatile var tone: Int = 0
+}
+
+class LiveBeautyVideoProcessor : VideoProcessor {
     @Volatile private var output: VideoSink? = null
 
     override fun setSink(sink: VideoSink?) {
@@ -28,7 +32,7 @@ class LiveBeautyVideoProcessor(
     override fun onFrameCaptured(frame: VideoFrame) {
         val sink = output ?: return
         val source = frame.buffer.toI420()
-        if (source == null || smoothing <= 0.001f) {
+        if (source == null || LiveBeautySettings.smoothing <= 0.001f) {
             sink.onFrame(frame)
             source?.release()
             return
@@ -40,8 +44,8 @@ class LiveBeautyVideoProcessor(
             val result = JavaI420Buffer.allocate(w, h)
             val yIn = source.dataY
             val yOut = result.dataY
-            val amount = smoothing.coerceIn(0f, 0.55f)
-            val lift = (brightness.coerceIn(-0.08f, 0.12f) * 255f).toInt()
+            val amount = LiveBeautySettings.smoothing.coerceIn(0f, 0.55f)
+            val lift = (LiveBeautySettings.brightness.coerceIn(-0.08f, 0.12f) * 255f).toInt()
             val src = ByteArray(w * h)
             for (row in 0 until h) {
                 for (col in 0 until w) {
@@ -66,8 +70,17 @@ class LiveBeautyVideoProcessor(
                     yOut.put(row * result.strideY + col, value.toByte())
                 }
             }
-            copyPlane(source.dataU, source.strideU, result.dataU, result.strideU, (w + 1) / 2, (h + 1) / 2)
-            copyPlane(source.dataV, source.strideV, result.dataV, result.strideV, (w + 1) / 2, (h + 1) / 2)
+            val chromaW = (w + 1) / 2
+            val chromaH = (h + 1) / 2
+            val warmth = LiveBeautySettings.warmth.coerceIn(-0.35f, 0.35f)
+            val toneU = when (LiveBeautySettings.tone) { 1 -> -5; 2 -> 5; 3 -> -3; else -> 0 }
+            val toneV = when (LiveBeautySettings.tone) { 1 -> 7; 2 -> -5; 3 -> 9; else -> 0 }
+            for (row in 0 until chromaH) for (col in 0 until chromaW) {
+                val u = source.dataU.get(row * source.strideU + col).toInt() and 0xff
+                val v = source.dataV.get(row * source.strideV + col).toInt() and 0xff
+                result.dataU.put(row * result.strideU + col, (u + toneU - warmth * 9f).toInt().coerceIn(0, 255).toByte())
+                result.dataV.put(row * result.strideV + col, (v + toneV + warmth * 8f).toInt().coerceIn(0, 255).toByte())
+            }
             val processed = VideoFrame(result, frame.rotation, frame.timestampNs)
             sink.onFrame(processed)
             processed.release()
