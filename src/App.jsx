@@ -201,6 +201,24 @@ function App() {
     finally { setFollowListLoading(false); }
   };
 
+  const handleSignOut = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await signOut();
+      setSettingsOpen(false);
+      setFollowListOpen(false);
+      setUser(null);
+      setActive("الرئيسية");
+      setProfile(null);
+      setProfileStats({ videos: 0, followers: 0, following: 0 });
+    } catch (e) {
+      setError(e.message || "تعذر تسجيل الخروج. حاول مرة ثانية.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleAvatarChange = async (e) => {
     const selected = e.target.files?.[0];
     if (!selected || !user) return;
@@ -274,7 +292,7 @@ function App() {
       <a className="brand" href="#"><span className="brand-mark">ر</span><span>الرافدين <b>تيك</b></span></a>
       <label className="search"><Search size={18}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="ابحث عن فيديوهات أو حسابات"/></label>
       <button className="upload-btn" onClick={() => { if (user) { setError(""); setUploadOpen(true); } else openAuth(); }}><PlusSquare size={18}/> رفع فيديو</button><button className="login-btn" onClick={() => user ? setLiveOpen(true) : openAuth()}><Radio size={16}/> بث مباشر</button><button className="login-btn" onClick={openMessages}><MessageCircle size={16}/> رسائل</button>
-      {user ? <button className="login-btn" onClick={async () => { await signOut(); setUser(null); }}> <LogOut size={16}/> خروج</button> : <button className="login-btn" onClick={openAuth}>تسجيل الدخول</button>}
+      {user ? <button className="login-btn" onClick={handleSignOut} disabled={busy}> <LogOut size={16}/> خروج</button> : <button className="login-btn" onClick={openAuth}>تسجيل الدخول</button>}
     </header>
     <div className="layout">
       <aside className={`sidebar ${mobileMenu ? "open" : ""}`}>
@@ -347,7 +365,7 @@ function App() {
       </div>
     </section></div>}
 
-    {settingsOpen && <div className="modal-backdrop" onClick={() => setSettingsOpen(false)}><section className="modal settings-modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setSettingsOpen(false)}><X/></button><h2>الإعدادات</h2><button className="settings-option" onClick={() => { setSettingsOpen(false); setProfileEditOpen(true); }}>تعديل الملف الشخصي</button><button className="settings-option" onClick={() => { setSettingsOpen(false); openFollowList("followers"); }}>المتابعون</button><button className="settings-option" onClick={() => { setSettingsOpen(false); openFollowList("following"); }}>الحسابات التي أتابعها</button><button className="settings-option danger" onClick={async () => { setSettingsOpen(false); await signOut(); setUser(null); setActive("الرئيسية"); }}>تسجيل الخروج</button></section></div>}
+    {settingsOpen && <div className="modal-backdrop" onClick={() => setSettingsOpen(false)}><section className="modal settings-modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setSettingsOpen(false)}><X/></button><h2>الإعدادات</h2><button className="settings-option" onClick={() => { setSettingsOpen(false); setProfileEditOpen(true); }}>تعديل الملف الشخصي</button><button className="settings-option" onClick={() => { setSettingsOpen(false); openFollowList("followers"); }}>المتابعون</button><button className="settings-option" onClick={() => { setSettingsOpen(false); openFollowList("following"); }}>الحسابات التي أتابعها</button><button className="settings-option danger" onClick={handleSignOut} disabled={busy}>تسجيل الخروج</button></section></div>}
 
     {followListOpen && <div className="modal-backdrop" onClick={() => setFollowListOpen(false)}><section className="modal follow-list-modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setFollowListOpen(false)}><X/></button><h2>{followListType === "followers" ? "المتابعون" : "الحسابات التي أتابعها"}</h2>{followListLoading ? <p>جاري تحميل الحسابات…</p> : followList.length ? <div className="follow-list-items">{followList.map(person => <div className="follow-list-item" key={person.id}><span className="follow-list-avatar">{person.avatar_url ? <img src={person.avatar_url} alt=""/> : "🇮🇶"}</span><span><b>{person.display_name || person.username}</b><small>@{person.username}</small></span></div>)}</div> : <p>ماكو حسابات بهالقائمة حالياً.</p>}</section></div>}
 
