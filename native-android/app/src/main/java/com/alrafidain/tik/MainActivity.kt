@@ -779,8 +779,9 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
             LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(158.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                 items(8) { i ->
-                    val profile = seatProfiles.getOrNull(i)
                     val id = seatIds.getOrNull(i)
+                    // Match profile data by user ID, not database row order.
+                    val profile = id?.let { seatUserId -> seatProfiles.firstOrNull { it.id == seatUserId } }
                     val isSpeaking = id != null && activeSpeakers.contains(id)
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(Modifier.size(58.dp).clip(CircleShape)
