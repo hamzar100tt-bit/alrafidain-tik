@@ -1270,92 +1270,185 @@ private fun VideoLiveRoomScreen(
     var message by remember(roomName) { mutableStateOf("") }
     var chatItems by remember(roomName) { mutableStateOf(listOf("أحمد انضم إلى الغرفة", "نور: هلا بالجميع ❤️")) }
     var showMenu by remember(roomName) { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().background(Color(0xFF26141A)).statusBarsPadding()) {
-        Box(Modifier.fillMaxWidth().height(104.dp).background(Color(0xFF3B202B))) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.Default.Close, "إغلاق", tint = Color.White) }
-                IconButton(onClick = { }) { Icon(Icons.Default.Fullscreen, "تكبير", tint = Color.White) }
-                IconButton(onClick = { }) { Icon(Icons.Default.Refresh, "تحديث", tint = Color.White) }
-                Spacer(Modifier.weight(1f))
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(roomName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                    Text(if (connected) "● متصل بالبث" else connectionState, color = if (connected) Color(0xFF62E6B2) else Color.LightGray, fontSize = 12.sp)
-                }
-                IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, "المزيد", tint = Color.White) }
-                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                    DropdownMenuItem(text = { Text("الإبلاغ عن الغرفة") }, onClick = { showMenu = false })
-                    DropdownMenuItem(text = { Text("مشاركة") }, onClick = { showMenu = false })
-                }
+    var showParticipants by remember(roomName) { mutableStateOf(false) }
+    var followed by remember(roomName) { mutableStateOf(false) }
+    var compactChat by remember(roomName) { mutableStateOf(true) }
+    Box(
+        Modifier.fillMaxSize()
+            .background(Color(0xFF120B1D))
+            .statusBarsPadding()
+    ) {
+        // Full-screen vertical camera stage, like the supplied reference.
+        LiveKitRemoteVideo(
+            if (isHost) localVideoTrack else remoteVideoTrack,
+            Modifier.fillMaxSize()
+        )
+        Box(
+            Modifier.fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.48f),
+                        0.22f to Color.Transparent,
+                        0.62f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = 0.68f)
+                    )
+                )
+        )
+
+        // Top bar: close, viewers, room identity, follow, share and expand.
+        Row(
+            Modifier.align(Alignment.TopCenter).fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.Close, "إنهاء البث", tint = Color.White)
             }
-            Row(Modifier.align(Alignment.BottomStart).padding(start = 14.dp, bottom = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("100", color = Color.White, modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Color.Black.copy(alpha = .3f)).padding(horizontal = 12.dp, vertical = 5.dp))
-                Spacer(Modifier.width(8.dp))
-                repeat(3) {
-                    Box(Modifier.padding(end = 5.dp).size(32.dp).background(Color(0xFF66516B), CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Person, null, tint = Color.White)
-                    }
-                }
+            TextButton(onClick = { showParticipants = !showParticipants }) {
+                Icon(Icons.Default.Visibility, null, tint = Color.White, modifier = Modifier.size(17.dp))
+                Text(" ${if (showParticipants) "إخفاء" else "المشاهدون"}", color = Color.White, fontSize = 12.sp)
+            }
+            Spacer(Modifier.weight(1f))
+            Column(horizontalAlignment = Alignment.End) {
+                Text(roomName.take(22), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(if (connected) "● مباشر الآن" else connectionState,
+                    color = if (connected) Color(0xFF64E6B5) else Color.White.copy(alpha = .85f), fontSize = 11.sp)
+            }
+            Spacer(Modifier.width(8.dp))
+            Button(
+                onClick = { followed = !followed },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = if (followed) Color.DarkGray else Color(0xFFFF315C)),
+                shape = RoundedCornerShape(22.dp)
+            ) {
+                Text(if (followed) "✓ متابَع" else "+ متابعة", color = Color.White, fontSize = 12.sp)
+            }
+            IconButton(onClick = {
+                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("رابط الغرفة", roomName))
+                connectionError = "تم نسخ رمز الغرفة"
+            }) { Icon(Icons.Default.Share, "مشاركة الغرفة", tint = Color.White) }
+            IconButton(onClick = { compactChat = !compactChat }) {
+                Icon(Icons.Default.Expand, "تبديل عرض الشاشة", tint = Color.White)
             }
         }
-        Column(Modifier.weight(1f).fillMaxWidth()) {
-            Row(Modifier.fillMaxWidth().height(390.dp).background(Color(0xFF25171F))) {
-                Column(Modifier.weight(1f).fillMaxHeight()) {
-                    (1..2).forEach { seat ->
-                        Box(Modifier.weight(1f).fillMaxWidth().padding(1.dp)
-                            .background(Color(0xFF402B35)), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Chair, null, tint = Color(0xFFC18A52), modifier = Modifier.size(48.dp))
-                            Text(seat.toString(), color = Color.LightGray, modifier = Modifier.align(Alignment.TopEnd).padding(6.dp))
-                            Icon(Icons.Default.Mic, null, tint = Color(0xFF25D0C4), modifier = Modifier.align(Alignment.TopStart).padding(7.dp).size(18.dp))
-                        }
-                    }
+
+        if (showParticipants) {
+            Column(
+                Modifier.align(Alignment.TopEnd).padding(top = 70.dp, end = 12.dp)
+                    .widthIn(min = 150.dp, max = 220.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.Black.copy(alpha = .72f)).padding(12.dp)
+            ) {
+                Text("المتواجدون في البث", color = Color.White, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Person, null, tint = Color.White)
+                    Text(if (isHost) "أنت • المضيف" else "المضيف", color = Color.White, fontSize = 13.sp)
                 }
-                Box(Modifier.weight(2f).fillMaxHeight().padding(1.dp).background(Color(0xFF60414A)), contentAlignment = Alignment.Center) {
-                    LiveKitRemoteVideo(if (isHost) localVideoTrack else remoteVideoTrack, Modifier.fillMaxSize())
-                    if ((if (isHost) localVideoTrack else remoteVideoTrack) == null) {
-                        Text(if (isHost && cameraEnabled) "جارٍ تجهيز صورة الكاميرا..." else "بانتظار فيديو المضيف...",
-                            color = Color.White, modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp))
-                    }
-                    Text("5", color = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).background(Color.Black.copy(alpha = .4f), CircleShape).padding(horizontal = 8.dp, vertical = 3.dp))
-                    Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomStart).padding(8.dp))
-                }
+                Text("عدد المشاهدين يظهر حسب بيانات الغرفة المتاحة", color = Color.LightGray, fontSize = 10.sp)
             }
-            Row(Modifier.fillMaxWidth().height(92.dp).background(Color(0xFF25171F))) {
-                listOf("Host", "4", "3").forEachIndexed { index, label ->
-                    Box(Modifier.weight(1f).fillMaxHeight().padding(1.dp).background(Color(0xFF382630)), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(38.dp))
-                        Text(label, color = if (index == 0) Color.Cyan else Color.White,
-                            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 5.dp)
-                                .background(Color.Black.copy(alpha = .35f), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
-                            fontSize = 12.sp)
-                        Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(5.dp).size(17.dp))
-                    }
-                }
-            }
+        }
+
+        // Host / viewer state and connection feedback.
+        if (connectionError != null) {
+            Text(
+                connectionError!!,
+                color = Color.White,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 66.dp)
+                    .clip(RoundedCornerShape(18.dp)).background(Color(0xCC8B1E3F))
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                fontSize = 12.sp
+            )
+        }
+        if (!isHost && remoteVideoTrack == null) {
+            Text(
+                "بانتظار تشغيل كاميرا المضيف...",
+                color = Color.White,
+                modifier = Modifier.align(Alignment.Center)
+                    .clip(RoundedCornerShape(18.dp)).background(Color.Black.copy(alpha = .55f))
+                    .padding(14.dp)
+            )
+        }
+
+        // Live chat overlays the lower part of the video.
+        Column(
+            Modifier.align(Alignment.BottomStart)
+                .fillMaxWidth(if (compactChat) 0.82f else 1f)
+                .padding(start = 12.dp, end = 12.dp, bottom = 78.dp)
+        ) {
             if (showChat) {
-                Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
-                    Spacer(Modifier.weight(1f))
-                    chatItems.takeLast(4).forEach { line ->
-                        Row(Modifier.padding(top = 6.dp).clip(RoundedCornerShape(18.dp))
-                            .background(Color.Black.copy(alpha = .28f)).padding(horizontal = 9.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.AccountCircle, null, tint = Color.LightGray, modifier = Modifier.size(24.dp))
-                            Text(line, color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(start = 7.dp))
-                        }
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(value = message, onValueChange = { message = it }, modifier = Modifier.weight(1f),
-                            singleLine = true, placeholder = { Text("اكتب تعليقاً...") })
-                        IconButton(onClick = { if (message.isNotBlank()) { chatItems = chatItems + ("أنت: " + message); message = "" } }) {
-                            Icon(Icons.Default.Send, "إرسال", tint = Color.White)
-                        }
+                chatItems.takeLast(5).forEach { line ->
+                    Row(
+                        Modifier.padding(top = 5.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Color.Black.copy(alpha = .38f))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.AccountCircle, null, tint = Color.White.copy(alpha = .9f), modifier = Modifier.size(20.dp))
+                        Text(line, color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(start = 6.dp))
                     }
                 }
             }
+            Row(
+                Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = message,
+                    onValueChange = { message = it },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    placeholder = { Text("اكتب تعليقاً...") },
+                    shape = RoundedCornerShape(24.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color.White.copy(alpha = .55f),
+                        unfocusedBorderColor = Color.White.copy(alpha = .35f),
+                        focusedContainerColor = Color.Black.copy(alpha = .35f),
+                        unfocusedContainerColor = Color.Black.copy(alpha = .35f),
+                        focusedPlaceholderColor = Color.White.copy(alpha = .7f),
+                        unfocusedPlaceholderColor = Color.White.copy(alpha = .7f)
+                    )
+                )
+                IconButton(onClick = {
+                    if (message.isNotBlank()) {
+                        chatItems = chatItems + ("أنت: " + message.trim())
+                        message = ""
+                    }
+                }) { Icon(Icons.Default.Send, "إرسال التعليق", tint = Color.White) }
+            }
         }
-        if (connectionError != null) Text(connectionError!!, color = Color(0xFFFFA8B8), fontSize = 12.sp, modifier = Modifier.fillMaxWidth().background(Color(0xFF100C13)).padding(horizontal = 12.dp, vertical = 5.dp))
-        Row(Modifier.fillMaxWidth().background(Color(0xFF100C13)).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onRequireLogin) { Icon(Icons.Default.CardGiftcard, "هدايا", tint = Color(0xFFFF3D70)) }
+
+        // Functional controls: gifts, chat visibility, microphone and camera.
+        Row(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xEE100B16))))
+                .padding(horizontal = 8.dp, vertical = 8.dp)
+                .navigationBarsPadding(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onRequireLogin) {
+                Icon(Icons.Default.CardGiftcard, "الهدايا", tint = Color(0xFFFF3D70), modifier = Modifier.size(27.dp))
+            }
+            IconButton(onClick = { showChat = !showChat }) {
+                Icon(Icons.Default.Chat, "إظهار أو إخفاء التعليقات", tint = Color.White, modifier = Modifier.size(25.dp))
+            }
+            IconButton(onClick = {
+                if (!connected) connectionError = "انتظر اتصال الغرفة أولاً"
+                else if (credentials?.role == "viewer") connectionError = "أنت مشاهد حالياً؛ المضيف يمنحك صلاحية المايك"
+                else if (micEnabled) {
+                    scope.launch {
+                        try { micEnabled = !liveRoom.localParticipant.setMicrophoneEnabled(false) }
+                        catch (e: Exception) { connectionError = e.message ?: "تعذر إيقاف المايك" }
+                    }
+                } else permissionLauncher.launch(arrayOf(android.Manifest.permission.RECORD_AUDIO))
+            }) {
+                Icon(if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff, "تشغيل أو كتم المايك",
+                    tint = if (micEnabled) Color(0xFF36E0D0) else Color.White, modifier = Modifier.size(27.dp))
+            }
             IconButton(onClick = {
                 if (!connected) connectionError = "انتظر اتصال الغرفة أولاً"
                 else if (credentials?.role == "viewer") connectionError = "أنت مشاهد حالياً؛ المضيف يمنحك صلاحية الكاميرا"
@@ -1372,22 +1465,14 @@ private fun VideoLiveRoomScreen(
                         } catch (e: Exception) { connectionError = e.message ?: "تعذر إيقاف الكاميرا" }
                     }
                 } else permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA))
-            }) { Icon(if (cameraEnabled) Icons.Default.Videocam else Icons.Default.VideocamOff, "الكاميرا", tint = Color.White) }
-            IconButton(onClick = {
-                if (!connected) connectionError = "انتظر اتصال الغرفة أولاً"
-                else if (credentials?.role == "viewer") connectionError = "أنت مشاهد حالياً؛ المضيف يمنحك صلاحية المايك"
-                else if (micEnabled) {
-                    scope.launch {
-                        try {
-                            micEnabled = !liveRoom.localParticipant.setMicrophoneEnabled(false)
-                        } catch (e: Exception) { connectionError = e.message ?: "تعذر إيقاف المايك" }
-                    }
-                } else {
-                    permissionLauncher.launch(arrayOf(android.Manifest.permission.RECORD_AUDIO))
-                }
-            }) { Icon(if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff, "المايك", tint = if (micEnabled) Color.Cyan else Color.White) }
-            TextButton(onClick = onRequireLogin) { Text("الانضمام ✋", color = Color.White) }
-            IconButton(onClick = { showChat = !showChat }) { Icon(Icons.Default.Chat, "التعليقات", tint = Color.White) }
+            }) {
+                Icon(if (cameraEnabled) Icons.Default.Videocam else Icons.Default.VideocamOff,
+                    "تشغيل أو إيقاف الكاميرا", tint = if (cameraEnabled) Color(0xFFFF315C) else Color.White,
+                    modifier = Modifier.size(27.dp))
+            }
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.ExitToApp, "مغادرة البث", tint = Color.White, modifier = Modifier.size(25.dp))
+            }
         }
     }
 }
