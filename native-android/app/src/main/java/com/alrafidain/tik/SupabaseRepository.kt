@@ -535,7 +535,7 @@ class SupabaseRepository(private val context: Context) {
     }
     fun searchProfiles(term: String): List<DiscoverProfile> {
         val q = java.net.URLEncoder.encode("%$term%", "UTF-8")
-        val rows = publicRows("profiles?select=id,username,display_name,avatar_url&or=(username.ilike.$q,display_name.ilike.$q)&limit=30")
+        val rows = publicRows("profiles?select=id,username,display_name,avatar_url,account_level&or=(username.ilike.$q,display_name.ilike.$q)&limit=30")
         return (0 until rows.length()).map { i ->
             val row = rows.getJSONObject(i)
             DiscoverProfile(row.optString("id"), row.optString("username"),
