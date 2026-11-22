@@ -263,7 +263,28 @@ class SupabaseRepository(private val context: Context) {
             .addHeader("Authorization", "Bearer $token")
     }
 
-    fun currentUserId(): String? = prefs.getString("user_id", null)
+    
+    fun isAdmin(): Boolean {
+        val request = authedRequest("$base/rest/v1/rpc/is_admin")
+            .post("{}".toRequestBody("application/json".toMediaType())).build()
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IOException("تعذر التحقق من صلاحية الإدارة")
+            return body.trim().equals("true", ignoreCase = true)
+        }
+    }
+
+    fun loadAdminDashboardSummary(): JSONObject {
+        val request = authedRequest("$base/rest/v1/rpc/admin_dashboard_summary")
+            .post("{}".toRequestBody("application/json".toMediaType())).build()
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IOException("تعذر تحميل لوحة الإدارة")
+            return JSONObject(body)
+        }
+    }
+
+fun currentUserId(): String? = prefs.getString("user_id", null)
 
     fun loadProfile(): JSONObject {
         val userId = currentUserId() ?: throw IOException("تعذر تحديد الحساب")
