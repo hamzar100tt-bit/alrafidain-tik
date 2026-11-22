@@ -2066,6 +2066,88 @@ private fun ProfileScreen(repository: SupabaseRepository, onSignOut: () -> Unit)
     }
 }
 
+
+@Composable
+private fun AdminDashboardScreen(repository: SupabaseRepository, onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var summary by remember { mutableStateOf<org.json.JSONObject?>(null) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    fun refresh() {
+        scope.launch {
+            loading = true
+            error = null
+            try { summary = withContext(Dispatchers.IO) { repository.loadAdminDashboardSummary() } }
+            catch (e: Exception) { error = e.message ?: "تعذر تحميل الإحصائيات" }
+            finally { loading = false }
+        }
+    }
+    LaunchedEffect(Unit) { refresh() }
+    Column(Modifier.fillMaxSize().background(Color(0xFFF7F7FA)).statusBarsPadding()) {
+        Row(Modifier.fillMaxWidth().background(Color.White).padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = onBack) { Text("رجوع") }
+            Text("لوحة إدارة الرافدين تيك", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+            TextButton(onClick = { refresh() }, enabled = !loading) { Text("تحديث") }
+        }
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("مرحباً بك، المدير الرئيسي", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Ink)
+            Text("إحصائيات التطبيق", color = Muted)
+            if (loading && summary == null) {
+                Box(Modifier.fillMaxWidth().padding(30.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Brand)
+                }
+            } else if (error != null) {
+                Text(error!!, color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = { refresh() }) { Text("إعادة المحاولة") }
+            } else {
+                val statsItems = listOf(
+                    "المستخدمون" to (summary?.optInt("users", 0) ?: 0),
+                    "الفيديوهات" to (summary?.optInt("videos", 0) ?: 0),
+                    "البثوث النشطة" to (summary?.optInt("live_rooms", 0) ?: 0),
+                    "التعليقات" to (summary?.optInt("comments", 0) ?: 0),
+                    "طلبات شحن معلّقة" to (summary?.optInt("pending_topups", 0) ?: 0)
+                )
+                statsItems.chunked(2).forEach { pair ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        pair.forEach { item ->
+                            Card(Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                                Column(Modifier.padding(16.dp)) {
+                                    Text(item.first, color = Muted, fontSize = 13.sp)
+                                    Text(item.second.toString(), color = Brand, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
+                                }
+                            }
+                        }
+                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+            Text("أقسام الإدارة", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+            val sections = listOf(
+                "إدارة الحسابات" to "رفع مستوى، توثيق، حظر وفك حظر",
+                "إدارة الفيديوهات والمنشورات" to "مراجعة المحتوى وإخفاؤه أو إزالته",
+                "إدارة البث المباشر" to "متابعة الغرف وإيقاف البث والإشراف",
+                "الترويج والإعلانات" to "إدارة الحملات ومدة الترويج",
+                "المحفظة و Coins" to "الشحن والهدايا وسجل العملات",
+                "البلاغات والتعليقات" to "مراجعة البلاغات والمحتوى",
+                "المديرون والصلاحيات" to "إضافة مدير مساعد وتحديد صلاحياته",
+                "إعدادات التطبيق" to "الإعدادات العامة والإشعارات والميزات",
+                "سجل الإدارة" to "الإجراءات الإدارية ومن نفذها"
+            )
+            sections.forEach { section ->
+                Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp)) {
+                        Text(section.first, fontWeight = FontWeight.Bold, color = Ink)
+                        Text(section.second, color = Muted, fontSize = 12.sp)
+                    }
+                }
+            }
+            Text("هذه واجهة البداية؛ تفعيل أدوات كل قسم يتم على مراحل مع حماية صلاحيات الخادم.", color = Muted, fontSize = 12.sp)
+        }
+    }
+}
+
 @Composable
 private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit, onSignOut: () -> Unit) {
     val scope = rememberCoroutineScope()
@@ -2078,6 +2160,18 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
     var extraLoading by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var topupInfoOpen by remember { mutableStateOf(false) }
+    var adminPanelOpen by remember { mutableStateOf(false) }
+    var hasAdminAccess by remember { mutableStateOf(false) }
+    var adminCheckFinished by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        hasAdminAccess = withContext(Dispatchers.IO) { runCatching { repository.isAdmin() }.getOrDefault(false) }
+        adminCheckFinished = true
+    }
+    if (adminPanelOpen && hasAdminAccess) {
+        AdminDashboardScreen(repository, onBack = { adminPanelOpen = false })
+        return
+    }
 
     fun load() {
         scope.launch {
@@ -2133,6 +2227,10 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                         Icon(Icons.Default.Menu, contentDescription = "القائمة", tint = Ink, modifier = Modifier.size(27.dp))
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        if (hasAdminAccess && adminCheckFinished) {
+                            DropdownMenuItem(text = { Text("لوحة الإدارة") }, leadingIcon = { Icon(Icons.Default.Settings, null) },
+                                onClick = { menuOpen = false; adminPanelOpen = true })
+                        }
                         DropdownMenuItem(text = { Text("تسجيل الخروج") }, leadingIcon = { Icon(Icons.Default.Logout, null) },
                             onClick = { menuOpen = false; onSignOut() })
                     }
