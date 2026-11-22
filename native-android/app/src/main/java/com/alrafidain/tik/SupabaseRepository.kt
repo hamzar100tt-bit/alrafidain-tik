@@ -267,7 +267,7 @@ class SupabaseRepository(private val context: Context) {
 
     fun loadProfile(): JSONObject {
         val userId = currentUserId() ?: throw IOException("تعذر تحديد الحساب")
-        val request = authedRequest("$base/rest/v1/profiles?id=eq.$userId&select=username,display_name,bio,avatar_url")
+        val request = authedRequest("$base/rest/v1/profiles?id=eq.$userId&select=username,display_name,bio,avatar_url,coin_balance,recharge_points,support_points,level_points,account_level")
             .get().build()
         client.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
@@ -481,7 +481,7 @@ class SupabaseRepository(private val context: Context) {
     }
 
 
-    data class DiscoverProfile(val id: String, val username: String, val displayName: String, val avatarUrl: String?)
+    data class DiscoverProfile(val id: String, val username: String, val displayName: String, val avatarUrl: String?, val accountLevel: Int = 1)
     data class InboxConversation(val userId: String, val username: String, val displayName: String, val avatarUrl: String?, val lastMessage: String)
     data class DirectMessage(val id: String, val senderId: String, val body: String, val createdAt: String)
 
@@ -499,17 +499,17 @@ class SupabaseRepository(private val context: Context) {
     fun loadPublicProfiles(userIds: List<String>): List<DiscoverProfile> {
         val ids = userIds.distinct().filter { it.matches(Regex("[A-Fa-f0-9-]{16,}")) }
         if (ids.isEmpty()) return emptyList()
-        val rows = publicRows("profiles?id=in.(${ids.joinToString(",")})&select=id,username,display_name,avatar_url")
+        val rows = publicRows("profiles?id=in.(${ids.joinToString(",")})&select=id,username,display_name,avatar_url,account_level")
         return (0 until rows.length()).map { i ->
             val row = rows.getJSONObject(i)
             DiscoverProfile(row.optString("id"), row.optString("username"),
                 row.optString("display_name").ifBlank { row.optString("username").ifBlank { "مستخدم" } },
-                row.optString("avatar_url").takeIf { it.isNotBlank() })
+                row.optString("avatar_url").takeIf { it.isNotBlank() }, row.optInt("account_level", 1))
         }
     }
 
     fun loadPublicProfile(userId: String): DiscoverProfile {
-        val rows = publicRows("profiles?id=eq.$userId&select=id,username,display_name,avatar_url&limit=1")
+        val rows = publicRows("profiles?id=eq.$userId&select=id,username,display_name,avatar_url,account_level&limit=1")
         if (rows.length() == 0) throw IOException("الحساب غير موجود")
         val row = rows.getJSONObject(0)
         return DiscoverProfile(row.optString("id"), row.optString("username"),
