@@ -284,6 +284,55 @@ class SupabaseRepository(private val context: Context) {
         }
     }
 
+    fun adminSearchUsers(query: String): List<JSONObject> {
+        val payload = JSONObject().put("p_query", query.trim())
+        val request = authedRequest("$base/rest/v1/rpc/admin_search_users")
+            .addHeader("Content-Type", "application/json")
+            .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IOException("تعذر البحث عن الحسابات (${response.code})")
+            val rows = JSONArray(body)
+            return (0 until rows.length()).map { rows.getJSONObject(it) }
+        }
+    }
+
+    private fun adminRpc(name: String, payload: JSONObject) {
+        val request = authedRequest("$base/rest/v1/rpc/$name")
+            .addHeader("Content-Type", "application/json")
+            .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IOException(
+                runCatching { JSONObject(body).optString("message") }.getOrNull()
+                    ?.takeIf { it.isNotBlank() } ?: "فشل تنفيذ الإجراء الإداري (${response.code})"
+            )
+        }
+    }
+
+    fun adminSetAccountStatus(userId: String, status: String, reason: String?) {
+        adminRpc("admin_set_account_status", JSONObject()
+            .put("p_target_user_id", userId)
+            .put("p_status", status)
+            .put("p_reason", reason))
+    }
+
+    fun adminSetVip(userId: String, vipUntil: String?) {
+        adminRpc("admin_set_vip", JSONObject()
+            .put("p_target_user_id", userId)
+            .put("p_vip_until", vipUntil))
+    }
+
+    fun adminGrantRole(userId: String, role: String) {
+        adminRpc("admin_grant_role", JSONObject()
+            .put("p_target_user_id", userId)
+            .put("p_role", role))
+    }
+
+    fun adminRevokeRole(userId: String) {
+        adminRpc("admin_revoke_role", JSONObject().put("p_target_user_id", userId))
+    }
+
 fun currentUserId(): String? = prefs.getString("user_id", null)
 
     fun loadProfile(): JSONObject {
