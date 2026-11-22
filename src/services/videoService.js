@@ -243,7 +243,7 @@ async function getFollowProfiles(userId, direction) {
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase.from("follows")
       .select(relationColumn).eq(filterColumn, userId)
-      .order("created_at", { ascending: false }).range(from, from + pageSize - 1);
+      .order(relationColumn, { ascending: true }).range(from, from + pageSize - 1);
     if (error) throw error;
     const page = (data || []).map(row => row[relationColumn]).filter(Boolean);
     ids.push(...page);
