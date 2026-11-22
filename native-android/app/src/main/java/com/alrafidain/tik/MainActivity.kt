@@ -67,6 +67,7 @@ import io.livekit.android.events.RoomEvent
 import io.livekit.android.events.collect
 import io.livekit.android.room.participant.Participant
 import io.livekit.android.room.track.VideoTrack
+import io.livekit.android.room.track.Track
 import io.livekit.android.util.flow
 import io.livekit.android.compose.ui.VideoTrackView
 
@@ -1184,12 +1185,11 @@ private fun VideoLiveRoomScreen(
     var connected by remember(roomName) { mutableStateOf(false) }
     var credentials by remember(roomName) { mutableStateOf<LiveKitCredentials?>(null) }
     var remoteVideoTrack by remember(roomName) { mutableStateOf<VideoTrack?>(null) }
+    var localVideoTrack by remember(roomName) { mutableStateOf<VideoTrack?>(null) }
     var showChat by remember(roomName) { mutableStateOf(true) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { grants ->
-        val granted = grants[android.Manifest.permission.CAMERA] == true &&
-            grants[android.Manifest.permission.RECORD_AUDIO] == true
         val cameraGranted = grants[android.Manifest.permission.CAMERA] == true
         val microphoneGranted = grants[android.Manifest.permission.RECORD_AUDIO] == true
         if (!cameraGranted && !microphoneGranted) {
@@ -1200,6 +1200,8 @@ private fun VideoLiveRoomScreen(
             try {
                 if (cameraGranted) {
                     cameraEnabled = liveRoom.localParticipant.setCameraEnabled(true)
+                    localVideoTrack = liveRoom.localParticipant
+                        .getTrackPublication(Track.Source.CAMERA)?.track as? VideoTrack
                     if (!cameraEnabled) connectionError = "تعذر تشغيل الكاميرا؛ تحقق من صلاحيتها."
                 }
                 if (microphoneGranted) {
@@ -1289,13 +1291,10 @@ private fun VideoLiveRoomScreen(
                     }
                 }
                 Box(Modifier.weight(2f).fillMaxHeight().padding(1.dp).background(Color(0xFF60414A)), contentAlignment = Alignment.Center) {
-                    LiveKitRemoteVideo(remoteVideoTrack, Modifier.fillMaxSize())
-                    if (cameraEnabled) {
-                        Icon(Icons.Default.Videocam, null, tint = Color.White, modifier = Modifier.size(64.dp))
-                        Text("كاميرتك مفعّلة", color = Color.White, modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp))
-                    } else {
-                        Icon(Icons.Default.Person, null, tint = Color.White.copy(alpha = .8f), modifier = Modifier.size(86.dp))
-                        Text("البث الرئيسي", color = Color.White, modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp))
+                    LiveKitRemoteVideo(if (isHost) localVideoTrack else remoteVideoTrack, Modifier.fillMaxSize())
+                    if ((if (isHost) localVideoTrack else remoteVideoTrack) == null) {
+                        Text(if (isHost && cameraEnabled) "جارٍ تجهيز صورة الكاميرا..." else "بانتظار فيديو المضيف...",
+                            color = Color.White, modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp))
                     }
                     Text("5", color = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).background(Color.Black.copy(alpha = .4f), CircleShape).padding(horizontal = 8.dp, vertical = 3.dp))
                     Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomStart).padding(8.dp))
@@ -1338,7 +1337,19 @@ private fun VideoLiveRoomScreen(
         Row(Modifier.fillMaxWidth().background(Color(0xFF100C13)).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onRequireLogin) { Icon(Icons.Default.CardGiftcard, "هدايا", tint = Color(0xFFFF3D70)) }
-            IconButton(onClick = { if (!connected) connectionError = "انتظر اتصال الغرفة أولاً" else if (credentials?.role == "viewer") connectionError = "أنت مشاهد حالياً؛ المضيف يمنحك صلاحية الكاميرا" else permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA, android.Manifest.permission.RECORD_AUDIO)) }) { Icon(if (cameraEnabled) Icons.Default.Videocam else Icons.Default.VideocamOff, "الكاميرا", tint = Color.White) }
+            IconButton(onClick = {
+                if (!connected) connectionError = "انتظر اتصال الغرفة أولاً"
+                else if (credentials?.role == "viewer") connectionError = "أنت مشاهد حالياً؛ المضيف يمنحك صلاحية الكاميرا"
+                else if (cameraEnabled) {
+                    scope.launch {
+                        try {
+                            liveRoom.localParticipant.setCameraEnabled(false)
+                            cameraEnabled = false
+                            localVideoTrack = null
+                        } catch (e: Exception) { connectionError = e.message ?: "تعذر إيقاف الكاميرا" }
+                    }
+                } else permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA))
+            }) { Icon(if (cameraEnabled) Icons.Default.Videocam else Icons.Default.VideocamOff, "الكاميرا", tint = Color.White) }
             IconButton(onClick = {
                 if (!connected) connectionError = "انتظر اتصال الغرفة أولاً"
                 else if (credentials?.role == "viewer") connectionError = "أنت مشاهد حالياً؛ المضيف يمنحك صلاحية المايك"
