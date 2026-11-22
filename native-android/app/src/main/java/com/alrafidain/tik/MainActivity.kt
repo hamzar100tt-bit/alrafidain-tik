@@ -422,7 +422,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
                     }
                     Spacer(Modifier.height(12.dp))
                     Text("إعدادات الغرفة", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().padding(top = 1.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text("عدد مقاعد المايك", color = Color.White)
                         Text("8 مقاعد", color = Color(0xFF6BD5FF), fontWeight = FontWeight.Bold)
                     }
@@ -1389,7 +1389,7 @@ private fun PublicCommentProfileScreen(repository: SupabaseRepository, userId: S
                     if (!avatar.isNullOrBlank()) AsyncImage(
                         model = avatar, contentDescription = profile?.displayName,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(112.dp).clip(CircleShape).border(4.dp, Color.White, CircleShape)
+                        modifier = Modifier.size(88.dp).clip(CircleShape).border(4.dp, Color.White, CircleShape)
                     ) else Box(Modifier.size(112.dp).clip(CircleShape).background(Brand), contentAlignment = Alignment.Center) {
                         Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(58.dp))
                     }
@@ -2149,14 +2149,14 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
             }
         } else {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 3.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
                     Text(displayName, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, color = Ink, maxLines = 1)
                     Text("@${username.ifBlank { "user" }}", fontSize = 14.sp, color = Muted)
-                    Spacer(Modifier.height(22.dp))
+                    Spacer(Modifier.height(8.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         ProfileStat(stats?.following ?: 0, "أتابعه")
                         ProfileStat(stats?.followers ?: 0, "متابعين")
@@ -2178,13 +2178,13 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                             .clickable { onEdit() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.AddAPhoto, "أضف صورة شخصية", tint = Brand, modifier = Modifier.size(42.dp))
+                        Icon(Icons.Default.AddAPhoto, "أضف صورة شخصية", tint = Brand, modifier = Modifier.size(34.dp))
                     }
                 }
             }
             OutlinedButton(
                 onClick = { topupInfoOpen = true },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp)
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 2.dp).height(40.dp)
             ) {
                 Icon(Icons.Default.AccountBalanceWallet, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
@@ -2212,23 +2212,23 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
             val coinBalance = (profile?.optLong("coin_balance", 0L) ?: 0L).coerceAtLeast(0L)
             val pointsIntoLevel = (levelPoints % 1000L).toInt()
             Column(
-                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp)
-                    .background(Color(0xFFF7F1FF), RoundedCornerShape(16.dp)).padding(14.dp)
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 3.dp)
+                    .background(Color(0xFFF7F1FF), RoundedCornerShape(14.dp)).padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("🪙 $coinBalance عملة", color = Color(0xFF7A35B5), fontWeight = FontWeight.Bold)
                     Text("المستوى LV $accountLevel", color = Color(0xFF7A35B5), fontWeight = FontWeight.ExtraBold)
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(5.dp))
                 LinearProgressIndicator(
                     progress = { pointsIntoLevel / 1000f },
-                    modifier = Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(8.dp)),
+                    modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(8.dp)),
                     color = Brand,
                     trackColor = Color(0xFFE6D9F2)
                 )
                 Text(
                     "$pointsIntoLevel / 1000 نقطة للمستوى التالي",
-                    modifier = Modifier.align(Alignment.End).padding(top = 5.dp),
+                    modifier = Modifier.align(Alignment.End).padding(top = 2.dp),
                     color = Muted,
                     fontSize = 11.sp
                 )
@@ -2236,8 +2236,9 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
 
             Text(
                 bio.ifBlank { "أضف نبذة عنك حتى يعرفك الناس" },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 13.dp),
-                fontSize = 15.sp,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+                maxLines = 1,
+                fontSize = 13.sp,
                 color = if (bio.isBlank()) Muted else Ink,
                 textAlign = TextAlign.Start
             )
@@ -2250,8 +2251,8 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                 val tabs = listOf(Icons.Default.GridView, Icons.Default.Lock, Icons.Default.Repeat, Icons.Default.BookmarkBorder, Icons.Default.FavoriteBorder)
                 tabs.forEachIndexed { index, icon ->
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        IconButton(onClick = { selectedTab = index }) {
-                            Icon(icon, contentDescription = null, tint = if (selectedTab == index) Ink else Muted, modifier = Modifier.size(28.dp))
+                        IconButton(onClick = { selectedTab = index }, modifier = Modifier.size(42.dp)) {
+                            Icon(icon, contentDescription = null, tint = if (selectedTab == index) Ink else Muted, modifier = Modifier.size(25.dp))
                         }
                         Box(Modifier.width(42.dp).height(3.dp).background(if (selectedTab == index) Ink else Color.Transparent, RoundedCornerShape(2.dp)))
                     }
