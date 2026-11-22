@@ -1212,10 +1212,16 @@ private fun VideoLiveRoomScreen(
         scope.launch {
             try {
                 if (cameraGranted) {
-                    cameraEnabled = liveRoom.localParticipant.setCameraEnabled(true)
-                    localVideoTrack = liveRoom.localParticipant
-                        .getTrackPublication(Track.Source.CAMERA)?.track as? VideoTrack
-                    if (!cameraEnabled) connectionError = "تعذر تشغيل الكاميرا؛ تحقق من صلاحيتها."
+                    // Publish a processed camera track so the effect reaches viewers too.
+                    val processor = LiveBeautyVideoProcessor(smoothing = 0.30f, brightness = 0.015f)
+                    val beautyTrack = liveRoom.localParticipant.createVideoTrack(
+                        name = "alrafidain-beauty-camera",
+                        videoProcessor = processor
+                    )
+                    beautyTrack.startCapture()
+                    cameraEnabled = liveRoom.localParticipant.publishVideoTrack(beautyTrack)
+                    localVideoTrack = beautyTrack
+                    if (!cameraEnabled) connectionError = "تعذر نشر كاميرا البث؛ تحقق من صلاحيتها."
                 }
                 if (microphoneGranted) {
                     micEnabled = liveRoom.localParticipant.setMicrophoneEnabled(true)
