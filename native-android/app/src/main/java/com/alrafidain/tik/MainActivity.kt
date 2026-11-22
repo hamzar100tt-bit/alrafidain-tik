@@ -2366,53 +2366,55 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                 animationSpec = infiniteRepeatable(tween(1500), RepeatMode.Reverse),
                 label = "dragon_float"
             )
-            Box(Modifier.fillMaxWidth().height(154.dp)) {
-                if (dragonBackground) {
-                    Box(Modifier.fillMaxSize().background(
-                        Brush.linearGradient(listOf(Color(0xFF100B20), Color(0xFF4A1018), Color(0xFF160B24)))
-                    ))
-                    Text("🐉", fontSize = 76.sp, modifier = Modifier.align(Alignment.CenterStart)
-                        .offset(x = 12.dp, y = dragonOffset.dp))
-                    Text("🔥", fontSize = 36.sp, modifier = Modifier.align(Alignment.CenterStart)
-                        .offset(x = 82.dp, y = 15.dp).graphicsLayer { alpha = fireAlpha })
-                    Text("🔥", fontSize = 25.sp, modifier = Modifier.align(Alignment.BottomStart)
-                        .offset(x = 55.dp, y = (-5).dp).graphicsLayer { alpha = 1.1f - fireAlpha / 3f })
-                    Text("DRAGON • LV 90", color = Color(0xFFFFC46B), fontSize = 10.sp,
-                        fontWeight = FontWeight.ExtraBold, modifier = Modifier.align(Alignment.TopEnd).padding(10.dp))
-                }
-                Row(
-                    Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(horizontal = 18.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+            // Redesigned profile hero: avatar, identity and animated dragon are kept inside this page only.
+            Box(
+                Modifier.fillMaxWidth().height(218.dp)
+                    .background(Brush.linearGradient(listOf(Color(0xFF160B20), Color(0xFF501321), Color(0xFF1B1028))))
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Text("DRAGON • LV 90", color = Color(0xFFFFD27A), fontSize = 12.sp,
+                    fontWeight = FontWeight.ExtraBold, modifier = Modifier.align(Alignment.TopStart))
+                Column(
+                    Modifier.align(Alignment.CenterEnd).width(104.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                        Text(displayName, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold,
-                            color = if (dragonBackground) Color.White else Ink, maxLines = 1)
-                        Text("@${username.ifBlank { "user" }}", fontSize = 14.sp,
-                            color = if (dragonBackground) Color(0xFFE8D9E6) else Muted)
-                        Spacer(Modifier.height(8.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            ProfileStat(stats?.following ?: 0, "أتابعه")
-                            ProfileStat(stats?.followers ?: 0, "متابعين")
-                            ProfileStat(stats?.likes ?: 0, "تسجيلات الإعجاب")
-                        }
+                    Text("🐉", fontSize = 68.sp, modifier = Modifier.graphicsLayer {
+                        translationY = dragonOffset * 1.5f
+                    })
+                    Text("🔥", fontSize = 27.sp, modifier = Modifier.graphicsLayer { alpha = fireAlpha })
+                }
+                Column(
+                    Modifier.align(Alignment.Center).padding(horizontal = 108.dp, vertical = 12.dp).fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(displayName, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold,
+                        color = Color.White, maxLines = 1)
+                    Text("@${username.ifBlank { "user" }}", fontSize = 14.sp, color = Color(0xFFE8D9E6), maxLines = 1)
+                    Spacer(Modifier.height(14.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        ProfileStat(stats?.likes ?: 0, "الإعجابات")
+                        ProfileStat(stats?.followers ?: 0, "المتابعون")
+                        ProfileStat(stats?.following ?: 0, "أتابع")
                     }
-                    Box(Modifier.size(120.dp).clickable { onEdit() }, contentAlignment = Alignment.Center) {
-                        Box(Modifier.size(112.dp).clip(CircleShape)
-                            .background(Brush.sweepGradient(listOf(Color(0xFFFFD56A), Color(0xFFB56A19), Color(0xFFFFF0A8), Color(0xFF8E3D13))))
-                            .padding(5.dp).clip(CircleShape).background(Color(0xFF21151B)), contentAlignment = Alignment.Center) {
-                            if (!avatar.isNullOrBlank() && !avatarLoadFailed) {
-                                AsyncImage(model = avatar, contentDescription = "الصورة الشخصية - اضغط للتغيير",
-                                    contentScale = ContentScale.Crop, onError = { avatarLoadFailed = true },
-                                    modifier = Modifier.fillMaxSize().clip(CircleShape))
-                            } else Icon(Icons.Default.AddAPhoto, "أضف صورة شخصية", tint = Color.White, modifier = Modifier.size(34.dp))
-                        }
-                        if (profileFrame == "lion") {
-                            Text("🦁", fontSize = 31.sp, modifier = Modifier.align(Alignment.TopEnd)
-                                .offset(x = 1.dp, y = (-1).dp))
-                            Box(Modifier.size(116.dp).border(2.dp, Color(0xFFFFD36B), CircleShape))
-                        }
+                }
+                Box(Modifier.size(122.dp).align(Alignment.CenterStart).clickable { onEdit() }, contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(112.dp).clip(CircleShape)
+                        .background(Brush.sweepGradient(listOf(Color(0xFFFFE9A0), Color(0xFFB56A19), Color(0xFFFFF4C2), Color(0xFF8E3D13))))
+                        .padding(5.dp).clip(CircleShape).background(Color(0xFF21151B)), contentAlignment = Alignment.Center) {
+                        if (!avatar.isNullOrBlank() && !avatarLoadFailed) {
+                            AsyncImage(model = avatar, contentDescription = "الصورة الشخصية - اضغط للتغيير",
+                                contentScale = ContentScale.Crop, onError = { avatarLoadFailed = true },
+                                modifier = Modifier.fillMaxSize().clip(CircleShape))
+                        } else Icon(Icons.Default.AddAPhoto, "أضف صورة شخصية", tint = Color.White, modifier = Modifier.size(34.dp))
                     }
+                    if (profileFrame == "lion") {
+                        Text("🦁", fontSize = 30.sp, modifier = Modifier.align(Alignment.TopStart).offset(x = (-2).dp, y = (-5).dp))
+                        Box(Modifier.size(118.dp).border(3.dp, Color(0xFFFFD36B), CircleShape))
+                    }
+                }
+                IconButton(onClick = onEdit, modifier = Modifier.align(Alignment.TopEnd).size(36.dp)
+                    .background(Color.White.copy(alpha = 0.12f), CircleShape)) {
+                    Icon(Icons.Default.Edit, "تعديل الملف الشخصي", tint = Color.White, modifier = Modifier.size(18.dp))
                 }
             }
             OutlinedButton(
