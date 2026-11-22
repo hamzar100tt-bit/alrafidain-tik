@@ -2073,7 +2073,13 @@ private fun AdminDashboardScreen(repository: SupabaseRepository, onBack: () -> U
     var summary by remember { mutableStateOf<org.json.JSONObject?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
-    fun refresh() {
+    var query by remember { mutableStateOf("") }
+    var users by remember { mutableStateOf<List<org.json.JSONObject>>(emptyList()) }
+    var searching by remember { mutableStateOf(false) }
+    var actionMessage by remember { mutableStateOf<String?>(null) }
+    var actionError by remember { mutableStateOf<String?>(null) }
+
+    fun refreshSummary() {
         scope.launch {
             loading = true
             error = null
@@ -2082,25 +2088,52 @@ private fun AdminDashboardScreen(repository: SupabaseRepository, onBack: () -> U
             finally { loading = false }
         }
     }
-    LaunchedEffect(Unit) { refresh() }
+    fun searchUsers() {
+        if (query.trim().length < 2) {
+            actionError = "اكتب حرفين على الأقل للبحث"
+            return
+        }
+        scope.launch {
+            searching = true
+            actionError = null
+            actionMessage = null
+            try { users = withContext(Dispatchers.IO) { repository.adminSearchUsers(query) } }
+            catch (e: Exception) { actionError = e.message ?: "تعذر البحث" }
+            finally { searching = false }
+        }
+    }
+    fun runUserAction(userId: String, success: String, action: () -> Unit) {
+        scope.launch {
+            actionError = null
+            actionMessage = null
+            try {
+                withContext(Dispatchers.IO) { action() }
+                actionMessage = success
+                users = withContext(Dispatchers.IO) { repository.adminSearchUsers(query) }
+                refreshSummary()
+            } catch (e: Exception) { actionError = e.message ?: "تعذر تنفيذ الإجراء" }
+        }
+    }
+
+    LaunchedEffect(Unit) { refreshSummary() }
     Column(Modifier.fillMaxSize().background(Color(0xFFF7F7FA)).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().background(Color.White).padding(12.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             TextButton(onClick = onBack) { Text("رجوع") }
             Text("لوحة إدارة الرافدين تيك", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
-            TextButton(onClick = { refresh() }, enabled = !loading) { Text("تحديث") }
+            TextButton(onClick = { refreshSummary() }, enabled = !loading) { Text("تحديث") }
         }
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("مرحباً بك، المدير الرئيسي", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Ink)
             Text("إحصائيات التطبيق", color = Muted)
             if (loading && summary == null) {
-                Box(Modifier.fillMaxWidth().padding(30.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Brand)
                 }
             } else if (error != null) {
                 Text(error!!, color = MaterialTheme.colorScheme.error)
-                TextButton(onClick = { refresh() }) { Text("إعادة المحاولة") }
+                TextButton(onClick = { refreshSummary() }) { Text("إعادة المحاولة") }
             } else {
                 val statsItems = listOf(
                     "المستخدمون" to (summary?.optInt("users", 0) ?: 0),
@@ -2113,9 +2146,9 @@ private fun AdminDashboardScreen(repository: SupabaseRepository, onBack: () -> U
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         pair.forEach { item ->
                             Card(Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-                                Column(Modifier.padding(16.dp)) {
-                                    Text(item.first, color = Muted, fontSize = 13.sp)
-                                    Text(item.second.toString(), color = Brand, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
+                                Column(Modifier.padding(14.dp)) {
+                                    Text(item.first, color = Muted, fontSize = 12.sp)
+                                    Text(item.second.toString(), color = Brand, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
                                 }
                             }
                         }
@@ -2123,27 +2156,99 @@ private fun AdminDashboardScreen(repository: SupabaseRepository, onBack: () -> U
                     }
                 }
             }
-            Text("أقسام الإدارة", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
-            val sections = listOf(
-                "إدارة الحسابات" to "رفع مستوى، توثيق، حظر وفك حظر",
-                "إدارة الفيديوهات والمنشورات" to "مراجعة المحتوى وإخفاؤه أو إزالته",
-                "إدارة البث المباشر" to "متابعة الغرف وإيقاف البث والإشراف",
-                "الترويج والإعلانات" to "إدارة الحملات ومدة الترويج",
-                "المحفظة و Coins" to "الشحن والهدايا وسجل العملات",
-                "البلاغات والتعليقات" to "مراجعة البلاغات والمحتوى",
-                "المديرون والصلاحيات" to "إضافة مدير مساعد وتحديد صلاحياته",
-                "إعدادات التطبيق" to "الإعدادات العامة والإشعارات والميزات",
-                "سجل الإدارة" to "الإجراءات الإدارية ومن نفذها"
+
+            Text("إدارة الحسابات", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Ink)
+            Text("ابحث باسم المستخدم أو الاسم الظاهر، ثم اختر الإجراء المناسب.", color = Muted, fontSize = 13.sp)
+            OutlinedTextField(
+                value = query, onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("اسم المستخدم أو الاسم") },
+                singleLine = true,
+                trailingIcon = {
+                    IconButton(onClick = { searchUsers() }, enabled = !searching) {
+                        if (searching) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        else Icon(Icons.Default.Search, contentDescription = "بحث")
+                    }
+                }
             )
-            sections.forEach { section ->
+            Button(onClick = { searchUsers() }, modifier = Modifier.fillMaxWidth(), enabled = !searching) {
+                Text(if (searching) "جاري البحث..." else "بحث عن حساب")
+            }
+            actionMessage?.let { Text(it, color = Color(0xFF16834A), fontWeight = FontWeight.SemiBold) }
+            actionError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (users.isEmpty() && query.trim().length >= 2 && !searching) {
+                Text("لا توجد نتائج حالياً. اضغط بحث عن حساب.", color = Muted, fontSize = 13.sp)
+            }
+            users.forEach { user ->
+                val userId = user.optString("id")
+                val username = user.optString("username").ifBlank { "بدون اسم مستخدم" }
+                val displayName = user.optString("display_name").ifBlank { username }
+                val status = user.optString("account_status", "active")
+                val role = user.optString("admin_role")
+                val vipUntil = user.optString("vip_until")
                 Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
-                    Column(Modifier.fillMaxWidth().padding(14.dp)) {
-                        Text(section.first, fontWeight = FontWeight.Bold, color = Ink)
-                        Text(section.second, color = Muted, fontSize = 12.sp)
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Text(displayName, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Ink)
+                        Text("@$username", color = Muted, fontSize = 12.sp)
+                        Text("الحالة: $status   •   المستوى: ${user.optInt("account_level", 1)}   •   Coins: ${user.optLong("coin_balance", 0)}", color = Muted, fontSize = 12.sp)
+                        if (role.isNotBlank()) Text("الصلاحية: $role", color = Brand, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        if (vipUntil.isNotBlank() && vipUntil != "null") Text("VIP لغاية: $vipUntil", color = Color(0xFF8A5A00), fontSize = 12.sp)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    val next = if (status == "active") "suspended" else "active"
+                                    runUserAction(userId, if (next == "active") "تم تفعيل الحساب" else "تم إيقاف الحساب") {
+                                        repository.adminSetAccountStatus(userId, next, if (next == "active") null else "إيقاف من لوحة الإدارة")
+                                    }
+                                }
+                            ) { Text(if (status == "active") "إيقاف" else "تفعيل") }
+                            OutlinedButton(
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    val nextVip = if (vipUntil.isNotBlank() && vipUntil != "null") null
+                                        else java.time.Instant.now().plusSeconds(30L * 24 * 60 * 60).toString()
+                                    runUserAction(userId, if (nextVip == null) "تم إلغاء VIP" else "تم منح VIP لمدة 30 يوماً") {
+                                        repository.adminSetVip(userId, nextVip)
+                                    }
+                                }
+                            ) { Text(if (vipUntil.isNotBlank() && vipUntil != "null") "إلغاء VIP" else "منح VIP") }
+                        }
+                        if (role == "admin" || role == "moderator") {
+                            OutlinedButton(
+                                onClick = { runUserAction(userId, "تم سحب صلاحية الإدارة") { repository.adminRevokeRole(userId) } },
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text("سحب صلاحية المدير") }
+                        } else {
+                            OutlinedButton(
+                                onClick = { runUserAction(userId, "تم تعيينه مديراً مساعداً") { repository.adminGrantRole(userId, "moderator") } },
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text("تعيينه مشرفاً مساعداً") }
+                        }
                     }
                 }
             }
-            Text("هذه واجهة البداية؛ تفعيل أدوات كل قسم يتم على مراحل مع حماية صلاحيات الخادم.", color = Muted, fontSize = 12.sp)
+
+            Divider(color = Color(0xFFE7E7EC))
+            Text("باقي أقسام الإدارة", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+            listOf(
+                "إدارة الفيديوهات والمنشورات",
+                "إدارة البث المباشر",
+                "الترويج والإعلانات",
+                "المحفظة و Coins وطلبات الشحن",
+                "البلاغات والتعليقات",
+                "إعدادات التطبيق",
+                "سجل الإدارة"
+            ).forEach { title ->
+                Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                    Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(title, color = Ink, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.weight(1f))
+                        Text("قريباً", color = Muted, fontSize = 12.sp)
+                    }
+                }
+            }
+            Text("إجراءات الحسابات محمية أيضاً بصلاحيات قاعدة البيانات، وليس بمجرد إخفاء الواجهة.", color = Muted, fontSize = 12.sp)
         }
     }
 }
