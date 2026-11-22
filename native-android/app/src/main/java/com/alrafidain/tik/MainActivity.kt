@@ -822,6 +822,18 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                             if (isSpeaking) Icon(Icons.Default.Mic, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp).size(13.dp))
                         }
                         Text(profile?.displayName ?: "مقعد ${i + 1}", color = Color.White, fontSize = 11.sp, maxLines = 1)
+                        if (profile != null) {
+                            Text(
+                                "⭐ LV ${profile.accountLevel.coerceIn(1, 100)}",
+                                color = Color(0xFFFFD36A),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .padding(top = 2.dp)
+                                    .background(Color(0x55301850), RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
             }
