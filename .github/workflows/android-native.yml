@@ -3,7 +3,7 @@ name: Build Native Android APK # validate current Android source
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, feature/profile-settings-followers]
     paths:
       - "native-android/**"
       - ".github/workflows/android-native.yml"
