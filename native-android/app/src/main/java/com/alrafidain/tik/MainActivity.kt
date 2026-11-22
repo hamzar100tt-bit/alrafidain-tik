@@ -1499,6 +1499,7 @@ private fun PublicCommentProfileScreen(repository: SupabaseRepository, userId: S
     var loading by remember(userId) { mutableStateOf(true) }
     var followBusy by remember(userId) { mutableStateOf(false) }
     var error by remember(userId) { mutableStateOf<String?>(null) }
+
     LaunchedEffect(userId) {
         try {
             val result = withContext(Dispatchers.IO) {
@@ -1507,102 +1508,141 @@ private fun PublicCommentProfileScreen(repository: SupabaseRepository, userId: S
             profile = result.first
             stats = result.second
             following = result.third
-        } catch (e: Exception) { error = e.message ?: "تعذر تحميل الحساب" }
-        finally { loading = false }
-    }
-    Column(Modifier.fillMaxWidth().fillMaxHeight(0.90f)
-        .clip(RoundedCornerShape(topStart = 25.dp, topEnd = 25.dp)).background(Color.White)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("الملف الشخصي", color = Ink, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
-            IconButton(onClick = onBack) { Icon(Icons.Default.Close, "إغلاق", tint = Ink) }
+        } catch (e: Exception) {
+            error = e.message ?: "تعذر تحميل الحساب"
+        } finally {
+            loading = false
         }
-        if (loading) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = Brand)
-        } else if (error != null) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Text(error!!, color = Muted)
+    }
+
+    Column(
+        Modifier
+            .fillMaxWidth(0.88f)
+            .heightIn(max = 610.dp)
+            .clip(RoundedCornerShape(27.dp))
+            .background(Color.White)
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack, modifier = Modifier.size(38.dp)) {
+                Icon(Icons.Default.Close, "إغلاق الملف", tint = Color(0xFF22222B))
+            }
+            Spacer(Modifier.weight(1f))
+            Text("الملف الشخصي", color = Color(0xFF22222B), fontWeight = FontWeight.Bold, fontSize = 17.sp)
+            Spacer(Modifier.width(8.dp))
+        }
+
+        if (loading) {
+            Box(Modifier.fillMaxWidth().height(330.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Brand)
+            }
+        } else if (error != null) {
+            Box(Modifier.fillMaxWidth().height(250.dp).padding(20.dp), contentAlignment = Alignment.Center) {
+                Text(error!!, color = Muted, textAlign = TextAlign.Center)
+            }
         } else {
-            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-                Spacer(Modifier.height(8.dp))
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-                    Box(Modifier.padding(top = 35.dp).fillMaxWidth().height(110.dp)
-                        .background(Brush.verticalGradient(listOf(Color(0xFF281047), Color(0xFF080D24)))))
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                Box(Modifier.fillMaxWidth().height(142.dp)) {
+                    Box(
+                        Modifier.fillMaxWidth().height(104.dp)
+                            .background(Brush.verticalGradient(listOf(Color(0xFF291047), Color(0xFF0A0B25))))
+                    )
                     val avatar = profile?.avatarUrl
-                    if (!avatar.isNullOrBlank()) AsyncImage(
-                        model = avatar, contentDescription = profile?.displayName,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(88.dp).clip(CircleShape).border(4.dp, Color.White, CircleShape)
-                    ) else Box(Modifier.size(112.dp).clip(CircleShape).background(Brand), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(58.dp))
+                    Box(
+                        Modifier.align(Alignment.BottomCenter).size(94.dp)
+                            .clip(CircleShape).background(Color(0xFFE8E8EC))
+                            .border(3.dp, Color.White, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!avatar.isNullOrBlank()) {
+                            AsyncImage(
+                                model = avatar,
+                                contentDescription = "صورة ${profile?.displayName}",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Icon(Icons.Default.Person, null, tint = Brand, modifier = Modifier.size(55.dp))
+                        }
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-                Text(profile?.displayName.orEmpty(), color = Ink, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold,
-                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-                Text("@${profile?.username.orEmpty()}", color = Muted, fontSize = 14.sp,
-                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-                Text("⭐ المستوى LV ${profile?.accountLevel ?: 1}", color = Color(0xFF8A3FC2), fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-                Text("ID: $userId", color = Color(0xFF9A9AA3), fontSize = 12.sp,
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp), textAlign = TextAlign.Center)
-                Spacer(Modifier.height(20.dp))
-                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("${stats?.posts?.size ?: 0}", color = Ink, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
-                        Text("منشور", color = Muted, fontSize = 12.sp)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("${stats?.followers ?: 0}", color = Ink, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
-                        Text("متابعون", color = Muted, fontSize = 12.sp)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("${stats?.following ?: 0}", color = Ink, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
-                        Text("يتابع", color = Muted, fontSize = 12.sp)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("${stats?.likes ?: 0}", color = Ink, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
-                        Text("إعجابات", color = Muted, fontSize = 12.sp)
-                    }
-                }
+
+                Spacer(Modifier.height(9.dp))
+                Text(
+                    profile?.displayName.orEmpty(), color = Color(0xFF17171D),
+                    fontSize = 21.sp, fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center
+                )
+                Text(
+                    "@${profile?.username.orEmpty()}", color = Color(0xFF85858E), fontSize = 13.sp,
+                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center
+                )
+                Text(
+                    "⭐ المستوى LV ${profile?.accountLevel ?: 1}", color = Color(0xFF8A3FC2),
+                    fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth().padding(top = 5.dp), textAlign = TextAlign.Center
+                )
+                Text(
+                    "ID: $userId", color = Color(0xFF9A9AA3), fontSize = 11.sp,
+                    modifier = Modifier.fillMaxWidth().padding(top = 7.dp), textAlign = TextAlign.Center
+                )
+
                 Spacer(Modifier.height(18.dp))
-                Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 9.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    ProfileStat(stats?.likes ?: 0, "إعجابات")
+                    ProfileStat(stats?.following ?: 0, "يتابع")
+                    ProfileStat(stats?.followers ?: 0, "متابعون")
+                    ProfileStat(stats?.posts?.size ?: 0, "منشور")
+                }
+
+                Spacer(Modifier.height(19.dp))
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 13.dp),
+                    horizontalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onBack,
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        shape = RoundedCornerShape(25.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFB8B8BE))
+                    ) {
+                        Text("إغلاق الملف", color = Color(0xFFD45C83), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
                     Button(
                         onClick = {
                             if (!followBusy) {
                                 followBusy = true
                                 scope.launch {
-                                    try { following = withContext(Dispatchers.IO) { repository.toggleFollow(userId) } }
-                                    catch (e: Exception) { error = e.message ?: "تعذر تحديث المتابعة" }
-                                    finally { followBusy = false }
+                                    try {
+                                        following = withContext(Dispatchers.IO) { repository.toggleFollow(userId) }
+                                    } catch (e: Exception) {
+                                        error = e.message ?: "تعذر تحديث المتابعة"
+                                    } finally {
+                                        followBusy = false
+                                    }
                                 }
                             }
                         },
                         enabled = !followBusy && repository.currentUserId() != userId,
-                        modifier = Modifier.weight(1f).height(48.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = if (following) Color(0xFFECEEF4) else Color(0xFF16C8C3),
-                            contentColor = if (following) Ink else Color.White),
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (following) Color(0xFFE7E7EA) else Color(0xFF16C8C3),
+                            contentColor = if (following) Color(0xFF22222B) else Color.White
+                        ),
                         shape = RoundedCornerShape(25.dp)
                     ) {
-                        Text(if (followBusy) "..." else if (following) "متابَع ✓" else "＋ متابعة", fontWeight = FontWeight.Bold)
+                        Text(
+                            if (followBusy) "..." else if (following) "متابَع ✓" else "＋ متابعة",
+                            fontWeight = FontWeight.Bold, fontSize = 12.sp
+                        )
                     }
-                    OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f).height(48.dp),
-                        shape = RoundedCornerShape(25.dp)) { Text("إغلاق الملف") }
                 }
-                Spacer(Modifier.height(18.dp))
-                HorizontalDivider(color = Color(0xFFEAEAEA))
-                Text("المنشورات", color = Ink, fontWeight = FontWeight.Bold, fontSize = 17.sp,
-                    modifier = Modifier.fillMaxWidth().padding(15.dp))
-                stats?.posts.orEmpty().forEach { video ->
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(if (video.mediaType == "image") Icons.Default.Image else Icons.Default.PlayCircle,
-                            null, tint = Brand, modifier = Modifier.size(32.dp))
-                        Text(video.caption.ifBlank { "منشور بدون وصف" }, color = Ink,
-                            modifier = Modifier.padding(start = 10.dp).weight(1f), maxLines = 2)
-                    }
-                    HorizontalDivider(color = Color(0xFFEFEFEF))
-                }
-                if (stats?.posts.isNullOrEmpty()) Text("ماكو منشورات بعد", color = Muted,
-                    modifier = Modifier.fillMaxWidth().padding(24.dp), textAlign = TextAlign.Center)
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(15.dp))
             }
         }
     }
