@@ -1226,7 +1226,7 @@ private fun VideoLiveRoomScreen(
             try {
                 if (cameraGranted) {
                     // Publish a processed camera track so the effect reaches viewers too.
-                    val processor = LiveBeautyVideoProcessor(smoothing = 0.30f, brightness = 0.015f)
+                    val processor = LiveBeautyVideoProcessor()
                     val beautyTrack = liveRoom.localParticipant.createVideoTrack(
                         name = "alrafidain-beauty-camera",
                         videoProcessor = processor
