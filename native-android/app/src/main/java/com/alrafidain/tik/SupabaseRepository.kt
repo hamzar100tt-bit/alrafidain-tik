@@ -337,7 +337,7 @@ fun currentUserId(): String? = prefs.getString("user_id", null)
 
     fun loadProfile(): JSONObject {
         val userId = currentUserId() ?: throw IOException("تعذر تحديد الحساب")
-        val request = authedRequest("$base/rest/v1/profiles?id=eq.$userId&select=username,display_name,bio,avatar_url,coin_balance,recharge_points,support_points,level_points,account_level")
+        val request = authedRequest("$base/rest/v1/profiles?id=eq.$userId&select=username,display_name,bio,avatar_url,coin_balance,recharge_points,support_points,level_points,account_level,profile_frame,profile_background")
             .get().build()
         client.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
