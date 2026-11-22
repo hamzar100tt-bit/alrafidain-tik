@@ -198,11 +198,13 @@ private fun AlrafidainApp() {
         }
 
         if (selected != 2) {
+            // Light pages need a solid navigation surface; white icons were invisible on the profile.
+            val lightNavigation = selected == 1 || selected == 3 || selected == 4 || selected == 5
             NavigationBar(
                 modifier = Modifier.align(Alignment.BottomCenter)
                     .navigationBarsPadding()
                     .fillMaxWidth(),
-                containerColor = if (selected == 5) Color.White else Color.Transparent,
+                containerColor = if (lightNavigation) Color.White else Color.Transparent,
                 tonalElevation = 0.dp,
                 windowInsets = WindowInsets(0)
             ) {
@@ -215,9 +217,9 @@ private fun AlrafidainApp() {
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Brand,
                             selectedTextColor = Brand,
-                            indicatorColor = if (selected == 5) Color(0xFFFFE7ED) else Color.White.copy(alpha = 0.16f),
-                            unselectedIconColor = if (selected == 5) Muted else Color.White.copy(alpha = 0.82f),
-                            unselectedTextColor = if (selected == 5) Muted else Color.White.copy(alpha = 0.82f)
+                            indicatorColor = if (lightNavigation) Color(0xFFFFE7ED) else Color.White.copy(alpha = 0.16f),
+                            unselectedIconColor = if (lightNavigation) Muted else Color.White.copy(alpha = 0.92f),
+                            unselectedTextColor = if (lightNavigation) Muted else Color.White.copy(alpha = 0.92f)
                         )
                     )
                 }
