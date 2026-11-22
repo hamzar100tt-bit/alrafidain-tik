@@ -2,31 +2,29 @@ package com.alrafidain.tik
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.view.View
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
+import androidx.camera.core.CameraSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -46,18 +44,17 @@ fun VideoBroadcastSetupScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     var title by remember { mutableStateOf("بث الرافدين تيك") }
     var lens by remember { mutableIntStateOf(CameraSelector.LENS_FACING_FRONT) }
-    var selectedFilter by remember { mutableStateOf("طبيعي") }
-    var beautyLevel by remember { mutableFloatStateOf(35f) }
-    var activeTab by remember { mutableStateOf("تحسين") }
     var cameraGranted by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
     var previewView by remember { mutableStateOf<PreviewView?>(null) }
     var cameraError by remember { mutableStateOf<String?>(null) }
+    var selectedTool by remember { mutableStateOf("المؤثرات") }
+    var showToolMessage by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         cameraGranted = granted
-        if (!granted) cameraError = "لازم تسمح باستخدام الكاميرا حتى تشوف المعاينة"
+        if (!granted) cameraError = "اسمح للرافدين تيك باستخدام الكاميرا"
     }
 
     LaunchedEffect(cameraGranted, lens, previewView, lifecycleOwner) {
@@ -84,23 +81,8 @@ fun VideoBroadcastSetupScreen(
     }
 
     DisposableEffect(Unit) {
-        onDispose {
-            try { ProcessCameraProvider.getInstance(context).get().unbindAll() } catch (_: Exception) { }
-        }
+        onDispose { try { ProcessCameraProvider.getInstance(context).get().unbindAll() } catch (_: Exception) { } }
     }
-
-    val filterBase = when (selectedFilter) {
-        "ناعم" -> Color(0x22F5C5B8)
-        "دافئ" -> Color(0x33FF9A42)
-        "ذهبي" -> Color(0x33DCA52E)
-        "بارد" -> Color(0x3380BCEB)
-        "وردي" -> Color(0x33FF83B3)
-        "سينما" -> Color(0x33415C50)
-        "ليلي" -> Color(0x443D478B)
-        "أبيض وأسود" -> Color(0x55777777)
-        else -> Color.Transparent
-    }
-    val filterTint = filterBase.copy(alpha = (filterBase.alpha * (beautyLevel / 100f)).coerceIn(0f, 1f))
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (cameraGranted) {
@@ -114,117 +96,145 @@ fun VideoBroadcastSetupScreen(
                 },
                 modifier = Modifier.fillMaxSize()
             )
-            Box(Modifier.fillMaxSize().background(filterTint))
         } else {
-            Column(Modifier.align(Alignment.Center).padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.CameraAlt, null, tint = Color.White, modifier = Modifier.size(56.dp))
-                Spacer(Modifier.height(12.dp))
-                Text("اسمح للرافدين تيك باستخدام الكاميرا", color = Color.White, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(12.dp))
-                Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
-                    colors = ButtonDefaults.buttonColors(containerColor = SetupPink)) { Text("السماح بالكاميرا") }
+            Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.CameraAlt, null, tint = Color.White, modifier = Modifier.size(54.dp))
+                Text("اسمح باستخدام الكاميرا للمعاينة", color = Color.White)
+                Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) { Text("السماح بالكاميرا") }
             }
         }
 
-        Box(Modifier.fillMaxWidth().fillMaxHeight(.42f).background(
-            Brush.verticalGradient(listOf(Color.Black.copy(.72f), Color.Transparent))
-        ))
-        Box(Modifier.fillMaxWidth().fillMaxHeight(.38f).align(Alignment.BottomCenter).background(
-            Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(.88f)))
-        ))
+        // تدرج خفيف يحافظ على وضوح النصوص فوق صورة الكاميرا.
+        Box(Modifier.fillMaxWidth().fillMaxHeight(.34f).background(Brush.verticalGradient(listOf(Color.Black.copy(.48f), Color.Transparent))))
+        Box(Modifier.fillMaxWidth().fillMaxHeight(.62f).align(Alignment.BottomCenter)
+            .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(.76f), Color.Black.copy(.94f)))))
 
+        // الشريط العلوي كما في مرجع مركز البث.
         Row(
-            Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 18.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            IconButton(onClick = onClose, enabled = !creating) {
-                Icon(Icons.Default.Close, "إغلاق", tint = Color.White, modifier = Modifier.size(27.dp))
+            Surface(color = Color.White.copy(.38f), shape = RoundedCornerShape(28.dp),
+                modifier = Modifier.clickable { selectedTool = "مركز LIVE"; showToolMessage = true }) {
+                Row(Modifier.padding(horizontal = 14.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("مركز LIVE", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.width(7.dp))
+                    Icon(Icons.Default.PlayCircle, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                }
             }
-            Spacer(Modifier.weight(1f))
-            Text("تجهيز بث فيديو", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
-            Spacer(Modifier.weight(1f))
-            IconButton(onClick = { lens = if (lens == CameraSelector.LENS_FACING_FRONT) CameraSelector.LENS_FACING_BACK else CameraSelector.LENS_FACING_FRONT },
-                enabled = cameraGranted && !creating) {
-                Icon(Icons.Default.Cameraswitch, "تبديل الكاميرا", tint = Color.White, modifier = Modifier.size(27.dp))
+            IconButton(onClick = onClose, enabled = !creating) {
+                Icon(Icons.Default.Close, "إغلاق", tint = Color.White, modifier = Modifier.size(29.dp))
             }
         }
 
         Column(
+            Modifier.fillMaxWidth().align(Alignment.TopEnd).statusBarsPadding().padding(top = 76.dp, end = 24.dp, start = 24.dp),
+            horizontalAlignment = Alignment.End
+        ) {
+            Text("ابدأ التجهيز لبثك المباشر:", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(6.dp))
+            Text("تدرّب على انفراد قبل فتح بث مباشر أمام المشاهدين", color = Color.White.copy(.92f), fontSize = 15.sp)
+            Spacer(Modifier.height(18.dp))
+            Surface(
+                color = Color.White.copy(.10f), shape = RoundedCornerShape(28.dp),
+                modifier = Modifier.clickable { selectedTool = "التدرب الآن"; showToolMessage = true }
+            ) {
+                Text("التدرب الآن", color = Color.White, modifier = Modifier.padding(horizontal = 20.dp, vertical = 11.dp), fontSize = 13.sp)
+            }
+        }
+
+        // أدوات البث: صفّان من الأيقونات مثل الصورة المرجعية.
+        Column(
+            Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(start = 22.dp, end = 22.dp, bottom = 178.dp),
+            verticalArrangement = Arrangement.spacedBy(22.dp)
+        ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically) {
+                SetupTool(Icons.Default.OpenInNew, "Service+") { selectedTool = "Service+"; showToolMessage = true }
+                SetupTool(Icons.Default.Settings, "الإعدادات") { selectedTool = "الإعدادات"; showToolMessage = true }
+                SetupTool(Icons.Default.AutoAwesome, "المؤثرات") { selectedTool = "المؤثرات"; showToolMessage = true }
+                SetupTool(Icons.Default.Edit, "تعديل") { selectedTool = "تعديل"; showToolMessage = true }
+                SetupTool(Icons.Default.Cameraswitch, "قلب") {
+                    lens = if (lens == CameraSelector.LENS_FACING_FRONT) CameraSelector.LENS_FACING_BACK else CameraSelector.LENS_FACING_FRONT
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                SetupTool(Icons.Default.Share, "مشاركة") { selectedTool = "مشاركة"; showToolMessage = true }
+                SetupTool(Icons.Default.Forum, "التفاعل") { selectedTool = "التفاعل"; showToolMessage = true }
+                SetupTool(Icons.Default.FavoriteBorder, "مجتمع المعجبين") { selectedTool = "مجتمع المعجبين"; showToolMessage = true }
+            }
+        }
+
+        // لوحة العنوان وزر بدء البث في أسفل الشاشة.
+        Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                .navigationBarsPadding().imePadding().padding(horizontal = 16.dp, vertical = 10.dp),
+                .navigationBarsPadding().padding(horizontal = 18.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("معاينة مباشرة", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                    Text("تأكد من الإضاءة والزاوية قبل بدء البث", color = Color.White.copy(.78f), fontSize = 12.sp)
-                }
-                Surface(color = Color.Black.copy(.38f), shape = RoundedCornerShape(20.dp)) {
-                    Text("● LIVE PREVIEW", color = Color(0xFFFF6A82), fontSize = 10.sp,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp))
-                }
-            }
-
-            Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth().background(Color.Black.copy(.38f), RoundedCornerShape(18.dp)).padding(5.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly) {
-                listOf("تحسين", "الجمال", "المكياج", "الفلاتر").forEach { tab ->
-                    Box(Modifier.weight(1f).background(if (activeTab == tab) SetupPink.copy(.88f) else Color.Transparent, RoundedCornerShape(14.dp))
-                        .clickable { activeTab = tab }.padding(vertical = 9.dp), contentAlignment = Alignment.Center) {
-                        Text(tab, color = Color.White, fontSize = 12.sp, fontWeight = if (activeTab == tab) FontWeight.Bold else FontWeight.Normal)
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color.Black.copy(.38f))
+                    .clickable { selectedTool = "عنوان البث"; showToolMessage = true }.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                BasicTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 15.sp),
+                    modifier = Modifier.weight(1f),
+                    decorationBox = { inner ->
+                        if (title.isEmpty()) Text("إضافة عنوان", color = Color.White.copy(.65f), fontSize = 15.sp)
+                        inner()
                     }
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (activeTab == "الفلاتر") "اختيار الفلتر" else "مستوى التأثير", color = Color.White, fontSize = 12.sp)
-                Spacer(Modifier.weight(1f))
-                Text(if (activeTab == "الفلاتر") selectedFilter else "${beautyLevel.toInt()}%", color = Color.White, fontSize = 12.sp)
-            }
-            if (activeTab == "الفلاتر") {
-                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("طبيعي", "ناعم", "دافئ", "ذهبي", "بارد", "وردي", "سينما", "ليلي", "أبيض وأسود").forEach { name ->
-                        Surface(
-                            color = if (selectedFilter == name) SetupPink else Color.White.copy(.16f),
-                            shape = RoundedCornerShape(18.dp),
-                            modifier = Modifier.clickable { selectedFilter = name }
-                        ) { Text(name, color = Color.White, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 9.dp, vertical = 8.dp)) }
-                    }
-                }
-            } else {
-                Slider(value = beautyLevel, onValueChange = { beautyLevel = it }, valueRange = 0f..100f,
-                    colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = SetupPink, inactiveTrackColor = Color.White.copy(.35f)))
-            }
-
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("عنوان البث") },
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-                    focusedBorderColor = Color.White, unfocusedBorderColor = Color.White.copy(.65f),
-                    focusedLabelColor = Color.White, unfocusedLabelColor = Color.White.copy(.8f),
-                    cursorColor = SetupPink
                 )
-            )
-            if (cameraError != null) Text(cameraError!!, color = Color(0xFFFFB4AB), fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
-            if (errorMessage != null) Text(errorMessage, color = Color(0xFFFFB4AB), fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
-            Spacer(Modifier.height(9.dp))
+                Spacer(Modifier.width(10.dp))
+                Icon(Icons.Default.AccountCircle, null, tint = Color.White.copy(.8f), modifier = Modifier.size(28.dp))
+            }
+            Spacer(Modifier.height(12.dp))
             Button(
                 onClick = { if (title.isNotBlank() && cameraGranted) onStart(title.trim()) },
                 enabled = !creating && cameraGranted && title.isNotBlank(),
-                modifier = Modifier.fillMaxWidth().height(54.dp),
-                shape = RoundedCornerShape(28.dp),
+                modifier = Modifier.fillMaxWidth().height(58.dp),
+                shape = RoundedCornerShape(32.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = SetupPink, disabledContainerColor = SetupPink.copy(.45f))
             ) {
-                if (creating) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                else Icon(Icons.Default.Videocam, null)
-                Spacer(Modifier.width(8.dp))
-                Text(if (creating) "جارٍ إنشاء البث..." else "بدء LIVE", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                if (creating) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(21.dp), strokeWidth = 2.dp)
+                else {
+                    Text("بدء LIVE", fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(8.dp))
+                    Icon(Icons.Default.Videocam, null)
+                }
+            }
+            if (cameraError != null) Text(cameraError!!, color = Color(0xFFFFB4AB), fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
+            if (errorMessage != null) Text(errorMessage, color = Color(0xFFFFB4AB), fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
+        }
+
+        if (showToolMessage) {
+            LaunchedEffect(selectedTool) {
+                kotlinx.coroutines.delay(1800)
+                showToolMessage = false
+            }
+            Surface(
+                color = Color.Black.copy(.72f), shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = 40.dp)
+            ) {
+                Text(
+                    if (selectedTool == "المؤثرات") "المؤثرات قيد التجهيز" else "$selectedTool قيد التجهيز",
+                    color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp)
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun SetupTool(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.widthIn(min = 52.dp).clickable { onClick() }
+    ) {
+        Icon(icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(31.dp))
+        Spacer(Modifier.height(5.dp))
+        Text(label, color = Color.White, fontSize = 10.sp, maxLines = 1)
     }
 }
