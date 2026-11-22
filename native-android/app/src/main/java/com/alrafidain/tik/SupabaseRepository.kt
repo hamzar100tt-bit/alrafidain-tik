@@ -320,7 +320,7 @@ class SupabaseRepository(private val context: Context) {
     fun adminSetVip(userId: String, vipUntil: String?) {
         adminRpc("admin_set_vip", JSONObject()
             .put("p_target_user_id", userId)
-            .put("p_vip_until", vipUntil))
+            .put("p_vip_until", vipUntil ?: JSONObject.NULL))
     }
 
     fun adminGrantRole(userId: String, role: String) {
