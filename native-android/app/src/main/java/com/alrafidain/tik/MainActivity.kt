@@ -2214,14 +2214,14 @@ private fun AdminDashboardScreen(repository: SupabaseRepository, onBack: () -> U
                                 }
                             ) { Text(if (vipUntil.isNotBlank() && vipUntil != "null") "إلغاء VIP" else "منح VIP") }
                         }
-                        if (role == "admin" || role == "moderator") {
-                            OutlinedButton(
+                        when (role) {
+                            "super_admin" -> Text("مدير رئيسي — لا يمكن تغيير هذه الصلاحية من هنا", color = Muted, fontSize = 12.sp)
+                            "admin", "moderator" -> OutlinedButton(
                                 onClick = { runUserAction(userId, "تم سحب صلاحية الإدارة") { repository.adminRevokeRole(userId) } },
                                 modifier = Modifier.fillMaxWidth()
                             ) { Text("سحب صلاحية المدير") }
-                        } else {
-                            OutlinedButton(
-                                onClick = { runUserAction(userId, "تم تعيينه مديراً مساعداً") { repository.adminGrantRole(userId, "moderator") } },
+                            else -> OutlinedButton(
+                                onClick = { runUserAction(userId, "تم تعيينه مشرفاً مساعداً") { repository.adminGrantRole(userId, "moderator") } },
                                 modifier = Modifier.fillMaxWidth()
                             ) { Text("تعيينه مشرفاً مساعداً") }
                         }
