@@ -51,6 +51,12 @@ fun VideoBroadcastSetupScreen(
     var cameraError by remember { mutableStateOf<String?>(null) }
     var selectedTool by remember { mutableStateOf("المؤثرات") }
     var showToolMessage by remember { mutableStateOf(false) }
+    var showBeautyPanel by remember { mutableStateOf(false) }
+    var beautyTab by remember { mutableStateOf("تنعيم") }
+    var smoothing by remember { mutableFloatStateOf(LiveBeautySettings.smoothing) }
+    var brightness by remember { mutableFloatStateOf(LiveBeautySettings.brightness) }
+    var warmth by remember { mutableFloatStateOf(LiveBeautySettings.warmth) }
+    var tone by remember { mutableIntStateOf(LiveBeautySettings.tone) }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         cameraGranted = granted
@@ -152,7 +158,7 @@ fun VideoBroadcastSetupScreen(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically) {
                 SetupTool(Icons.Default.OpenInNew, "Service+") { selectedTool = "Service+"; showToolMessage = true }
                 SetupTool(Icons.Default.Settings, "الإعدادات") { selectedTool = "الإعدادات"; showToolMessage = true }
-                SetupTool(Icons.Default.AutoAwesome, "المؤثرات") { selectedTool = "المؤثرات"; showToolMessage = true }
+                SetupTool(Icons.Default.AutoAwesome, "المؤثرات") { showBeautyPanel = true }
                 SetupTool(Icons.Default.Edit, "تعديل") { selectedTool = "تعديل"; showToolMessage = true }
                 SetupTool(Icons.Default.Cameraswitch, "قلب") {
                     lens = if (lens == CameraSelector.LENS_FACING_FRONT) CameraSelector.LENS_FACING_BACK else CameraSelector.LENS_FACING_FRONT
@@ -207,6 +213,53 @@ fun VideoBroadcastSetupScreen(
             }
             if (cameraError != null) Text(cameraError!!, color = Color(0xFFFFB4AB), fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
             if (errorMessage != null) Text(errorMessage, color = Color(0xFFFFB4AB), fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
+        }
+
+        if (showBeautyPanel) {
+            AlertDialog(
+                onDismissRequest = { showBeautyPanel = false },
+                containerColor = Color(0xFF24142F),
+                title = { Text("جمال وفلاتر البث", color = Color.White, fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            listOf("تنعيم", "إضاءة", "دفء", "الفلاتر").forEach { tab ->
+                                FilterChip(selected = beautyTab == tab, onClick = { beautyTab = tab }, label = { Text(tab) })
+                            }
+                        }
+                        when (beautyTab) {
+                            "تنعيم" -> {
+                                Text("مستوى التنعيم: " + (smoothing * 100).toInt() + "%", color = Color.White)
+                                Slider(value = smoothing, onValueChange = { smoothing = it; LiveBeautySettings.smoothing = it }, valueRange = 0f..0.55f)
+                            }
+                            "إضاءة" -> {
+                                Text("سطوع الصورة: " + (brightness * 100).toInt() + "%", color = Color.White)
+                                Slider(value = brightness, onValueChange = { brightness = it; LiveBeautySettings.brightness = it }, valueRange = -0.08f..0.12f)
+                            }
+                            "دفء" -> {
+                                Text("دفء اللون: " + (warmth * 100).toInt() + "%", color = Color.White)
+                                Slider(value = warmth, onValueChange = { warmth = it; LiveBeautySettings.warmth = it }, valueRange = -0.35f..0.35f)
+                            }
+                            else -> {
+                                listOf("طبيعي", "دافئ", "بارد", "وردي").forEachIndexed { index, name ->
+                                    TextButton(onClick = { tone = index; LiveBeautySettings.tone = index }) {
+                                        Text(if (tone == index) "✓ " + name else name, color = Color.White)
+                                    }
+                                }
+                            }
+                        }
+                        Text("التنعيم والفلاتر اللونية تطبق على بث الفيديو. تشكيل الأنف والفك ومكياج الوجه بالذكاء الاصطناعي يحتاج معالجة وجه مستقلة.", color = Color.LightGray, fontSize = 11.sp)
+                        TextButton(onClick = {
+                            smoothing = 0.30f; brightness = 0.015f; warmth = 0f; tone = 0
+                            LiveBeautySettings.smoothing = smoothing
+                            LiveBeautySettings.brightness = brightness
+                            LiveBeautySettings.warmth = warmth
+                            LiveBeautySettings.tone = tone
+                        }) { Text("إعادة ضبط", color = Color(0xFFFF7892)) }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showBeautyPanel = false }) { Text("تم", color = Color(0xFFFF7892)) } }
+            )
         }
 
         if (showToolMessage) {
