@@ -1362,7 +1362,11 @@ private fun VideoLiveRoomScreen(
                 else if (cameraEnabled) {
                     scope.launch {
                         try {
-                            liveRoom.localParticipant.setCameraEnabled(false)
+                            localVideoTrack?.let { track ->
+                                liveRoom.localParticipant.unpublishTrack(track)
+                                track.stop()
+                                track.dispose()
+                            }
                             cameraEnabled = false
                             localVideoTrack = null
                         } catch (e: Exception) { connectionError = e.message ?: "تعذر إيقاف الكاميرا" }
