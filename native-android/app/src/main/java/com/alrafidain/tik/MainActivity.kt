@@ -2273,6 +2273,7 @@ private fun ProfileScreen(repository: SupabaseRepository, onSignOut: () -> Unit)
 @Composable
 private fun AdminDashboardScreen(repository: SupabaseRepository, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
+    var selectedAdminSection by remember { mutableStateOf<String?>(null) }
     var summary by remember { mutableStateOf<org.json.JSONObject?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
