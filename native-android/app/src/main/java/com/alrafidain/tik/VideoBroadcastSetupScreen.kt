@@ -57,6 +57,9 @@ fun VideoBroadcastSetupScreen(
     var brightness by remember { mutableFloatStateOf(LiveBeautySettings.brightness) }
     var warmth by remember { mutableFloatStateOf(LiveBeautySettings.warmth) }
     var tone by remember { mutableIntStateOf(LiveBeautySettings.tone) }
+    var lipstick by remember { mutableFloatStateOf(LiveBeautySettings.lipstick) }
+    var blush by remember { mutableFloatStateOf(LiveBeautySettings.blush) }
+    var eyeShadow by remember { mutableFloatStateOf(LiveBeautySettings.eyeShadow) }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         cameraGranted = granted
@@ -223,7 +226,7 @@ fun VideoBroadcastSetupScreen(
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            listOf("تنعيم", "إضاءة", "دفء", "الفلاتر").forEach { tab ->
+                            listOf("تنعيم", "إضاءة", "دفء", "الفلاتر", "المكياج").forEach { tab ->
                                 FilterChip(selected = beautyTab == tab, onClick = { beautyTab = tab }, label = { Text(tab) })
                             }
                         }
@@ -240,21 +243,33 @@ fun VideoBroadcastSetupScreen(
                                 Text("دفء اللون: " + (warmth * 100).toInt() + "%", color = Color.White)
                                 Slider(value = warmth, onValueChange = { warmth = it; LiveBeautySettings.warmth = it }, valueRange = -0.35f..0.35f)
                             }
-                            else -> {
+                            "الفلاتر" -> {
                                 listOf("طبيعي", "دافئ", "بارد", "وردي").forEachIndexed { index, name ->
                                     TextButton(onClick = { tone = index; LiveBeautySettings.tone = index }) {
                                         Text(if (tone == index) "✓ " + name else name, color = Color.White)
                                     }
                                 }
                             }
+                            else -> {
+                                Text("أحمر الشفاه: " + (lipstick * 100).toInt() + "%", color = Color.White)
+                                Slider(value = lipstick, onValueChange = { lipstick = it; LiveBeautySettings.lipstick = it })
+                                Text("توريد الخدود: " + (blush * 100).toInt() + "%", color = Color.White)
+                                Slider(value = blush, onValueChange = { blush = it; LiveBeautySettings.blush = it })
+                                Text("ظل العيون: " + (eyeShadow * 100).toInt() + "%", color = Color.White)
+                                Slider(value = eyeShadow, onValueChange = { eyeShadow = it; LiveBeautySettings.eyeShadow = it })
+                            }
                         }
                         Text("التنعيم والفلاتر اللونية تطبق على بث الفيديو. تشكيل الأنف والفك ومكياج الوجه بالذكاء الاصطناعي يحتاج معالجة وجه مستقلة.", color = Color.LightGray, fontSize = 11.sp)
                         TextButton(onClick = {
                             smoothing = 0.30f; brightness = 0.015f; warmth = 0f; tone = 0
+                            lipstick = 0f; blush = 0f; eyeShadow = 0f
                             LiveBeautySettings.smoothing = smoothing
                             LiveBeautySettings.brightness = brightness
                             LiveBeautySettings.warmth = warmth
                             LiveBeautySettings.tone = tone
+                            LiveBeautySettings.lipstick = lipstick
+                            LiveBeautySettings.blush = blush
+                            LiveBeautySettings.eyeShadow = eyeShadow
                         }) { Text("إعادة ضبط", color = Color(0xFFFF7892)) }
                     }
                 },
