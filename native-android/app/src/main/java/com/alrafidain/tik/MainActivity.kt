@@ -1226,15 +1226,15 @@ private fun VideoLiveRoomScreen(
         scope.launch {
             try {
                 if (cameraGranted) {
-                    // Start with the native unprocessed camera track for a stable baseline.
-                    // Face processing is intentionally bypassed until live publishing is verified on-device.
-                    val cameraTrack = liveRoom.localParticipant.createVideoTrack(
-                        name = "alrafidain-live-camera"
-                    )
-                    cameraTrack.startCapture()
-                    cameraEnabled = liveRoom.localParticipant.publishVideoTrack(cameraTrack)
-                    localVideoTrack = cameraTrack
-                    if (!cameraEnabled) connectionError = "تعذر نشر كاميرا البث؛ تحقق من صلاحيتها."
+                    // Let LiveKit manage camera capture, publication and lifecycle.
+                    // This avoids manually starting a camera capturer during permission callbacks.
+                    cameraEnabled = liveRoom.localParticipant.setCameraEnabled(true)
+                    localVideoTrack = liveRoom.localParticipant
+                        .getTrackPublication(Track.Source.CAMERA)?.track as? VideoTrack
+                    if (!cameraEnabled || localVideoTrack == null) {
+                        cameraEnabled = false
+                        connectionError = "لم تبدأ الكاميرا. تحقق من صلاحية الكاميرا ثم أعد المحاولة."
+                    }
                 }
                 if (microphoneGranted) {
                     micEnabled = liveRoom.localParticipant.setMicrophoneEnabled(true)
@@ -1476,12 +1476,7 @@ private fun VideoLiveRoomScreen(
                 else if (cameraEnabled) {
                     scope.launch {
                         try {
-                            localVideoTrack?.let { track ->
-                                liveRoom.localParticipant.unpublishTrack(track)
-                                track.stop()
-                                track.dispose()
-                            }
-                            cameraEnabled = false
+                            cameraEnabled = !liveRoom.localParticipant.setCameraEnabled(false)
                             localVideoTrack = null
                         } catch (e: Exception) { connectionError = e.message ?: "تعذر إيقاف الكاميرا" }
                     }
