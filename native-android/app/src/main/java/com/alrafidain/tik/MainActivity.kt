@@ -1770,6 +1770,7 @@ private fun VideoFeedPage(video: TikVideo, repository: SupabaseRepository, activ
     var likeCount by remember(video.id) { mutableIntStateOf(0) }
     var commentCount by remember(video.id) { mutableIntStateOf(0) }
     var actionError by remember { mutableStateOf<String?>(null) }
+    var selectedAdminSection by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(video.id, signedIn, active) {
         // Pager pre-composes nearby pages. Do not send database requests for pages
         // the user is not watching yet.
@@ -2443,13 +2444,35 @@ private fun AdminDashboardScreen(repository: SupabaseRepository, onBack: () -> U
                 "إعدادات التطبيق",
                 "سجل الإدارة"
             ).forEach { title ->
-                Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().clickable { selectedAdminSection = title },
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
                     Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(title, color = Ink, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.weight(1f))
-                        Text("قريباً", color = Muted, fontSize = 12.sp)
+                        Text("فتح القسم  ›", color = Brand, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
+            }
+            selectedAdminSection?.let { section ->
+                val details = when (section) {
+                    "إدارة الفيديوهات والمنشورات" -> "قسم مراجعة محتوى الفيديوهات والمنشورات. افتح القسم لتحديث القائمة ومراجعة المحتوى."
+                    "إدارة البث المباشر" -> "قسم متابعة غرف البث المباشر وحالتها."
+                    "الترويج والإعلانات" -> "قسم الحملات الإعلانية والترويج. لا توجد حالياً جداول حملات إعلانية موثقة في قاعدة بيانات المشروع."
+                    "المحفظة و Coins وطلبات الشحن" -> "قسم مراجعة طلبات شحن Coins. اعتماد الطلب يضيف العملات إلى رصيد المستخدم عبر إجراء قاعدة البيانات المحمي."
+                    "البلاغات والتعليقات" -> "قسم مراجعة البلاغات والتعليقات. يلزم ربط جدول البلاغات قبل تفعيل إجراءات البلاغات."
+                    "إعدادات التطبيق" -> "إعدادات عامة للتطبيق. لم يتم العثور على مخطط إعدادات مركزي في قاعدة البيانات الحالية."
+                    else -> "سجل الإجراءات الإدارية. يلزم إنشاء جدول سجل الإدارة وربط تسجيل العمليات قبل عرض السجل."
+                }
+                AlertDialog(
+                    onDismissRequest = { selectedAdminSection = null },
+                    title = { Text(section) },
+                    text = { Text(details) },
+                    confirmButton = {
+                        TextButton(onClick = { selectedAdminSection = null }) { Text("إغلاق") }
+                    }
+                )
             }
             Text("إجراءات الحسابات محمية أيضاً بصلاحيات قاعدة البيانات، وليس بمجرد إخفاء الواجهة.", color = Muted, fontSize = 12.sp)
         }
