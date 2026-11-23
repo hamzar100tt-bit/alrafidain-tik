@@ -1224,8 +1224,11 @@ private fun VideoLiveRoomScreen(
             return@rememberLauncherForActivityResult
         }
         scope.launch {
-            // Start camera and microphone independently: a camera failure must not
-            // prevent the host from joining with audio, and vice versa.
+            // Give LiveKit a short settling period after Room.connect() and the
+            // Android permission callback before opening the camera capturer.
+            // Start camera first and microphone only after camera initialization
+            // has completed, avoiding simultaneous hardware capture startup.
+            delay(700)
             if (cameraGranted) {
                 try {
                     cameraEnabled = liveRoom.localParticipant.setCameraEnabled(true)
