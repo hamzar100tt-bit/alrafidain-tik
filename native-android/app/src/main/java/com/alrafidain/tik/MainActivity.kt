@@ -2476,6 +2476,7 @@ private fun AdminDashboardScreen(repository: SupabaseRepository, onBack: () -> U
 
 @Composable
 private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit, onSignOut: () -> Unit) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var profile by remember { mutableStateOf<org.json.JSONObject?>(null) }
     var stats by remember { mutableStateOf<TikProfileStats?>(null) }
