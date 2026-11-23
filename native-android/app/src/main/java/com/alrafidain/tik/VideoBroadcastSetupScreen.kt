@@ -18,6 +18,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,6 +50,9 @@ fun VideoBroadcastSetupScreen(
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
     var previewView by remember { mutableStateOf<PreviewView?>(null) }
+    var activeCameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    var startingLive by remember { mutableStateOf(false) }
+    val setupScope = rememberCoroutineScope()
     var cameraError by remember { mutableStateOf<String?>(null) }
     var selectedTool by remember { mutableStateOf("المؤثرات") }
     var showToolMessage by remember { mutableStateOf(false) }
@@ -76,6 +81,7 @@ fun VideoBroadcastSetupScreen(
                 future.addListener({
                     try {
                         val provider = future.get()
+                        activeCameraProvider = provider
                         val preview = Preview.Builder().build().also { it.setSurfaceProvider(view.surfaceProvider) }
                         val selector = CameraSelector.Builder().requireLensFacing(lens).build()
                         provider.unbindAll()
@@ -92,7 +98,9 @@ fun VideoBroadcastSetupScreen(
     }
 
     DisposableEffect(Unit) {
-        onDispose { try { ProcessCameraProvider.getInstance(context).get().unbindAll() } catch (_: Exception) { } }
+        onDispose {
+            try { activeCameraProvider?.unbindAll() } catch (_: Exception) { }
+        }
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -203,13 +211,28 @@ fun VideoBroadcastSetupScreen(
             }
             Spacer(Modifier.height(12.dp))
             Button(
-                onClick = { if (title.isNotBlank() && cameraGranted) onStart(title.trim()) },
-                enabled = !creating && cameraGranted && title.isNotBlank(),
+                onClick = {
+                    if (!creating && !startingLive && title.isNotBlank() && cameraGranted) {
+                        startingLive = true
+                        setupScope.launch {
+                            // Release the setup preview before LiveKit opens its own camera.
+                            // This avoids two camera owners racing during the screen transition.
+                            try { activeCameraProvider?.unbindAll() } catch (e: Exception) {
+                                cameraError = e.message ?: "تعذر إغلاق معاينة الكاميرا"
+                                startingLive = false
+                                return@launch
+                            }
+                            delay(400)
+                            onStart(title.trim())
+                        }
+                    }
+                },
+                enabled = !creating && !startingLive && cameraGranted && title.isNotBlank(),
                 modifier = Modifier.fillMaxWidth().height(58.dp),
                 shape = RoundedCornerShape(32.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = SetupPink, disabledContainerColor = SetupPink.copy(.45f))
             ) {
-                if (creating) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(21.dp), strokeWidth = 2.dp)
+                if (creating || startingLive) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(21.dp), strokeWidth = 2.dp)
                 else {
                     Text("بدء LIVE", fontSize = 17.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.width(8.dp))
