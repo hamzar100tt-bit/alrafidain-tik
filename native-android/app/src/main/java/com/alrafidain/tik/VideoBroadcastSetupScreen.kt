@@ -60,6 +60,8 @@ fun VideoBroadcastSetupScreen(
     var lipstick by remember { mutableFloatStateOf(LiveBeautySettings.lipstick) }
     var blush by remember { mutableFloatStateOf(LiveBeautySettings.blush) }
     var eyeShadow by remember { mutableFloatStateOf(LiveBeautySettings.eyeShadow) }
+    var noseSlim by remember { mutableFloatStateOf(LiveBeautySettings.noseSlim) }
+    var jawSlim by remember { mutableFloatStateOf(LiveBeautySettings.jawSlim) }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         cameraGranted = granted
@@ -226,7 +228,7 @@ fun VideoBroadcastSetupScreen(
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            listOf("تنعيم", "إضاءة", "دفء", "الفلاتر", "المكياج").forEach { tab ->
+                            listOf("تنعيم", "إضاءة", "دفء", "الفلاتر", "المكياج", "ملامح الوجه").forEach { tab ->
                                 FilterChip(selected = beautyTab == tab, onClick = { beautyTab = tab }, label = { Text(tab) })
                             }
                         }
@@ -250,6 +252,13 @@ fun VideoBroadcastSetupScreen(
                                     }
                                 }
                             }
+                            "ملامح الوجه" -> {
+                                Text("تصغير الأنف: " + (noseSlim * 100).toInt() + "%", color = Color.White)
+                                Slider(value = noseSlim, onValueChange = { noseSlim = it; LiveBeautySettings.noseSlim = it }, valueRange = 0f..1f)
+                                Text("تنحيف الفك والخدود: " + (jawSlim * 100).toInt() + "%", color = Color.White)
+                                Slider(value = jawSlim, onValueChange = { jawSlim = it; LiveBeautySettings.jawSlim = it }, valueRange = 0f..1f)
+                                Text("تُطبّق التغييرات على الفيديو المرسل إلى البث عند اكتشاف الوجه", color = Color.LightGray, fontSize = 11.sp)
+                            }
                             else -> {
                                 Text("أحمر الشفاه: " + (lipstick * 100).toInt() + "%", color = Color.White)
                                 Slider(value = lipstick, onValueChange = { lipstick = it; LiveBeautySettings.lipstick = it })
@@ -259,10 +268,13 @@ fun VideoBroadcastSetupScreen(
                                 Slider(value = eyeShadow, onValueChange = { eyeShadow = it; LiveBeautySettings.eyeShadow = it })
                             }
                         }
-                        Text("التنعيم والفلاتر اللونية تطبق على بث الفيديو. تشكيل الأنف والفك ومكياج الوجه بالذكاء الاصطناعي يحتاج معالجة وجه مستقلة.", color = Color.LightGray, fontSize = 11.sp)
+                        Text("تُرسل المؤثرات المفعّلة مع فيديو البث. دقة تشكيل الملامح تعتمد على وضوح الوجه والإضاءة.", color = Color.LightGray, fontSize = 11.sp)
                         TextButton(onClick = {
                             smoothing = 0.30f; brightness = 0.015f; warmth = 0f; tone = 0
                             lipstick = 0f; blush = 0f; eyeShadow = 0f
+                            noseSlim = 0f; jawSlim = 0f
+                            LiveBeautySettings.noseSlim = noseSlim
+                            LiveBeautySettings.jawSlim = jawSlim
                             LiveBeautySettings.smoothing = smoothing
                             LiveBeautySettings.brightness = brightness
                             LiveBeautySettings.warmth = warmth
