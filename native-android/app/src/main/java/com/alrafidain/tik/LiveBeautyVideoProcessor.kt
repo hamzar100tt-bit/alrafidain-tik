@@ -29,10 +29,14 @@ object LiveBeautySettings {
     @Volatile var lipstick: Float = 0f
     @Volatile var blush: Float = 0f
     @Volatile var eyeShadow: Float = 0f
+    @Volatile var noseSlim: Float = 0f
+    @Volatile var jawSlim: Float = 0f
 }
 
 class LiveBeautyVideoProcessor : VideoProcessor {
     @Volatile private var output: VideoSink? = null
+    private data class FaceMesh(val bounds: Rect, val nose: List<android.graphics.PointF>, val faceOval: List<android.graphics.PointF>, val upperLip: List<android.graphics.PointF>, val lowerLip: List<android.graphics.PointF>, val leftEye: List<android.graphics.PointF>, val rightEye: List<android.graphics.PointF>)
+
     private val detector: FaceDetector = FaceDetection.getClient(
         FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
@@ -59,8 +63,9 @@ class LiveBeautyVideoProcessor : VideoProcessor {
             val h = source.height
             val smoothing = LiveBeautySettings.smoothing.coerceIn(0f, 0.55f)
             val lift = (LiveBeautySettings.brightness.coerceIn(-0.08f, 0.12f) * 255f).toInt()
-            val faceRects = if (smoothing > 0.001f || LiveBeautySettings.lipstick > 0f || LiveBeautySettings.blush > 0f || LiveBeautySettings.eyeShadow > 0f) detectFaces(source, frame.rotation) else emptyList()
-            if (smoothing <= 0.001f && lift == 0 && LiveBeautySettings.warmth == 0f && LiveBeautySettings.tone == 0 && LiveBeautySettings.lipstick == 0f && LiveBeautySettings.blush == 0f && LiveBeautySettings.eyeShadow == 0f) {
+            val faceMeshes = if (smoothing > 0.001f || LiveBeautySettings.lipstick > 0f || LiveBeautySettings.blush > 0f || LiveBeautySettings.eyeShadow > 0f || LiveBeautySettings.noseSlim > 0f || LiveBeautySettings.jawSlim > 0f) detectFaces(source, frame.rotation) else emptyList()
+            val faceRects = faceMeshes.map { it.bounds }
+            if (smoothing <= 0.001f && lift == 0 && LiveBeautySettings.warmth == 0f && LiveBeautySettings.tone == 0 && LiveBeautySettings.lipstick == 0f && LiveBeautySettings.blush == 0f && LiveBeautySettings.eyeShadow == 0f && LiveBeautySettings.noseSlim == 0f && LiveBeautySettings.jawSlim == 0f) {
                 sink.onFrame(frame)
                 return
             }
@@ -77,7 +82,8 @@ class LiveBeautyVideoProcessor : VideoProcessor {
             // Smooth only inside AI-detected face ovals. Background remains untouched.
             for (row in 0 until h) {
                 for (col in 0 until w) {
-                    val original = inputY[row * w + col].toInt() and 0xff
+                    val warp = displacement(col.toFloat(), row.toFloat(), faceMeshes)
+                    val original = bilinear(inputY, w, h, (col + warp.first).coerceIn(0f, (w - 1).toFloat()), (row + warp.second).coerceIn(0f, (h - 1).toFloat()))
                     var amount = 0f
                     if (smoothing > 0f) {
                         for (face in faceRects) {
@@ -114,14 +120,15 @@ class LiveBeautyVideoProcessor : VideoProcessor {
                 v = (v + toneV + warmth * 8f).toInt()
                 val px = col * 2f
                 val py = row * 2f
-                for (face in faceRects) {
+                for (mesh in faceMeshes) {
+                    val face = mesh.bounds
                     val fw = face.width().toFloat()
                     val fh = face.height().toFloat()
-                    val lip = ellipse(px, py, (face.left + face.right) * 0.5f, face.top + fh * 0.73f, fw * 0.16f, fh * 0.055f)
+                    val lip = max(contourInfluence(px, py, mesh.upperLip, fw * 0.05f), contourInfluence(px, py, mesh.lowerLip, fw * 0.05f))
                     val cheekL = ellipse(px, py, face.left + fw * 0.28f, face.top + fh * 0.64f, fw * 0.16f, fh * 0.09f)
                     val cheekR = ellipse(px, py, face.left + fw * 0.72f, face.top + fh * 0.64f, fw * 0.16f, fh * 0.09f)
-                    val eyeL = ellipse(px, py, face.left + fw * 0.32f, face.top + fh * 0.43f, fw * 0.17f, fh * 0.055f)
-                    val eyeR = ellipse(px, py, face.left + fw * 0.68f, face.top + fh * 0.43f, fw * 0.17f, fh * 0.055f)
+                    val eyeL = contourInfluence(px, py, mesh.leftEye, fw * 0.06f)
+                    val eyeR = contourInfluence(px, py, mesh.rightEye, fw * 0.06f)
                     val lm = (lip * LiveBeautySettings.lipstick.coerceIn(0f, 1f)).coerceIn(0f, 0.7f)
                     val bm = (max(cheekL, cheekR) * LiveBeautySettings.blush.coerceIn(0f, 1f)).coerceIn(0f, 0.5f)
                     val em = (max(eyeL, eyeR) * LiveBeautySettings.eyeShadow.coerceIn(0f, 1f)).coerceIn(0f, 0.4f)
@@ -145,7 +152,7 @@ class LiveBeautyVideoProcessor : VideoProcessor {
         }
     }
 
-    private fun detectFaces(buffer: livekit.org.webrtc.VideoFrame.I420Buffer, rotation: Int): List<Rect> {
+    private fun detectFaces(buffer: livekit.org.webrtc.VideoFrame.I420Buffer, rotation: Int): List<FaceMesh> {
         val width = buffer.width
         val height = buffer.height
         val nv21 = ByteArray(width * height + (width * height / 2))
@@ -164,7 +171,18 @@ class LiveBeautyVideoProcessor : VideoProcessor {
             emptyList()
         }
         return faces.mapNotNull { face ->
-            rotateRectToBuffer(face.boundingBox, width, height, rotation)
+            val bounds = rotateRectToBuffer(face.boundingBox, width, height, rotation) ?: return@mapNotNull null
+            fun contour(type: Int): List<android.graphics.PointF> =
+                face.getContour(type)?.points?.map { p -> rotatePoint(p.x, p.y, width, height, rotation) } ?: emptyList()
+            FaceMesh(
+                bounds,
+                contour(com.google.mlkit.vision.face.FaceContour.NOSE_BRIDGE) + contour(com.google.mlkit.vision.face.FaceContour.NOSE_BOTTOM),
+                contour(com.google.mlkit.vision.face.FaceContour.FACE),
+                contour(com.google.mlkit.vision.face.FaceContour.UPPER_LIP_TOP),
+                contour(com.google.mlkit.vision.face.FaceContour.LOWER_LIP_BOTTOM),
+                contour(com.google.mlkit.vision.face.FaceContour.LEFT_EYE),
+                contour(com.google.mlkit.vision.face.FaceContour.RIGHT_EYE)
+            )
         }
     }
 
@@ -187,6 +205,67 @@ class LiveBeautyVideoProcessor : VideoProcessor {
         val right = points.maxOf { it.first }.toInt().coerceIn(left + 1, width)
         val bottom = points.maxOf { it.second }.toInt().coerceIn(top + 1, height)
         return if (right > left && bottom > top) Rect(left, top, right, bottom) else null
+    }
+
+
+    private fun rotatePoint(x: Float, y: Float, width: Int, height: Int, rotation: Int): android.graphics.PointF {
+        val p = when ((rotation % 360 + 360) % 360) {
+            90 -> android.graphics.PointF(y, height - x)
+            180 -> android.graphics.PointF(width - x, height - y)
+            270 -> android.graphics.PointF(width - y, x)
+            else -> android.graphics.PointF(x, y)
+        }
+        return android.graphics.PointF(p.x.coerceIn(0f, (width - 1).toFloat()), p.y.coerceIn(0f, (height - 1).toFloat()))
+    }
+
+    private fun contourInfluence(x: Float, y: Float, points: List<android.graphics.PointF>, radius: Float): Float {
+        if (points.isEmpty()) return 0f
+        var best = Float.MAX_VALUE
+        for (p in points) {
+            val dx = x - p.x
+            val dy = y - p.y
+            best = min(best, dx * dx + dy * dy)
+        }
+        return (1f - kotlin.math.sqrt(best) / max(1f, radius)).coerceIn(0f, 1f)
+    }
+
+    private fun displacement(x: Float, y: Float, meshes: List<FaceMesh>): Pair<Float, Float> {
+        var dx = 0f
+        for (mesh in meshes) {
+            val b = mesh.bounds
+            val fw = b.width().toFloat()
+            val fh = b.height().toFloat()
+            if (LiveBeautySettings.noseSlim > 0f && mesh.nose.isNotEmpty()) {
+                val cx = mesh.nose.map { it.x }.average().toFloat()
+                val cy = mesh.nose.map { it.y }.average().toFloat()
+                val rx = max(1f, fw * 0.20f)
+                val ry = max(1f, fh * 0.24f)
+                val nx = (x - cx) / rx
+                val ny = (y - cy) / ry
+                val falloff = kotlin.math.exp(-(nx * nx + ny * ny) * 2f)
+                dx += nx * fw * 0.035f * LiveBeautySettings.noseSlim.coerceIn(0f, 1f) * falloff
+            }
+            if (LiveBeautySettings.jawSlim > 0f && mesh.faceOval.size >= 8) {
+                val center = (b.left + b.right) * 0.5f
+                val t = ((y - (b.top + fh * 0.58f)) / max(1f, fh * 0.42f)).coerceIn(0f, 1f)
+                val side = (x - center) / max(1f, fw * 0.5f)
+                dx += side * fw * 0.025f * LiveBeautySettings.jawSlim.coerceIn(0f, 1f) * kotlin.math.sin(t * Math.PI).toFloat()
+            }
+        }
+        return Pair(dx, 0f)
+    }
+
+    private fun bilinear(pixels: ByteArray, width: Int, height: Int, x: Float, y: Float): Int {
+        val x0 = x.toInt().coerceIn(0, width - 1)
+        val y0 = y.toInt().coerceIn(0, height - 1)
+        val x1 = (x0 + 1).coerceAtMost(width - 1)
+        val y1 = (y0 + 1).coerceAtMost(height - 1)
+        val fx = x - x0
+        val fy = y - y0
+        fun at(px: Int, py: Int) = pixels[py * width + px].toInt() and 0xff
+        val top = at(x0, y0) * (1f - fx) + at(x1, y0) * fx
+        val bottom = at(x0, y1) * (1f - fx) + at(x1, y1) * fx
+        return (top * (1f - fy) + bottom * fy).toInt().coerceIn(0, 255)
     }
 
     private fun ellipse(x: Float, y: Float, cx: Float, cy: Float, rx: Float, ry: Float): Float {
