@@ -2682,18 +2682,93 @@ private fun ProfileHomeScreen(repository: SupabaseRepository, onEdit: () -> Unit
                 Text("شحن العملات")
             }
             if (topupInfoOpen) {
+                val packages = listOf(
+                    2480 to 50000, 3980 to 80000, 5250 to 105000,
+                    10500 to 210000, 32150 to 630000, 43000 to 840000,
+                    49500 to 945000, 84000 to 1575000, 97200 to 1800000,
+                    108000 to 2000000
+                )
                 AlertDialog(
                     onDismissRequest = { topupInfoOpen = false },
-                    title = { Text("شحن عملات الرافدين تيك") },
+                    title = {
+                        Column(horizontalAlignment = Alignment.End, modifier = Modifier.fillMaxWidth()) {
+                            Text("وكيل شحن معتمد", fontWeight = FontWeight.ExtraBold, color = Ink)
+                            Text("شركة الرافدين تيك", color = Brand, fontSize = 13.sp)
+                        }
+                    },
                     text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("طريقة التحويل: سوبر كي")
-                            Text("رقم الاستلام: 07723756476", fontWeight = FontWeight.Bold)
-                            Text("حوّل المبلغ ثم احتفظ بصورة وصل التحويل. لا تُضاف العملات إلا بعد مراجعة الإدارة وتأكيد الاستلام.")
+                        Column(
+                            Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalAlignment = Alignment.End
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (!avatar.isNullOrBlank()) {
+                                    AsyncImage(model = avatar, contentDescription = "صورتك الشخصية",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.size(46.dp).clip(CircleShape))
+                                } else {
+                                    Box(Modifier.size(46.dp).clip(CircleShape).background(Color(0xFFEDE4F7)), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Person, null, tint = Brand)
+                                    }
+                                }
+                                Spacer(Modifier.width(9.dp))
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(displayName, fontWeight = FontWeight.Bold, color = Ink)
+                                    Text("@${username.ifBlank { "user" }}", color = Muted, fontSize = 12.sp)
+                                }
+                            }
+                            Divider()
+                            Text("اختر باقة العملات", fontWeight = FontWeight.Bold, color = Ink)
+                            packages.chunked(2).forEach { pair ->
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    pair.forEach { (coins, dinars) ->
+                                        Card(
+                                            modifier = Modifier.weight(1f).clickable {
+                                                val message = "مرحباً، أريد شحن $coins عملة في حساب الرافدين تيك: @$username"
+                                                runCatching {
+                                                    val intent = android.content.Intent(
+                                                        android.content.Intent.ACTION_VIEW,
+                                                        android.net.Uri.parse("https://wa.me/9647723756476?text=" + java.net.URLEncoder.encode(message, "UTF-8"))
+                                                    )
+                                                    context.startActivity(intent)
+                                                }
+                                            },
+                                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFCF3)),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE9E3D7))
+                                        ) {
+                                            Column(Modifier.fillMaxWidth().padding(9.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Text("%,d 💎".format(coins), fontWeight = FontWeight.ExtraBold, color = Ink, fontSize = 15.sp)
+                                                Text("%,d د.ع".format(dinars), color = Brand, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                    if (pair.size == 1) Spacer(Modifier.weight(1f))
+                                }
+                            }
+                            Divider()
+                            Text("طريقة الشحن", fontWeight = FontWeight.Bold, color = Ink)
+                            Text("1. اختر الباقة المناسبة لحسابك.", color = Muted, fontSize = 12.sp)
+                            Text("2. تواصل مع وكيل الشحن على الرقم 07723756476 عبر واتساب.", color = Muted, fontSize = 12.sp)
+                            Text("3. أرسل المبلغ إلى سوبر كي، ثم أرسل صورة عملية التحويل إلى الوكيل على واتساب.", color = Muted, fontSize = 12.sp)
+                            Text("4. بعد التحقق من التحويل، تُسلّم العملات إلى حسابك.", color = Muted, fontSize = 12.sp)
+                            Button(
+                                onClick = {
+                                    val message = "مرحباً، أريد شحن عملات الرافدين تيك لحساب @$username"
+                                    runCatching {
+                                        context.startActivity(android.content.Intent(
+                                            android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse("https://wa.me/9647723756476?text=" + java.net.URLEncoder.encode(message, "UTF-8"))
+                                        ))
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF18A85B))
+                            ) { Text("تواصل مع الوكيل عبر واتساب", color = Color.White) }
                         }
                     },
                     confirmButton = {
-                        TextButton(onClick = { topupInfoOpen = false }) { Text("حسناً") }
+                        TextButton(onClick = { topupInfoOpen = false }) { Text("إغلاق") }
                     }
                 )
             }
