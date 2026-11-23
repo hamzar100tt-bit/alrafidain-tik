@@ -1224,26 +1224,33 @@ private fun VideoLiveRoomScreen(
             return@rememberLauncherForActivityResult
         }
         scope.launch {
-            try {
-                if (cameraGranted) {
-                    // Let LiveKit manage camera capture, publication and lifecycle.
-                    // This avoids manually starting a camera capturer during permission callbacks.
+            // Start camera and microphone independently: a camera failure must not
+            // prevent the host from joining with audio, and vice versa.
+            if (cameraGranted) {
+                try {
                     cameraEnabled = liveRoom.localParticipant.setCameraEnabled(true)
                     localVideoTrack = liveRoom.localParticipant
                         .getTrackPublication(Track.Source.CAMERA)?.track as? VideoTrack
                     if (!cameraEnabled || localVideoTrack == null) {
                         cameraEnabled = false
-                        connectionError = "لم تبدأ الكاميرا. تحقق من صلاحية الكاميرا ثم أعد المحاولة."
+                        connectionError = "تعذر تشغيل فيديو البث. تحقق من صلاحية الكاميرا."
                     }
+                } catch (e: Exception) {
+                    cameraEnabled = false
+                    localVideoTrack = null
+                    connectionError = e.message ?: "تعذر تشغيل الكاميرا"
                 }
-                if (microphoneGranted) {
+            }
+            if (microphoneGranted) {
+                try {
                     micEnabled = liveRoom.localParticipant.setMicrophoneEnabled(true)
                     if (!micEnabled) connectionError = "تعذر تشغيل المايك؛ تحقق من صلاحيته."
+                } catch (e: Exception) {
+                    micEnabled = false
+                    if (connectionError == null) connectionError = e.message ?: "تعذر تشغيل المايك"
                 }
-                if (cameraEnabled || micEnabled) connectionError = null
-            } catch (e: Exception) {
-                connectionError = e.message ?: "تعذر تشغيل أجهزة البث"
             }
+            if (cameraEnabled && micEnabled) connectionError = null
         }
     }
     DisposableEffect(liveRoom) {
@@ -1276,7 +1283,14 @@ private fun VideoLiveRoomScreen(
                 connectionState = "متصل بالغرفة"
             }
             if (isHost) {
-                permissionLauncher.launch(arrayOf(android.Manifest.permission.RECORD_AUDIO))
+                // Hosts enter the video room with camera and microphone requested
+                // together; the camera is not left for a second manual activation.
+                permissionLauncher.launch(
+                    arrayOf(
+                        android.Manifest.permission.CAMERA,
+                        android.Manifest.permission.RECORD_AUDIO
+                    )
+                )
             }
         } catch (e: Exception) {
             connected = false
