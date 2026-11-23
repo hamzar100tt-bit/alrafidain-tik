@@ -40,10 +40,17 @@ class SupabaseRepository(private val context: Context) {
             val body = response.body?.string().orEmpty()
             val json = runCatching { JSONObject(body) }.getOrElse { JSONObject() }
             if (!response.isSuccessful) throw IOException(json.optString("error").ifBlank { "تعذر الاتصال بخدمة البث (${response.code})" })
-            val url = json.optString("serverUrl")
-            val token = json.optString("participantToken")
-            if (url.isBlank() || token.isBlank()) throw IOException("بيانات الاتصال بالبث غير مكتملة")
-            return LiveKitCredentials(url, token, json.optString("room", room), json.optString("role", role))
+            val rawUrl = json.optString("serverUrl").trim().trimEnd('/')
+            val token = json.optString("participantToken").trim()
+            if (rawUrl.isBlank() || token.isBlank()) throw IOException("بيانات الاتصال بالبث غير مكتملة")
+            // LiveKit Android connects over WebSocket; normalize dashboard URLs.
+            val serverUrl = when {
+                rawUrl.startsWith("https://", ignoreCase = true) -> "wss://" + rawUrl.substring(8)
+                rawUrl.startsWith("http://", ignoreCase = true) -> "ws://" + rawUrl.substring(7)
+                rawUrl.startsWith("wss://", ignoreCase = true) || rawUrl.startsWith("ws://", ignoreCase = true) -> rawUrl
+                else -> throw IOException("رابط خادم LiveKit غير صحيح؛ يجب أن يبدأ بـ wss://")
+            }
+            return LiveKitCredentials(serverUrl, token, json.optString("room", room), json.optString("role", role))
         }
     }
     fun loadLiveRooms(): List<LiveRoomInfo> {
