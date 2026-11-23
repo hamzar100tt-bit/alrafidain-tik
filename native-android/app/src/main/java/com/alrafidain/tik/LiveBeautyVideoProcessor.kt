@@ -26,6 +26,9 @@ object LiveBeautySettings {
     @Volatile var brightness: Float = 0.015f
     @Volatile var warmth: Float = 0f
     @Volatile var tone: Int = 0
+    @Volatile var lipstick: Float = 0f
+    @Volatile var blush: Float = 0f
+    @Volatile var eyeShadow: Float = 0f
 }
 
 class LiveBeautyVideoProcessor : VideoProcessor {
@@ -56,8 +59,8 @@ class LiveBeautyVideoProcessor : VideoProcessor {
             val h = source.height
             val smoothing = LiveBeautySettings.smoothing.coerceIn(0f, 0.55f)
             val lift = (LiveBeautySettings.brightness.coerceIn(-0.08f, 0.12f) * 255f).toInt()
-            val faceRects = if (smoothing > 0.001f) detectFaces(source, frame.rotation) else emptyList()
-            if (smoothing <= 0.001f && lift == 0 && LiveBeautySettings.warmth == 0f && LiveBeautySettings.tone == 0) {
+            val faceRects = if (smoothing > 0.001f || LiveBeautySettings.lipstick > 0f || LiveBeautySettings.blush > 0f || LiveBeautySettings.eyeShadow > 0f) detectFaces(source, frame.rotation) else emptyList()
+            if (smoothing <= 0.001f && lift == 0 && LiveBeautySettings.warmth == 0f && LiveBeautySettings.tone == 0 && LiveBeautySettings.lipstick == 0f && LiveBeautySettings.blush == 0f && LiveBeautySettings.eyeShadow == 0f) {
                 sink.onFrame(frame)
                 return
             }
@@ -105,10 +108,29 @@ class LiveBeautyVideoProcessor : VideoProcessor {
             val toneU = when (LiveBeautySettings.tone) { 1 -> -5; 2 -> 5; 3 -> -3; else -> 0 }
             val toneV = when (LiveBeautySettings.tone) { 1 -> 7; 2 -> -5; 3 -> 9; else -> 0 }
             for (row in 0 until chromaH) for (col in 0 until chromaW) {
-                val u = source.dataU.get(row * source.strideU + col).toInt() and 0xff
-                val v = source.dataV.get(row * source.strideV + col).toInt() and 0xff
-                result.dataU.put(row * result.strideU + col, (u + toneU - warmth * 9f).toInt().coerceIn(0, 255).toByte())
-                result.dataV.put(row * result.strideV + col, (v + toneV + warmth * 8f).toInt().coerceIn(0, 255).toByte())
+                var u = source.dataU.get(row * source.strideU + col).toInt() and 0xff
+                var v = source.dataV.get(row * source.strideV + col).toInt() and 0xff
+                u = (u + toneU - warmth * 9f).toInt()
+                v = (v + toneV + warmth * 8f).toInt()
+                val px = col * 2f
+                val py = row * 2f
+                for (face in faceRects) {
+                    val fw = face.width().toFloat()
+                    val fh = face.height().toFloat()
+                    val lip = ellipse(px, py, (face.left + face.right) * 0.5f, face.top + fh * 0.73f, fw * 0.16f, fh * 0.055f)
+                    val cheekL = ellipse(px, py, face.left + fw * 0.28f, face.top + fh * 0.64f, fw * 0.16f, fh * 0.09f)
+                    val cheekR = ellipse(px, py, face.left + fw * 0.72f, face.top + fh * 0.64f, fw * 0.16f, fh * 0.09f)
+                    val eyeL = ellipse(px, py, face.left + fw * 0.32f, face.top + fh * 0.43f, fw * 0.17f, fh * 0.055f)
+                    val eyeR = ellipse(px, py, face.left + fw * 0.68f, face.top + fh * 0.43f, fw * 0.17f, fh * 0.055f)
+                    val lm = (lip * LiveBeautySettings.lipstick.coerceIn(0f, 1f)).coerceIn(0f, 0.7f)
+                    val bm = (max(cheekL, cheekR) * LiveBeautySettings.blush.coerceIn(0f, 1f)).coerceIn(0f, 0.5f)
+                    val em = (max(eyeL, eyeR) * LiveBeautySettings.eyeShadow.coerceIn(0f, 1f)).coerceIn(0f, 0.4f)
+                    val totalMix = (lm + bm * 0.45f + em * 0.15f).coerceAtMost(0.85f)
+                    u = (u * (1f - totalMix) + 154f * lm + 112f * bm * 0.45f + 145f * em * 0.15f).toInt()
+                    v = (v * (1f - totalMix) + 145f * lm + 164f * bm * 0.45f + 105f * em * 0.15f).toInt()
+                }
+                result.dataU.put(row * result.strideU + col, u.coerceIn(0, 255).toByte())
+                result.dataV.put(row * result.strideV + col, v.coerceIn(0, 255).toByte())
             }
 
             val processed = VideoFrame(result, frame.rotation, frame.timestampNs)
@@ -165,6 +187,13 @@ class LiveBeautyVideoProcessor : VideoProcessor {
         val right = points.maxOf { it.first }.toInt().coerceIn(left + 1, width)
         val bottom = points.maxOf { it.second }.toInt().coerceIn(top + 1, height)
         return if (right > left && bottom > top) Rect(left, top, right, bottom) else null
+    }
+
+    private fun ellipse(x: Float, y: Float, cx: Float, cy: Float, rx: Float, ry: Float): Float {
+        if (rx <= 0f || ry <= 0f) return 0f
+        val dx = (x - cx) / rx
+        val dy = (y - cy) / ry
+        return ((1f - dx * dx - dy * dy) / 0.35f).coerceIn(0f, 1f)
     }
 
     private fun neighborhoodAverage(pixels: ByteArray, width: Int, height: Int, x: Int, y: Int): Int {
