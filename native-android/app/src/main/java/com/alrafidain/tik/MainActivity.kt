@@ -61,6 +61,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import io.livekit.android.LiveKit
 import io.livekit.android.room.Room
 import io.livekit.android.events.RoomEvent
@@ -1266,18 +1267,26 @@ private fun VideoLiveRoomScreen(
     LaunchedEffect(roomName) {
         try {
             connectionState = "جارٍ جلب تصريح الدخول..."
-            val auth = withContext(Dispatchers.IO) { repository.requestLiveKitToken(roomName, if (isHost) "host" else "viewer") }
-            credentials = auth
-            connectionState = "جارٍ الاتصال بخادم البث..."
-            liveRoom.connect(auth.serverUrl, auth.participantToken)
-            connected = true
-            connectionState = "متصل بالغرفة"
+            // Bound the complete startup sequence so the room cannot remain stuck forever.
+            withTimeout(30_000) {
+                val auth = withContext(Dispatchers.IO) { repository.requestLiveKitToken(roomName, if (isHost) "host" else "viewer") }
+                credentials = auth
+                connectionState = "جارٍ الاتصال بخادم البث..."
+                liveRoom.connect(auth.serverUrl, auth.participantToken)
+                connected = true
+                connectionState = "متصل بالغرفة"
+            }
             if (isHost) {
                 permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA, android.Manifest.permission.RECORD_AUDIO))
             }
         } catch (e: Exception) {
+            connected = false
             connectionState = "فشل الاتصال"
-            connectionError = e.message ?: "تعذر الاتصال بالغرفة"
+            connectionError = when {
+                e.message?.contains("timeout", ignoreCase = true) == true -> "انتهت مهلة الاتصال بخادم البث. تحقق من رابط LiveKit والإنترنت."
+                e.message.isNullOrBlank() -> "تعذر الاتصال بالغرفة. أعد المحاولة."
+                else -> e.message ?: "تعذر الاتصال بالغرفة"
+            }
         }
     }
     var message by remember(roomName) { mutableStateOf("") }
