@@ -1276,7 +1276,7 @@ private fun VideoLiveRoomScreen(
                 connectionState = "متصل بالغرفة"
             }
             if (isHost) {
-                permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA, android.Manifest.permission.RECORD_AUDIO))
+                permissionLauncher.launch(arrayOf(android.Manifest.permission.RECORD_AUDIO))
             }
         } catch (e: Exception) {
             connected = false
