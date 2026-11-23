@@ -1,16 +1,25 @@
 package com.alrafidain.tik
 
+import android.graphics.ImageFormat
+import android.graphics.Rect
+import com.google.android.gms.tasks.Tasks
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.FaceDetection
+import com.google.mlkit.vision.face.FaceDetector
+import com.google.mlkit.vision.face.FaceDetectorOptions
 import livekit.org.webrtc.JavaI420Buffer
 import livekit.org.webrtc.VideoFrame
 import livekit.org.webrtc.VideoProcessor
 import livekit.org.webrtc.VideoSink
+import java.nio.ByteBuffer
+import java.util.concurrent.TimeUnit
 import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Lightweight real-time softening processor for the outgoing LiveKit camera track.
- * It smooths luminance slightly while preserving chroma and frame timing.
- * This is a skin-softening base effect, not AI face reshaping.
+ * On-device face-aware beauty processor for the outgoing LiveKit camera track.
+ * ML Kit detects faces locally; luminance softening is limited to the detected face oval.
+ * No camera frames are uploaded to a third-party service by this processor.
  */
 object LiveBeautySettings {
     @Volatile var smoothing: Float = 0.30f
@@ -21,55 +30,75 @@ object LiveBeautySettings {
 
 class LiveBeautyVideoProcessor : VideoProcessor {
     @Volatile private var output: VideoSink? = null
+    private val detector: FaceDetector = FaceDetection.getClient(
+        FaceDetectorOptions.Builder()
+            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
+            .setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL)
+            .enableTracking()
+            .build()
+    )
 
-    override fun setSink(sink: VideoSink?) {
-        output = sink
-    }
-
+    override fun setSink(sink: VideoSink?) { output = sink }
     override fun onCapturerStarted(success: Boolean) = Unit
     override fun onCapturerStopped() = Unit
 
     override fun onFrameCaptured(frame: VideoFrame) {
         val sink = output ?: return
         val source = frame.buffer.toI420()
-        if (source == null || LiveBeautySettings.smoothing <= 0.001f) {
+        if (source == null) {
             sink.onFrame(frame)
-            source?.release()
             return
         }
-
+        var result: JavaI420Buffer? = null
         try {
             val w = source.width
             val h = source.height
-            val result = JavaI420Buffer.allocate(w, h)
-            val yIn = source.dataY
-            val yOut = result.dataY
-            val amount = LiveBeautySettings.smoothing.coerceIn(0f, 0.55f)
+            val smoothing = LiveBeautySettings.smoothing.coerceIn(0f, 0.55f)
             val lift = (LiveBeautySettings.brightness.coerceIn(-0.08f, 0.12f) * 255f).toInt()
-            val src = ByteArray(w * h)
+            val faceRects = if (smoothing > 0.001f) detectFaces(source, frame.rotation) else emptyList()
+            if (smoothing <= 0.001f && lift == 0 && LiveBeautySettings.warmth == 0f && LiveBeautySettings.tone == 0) {
+                sink.onFrame(frame)
+                return
+            }
+
+            result = JavaI420Buffer.allocate(w, h)
+            val inputY = ByteArray(w * h)
+            val outputY = result.dataY
             for (row in 0 until h) {
                 for (col in 0 until w) {
-                    src[row * w + col] = yIn.get(row * source.strideY + col)
+                    inputY[row * w + col] = source.dataY.get(row * source.strideY + col)
                 }
             }
+
+            // Smooth only inside AI-detected face ovals. Background remains untouched.
             for (row in 0 until h) {
                 for (col in 0 until w) {
-                    var total = 0
-                    var count = 0
-                    for (dy in -1..1) for (dx in -1..1) {
-                        val yy = row + dy
-                        val xx = col + dx
-                        if (yy in 0 until h && xx in 0 until w) {
-                            total += src[yy * w + xx].toInt() and 0xff
-                            count++
+                    val original = inputY[row * w + col].toInt() and 0xff
+                    var amount = 0f
+                    if (smoothing > 0f) {
+                        for (face in faceRects) {
+                            val cx = (face.left + face.right) * 0.5f
+                            val cy = face.top + (face.bottom - face.top) * 0.48f
+                            val rx = max(1f, face.width() * 0.48f)
+                            val ry = max(1f, face.height() * 0.52f)
+                            val nx = (col - cx) / rx
+                            val ny = (row - cy) / ry
+                            val distance = nx * nx + ny * ny
+                            if (distance < 1f) {
+                                val edge = ((1f - distance) / 0.22f).coerceIn(0f, 1f)
+                                amount = max(amount, smoothing * edge)
+                            }
                         }
                     }
-                    val original = src[row * w + col].toInt() and 0xff
-                    val blurred = total / max(1, count)
-                    val value = (original * (1f - amount) + blurred * amount + lift).toInt().coerceIn(0, 255)
-                    yOut.put(row * result.strideY + col, value.toByte())
+                    val value = if (amount > 0f) {
+                        val total = neighborhoodAverage(inputY, w, h, col, row)
+                        (original * (1f - amount) + total * amount + lift).toInt().coerceIn(0, 255)
+                    } else (original + lift).coerceIn(0, 255)
+                    outputY.put(row * result.strideY + col, value.toByte())
                 }
             }
+
             val chromaW = (w + 1) / 2
             val chromaH = (h + 1) / 2
             val warmth = LiveBeautySettings.warmth.coerceIn(-0.35f, 0.35f)
@@ -81,20 +110,72 @@ class LiveBeautyVideoProcessor : VideoProcessor {
                 result.dataU.put(row * result.strideU + col, (u + toneU - warmth * 9f).toInt().coerceIn(0, 255).toByte())
                 result.dataV.put(row * result.strideV + col, (v + toneV + warmth * 8f).toInt().coerceIn(0, 255).toByte())
             }
+
             val processed = VideoFrame(result, frame.rotation, frame.timestampNs)
             sink.onFrame(processed)
             processed.release()
+            result = null
         } catch (_: Throwable) {
             sink.onFrame(frame)
         } finally {
+            result?.release()
             source.release()
         }
     }
 
-    private fun copyPlane(input: java.nio.ByteBuffer, inputStride: Int, output: java.nio.ByteBuffer,
-                          outputStride: Int, width: Int, height: Int) {
+    private fun detectFaces(buffer: livekit.org.webrtc.VideoFrame.I420Buffer, rotation: Int): List<Rect> {
+        val width = buffer.width
+        val height = buffer.height
+        val nv21 = ByteArray(width * height + (width * height / 2))
+        var offset = 0
         for (row in 0 until height) for (col in 0 until width) {
-            output.put(row * outputStride + col, input.get(row * inputStride + col))
+            nv21[offset++] = buffer.dataY.get(row * buffer.strideY + col)
         }
+        for (row in 0 until (height + 1) / 2) for (col in 0 until (width + 1) / 2) {
+            nv21[offset++] = buffer.dataV.get(row * buffer.strideV + col)
+            nv21[offset++] = buffer.dataU.get(row * buffer.strideU + col)
+        }
+        val image = InputImage.fromByteArray(nv21, width, height, rotation, ImageFormat.NV21)
+        val faces = try {
+            Tasks.await(detector.process(image), 35, TimeUnit.MILLISECONDS)
+        } catch (_: Throwable) {
+            emptyList()
+        }
+        return faces.mapNotNull { face ->
+            rotateRectToBuffer(face.boundingBox, width, height, rotation)
+        }
+    }
+
+    private fun rotateRectToBuffer(rect: Rect, width: Int, height: Int, rotation: Int): Rect? {
+        val points = listOf(
+            Pair(rect.left.toFloat(), rect.top.toFloat()),
+            Pair(rect.right.toFloat(), rect.top.toFloat()),
+            Pair(rect.left.toFloat(), rect.bottom.toFloat()),
+            Pair(rect.right.toFloat(), rect.bottom.toFloat())
+        ).map { (x, y) ->
+            when ((rotation % 360 + 360) % 360) {
+                90 -> Pair(y, height - x)
+                180 -> Pair(width - x, height - y)
+                270 -> Pair(width - y, x)
+                else -> Pair(x, y)
+            }
+        }
+        val left = points.minOf { it.first }.toInt().coerceIn(0, width - 1)
+        val top = points.minOf { it.second }.toInt().coerceIn(0, height - 1)
+        val right = points.maxOf { it.first }.toInt().coerceIn(left + 1, width)
+        val bottom = points.maxOf { it.second }.toInt().coerceIn(top + 1, height)
+        return if (right > left && bottom > top) Rect(left, top, right, bottom) else null
+    }
+
+    private fun neighborhoodAverage(pixels: ByteArray, width: Int, height: Int, x: Int, y: Int): Int {
+        var total = 0
+        var count = 0
+        for (dy in -1..1) for (dx in -1..1) {
+            val xx = (x + dx).coerceIn(0, width - 1)
+            val yy = (y + dy).coerceIn(0, height - 1)
+            total += pixels[yy * width + xx].toInt() and 0xff
+            count++
+        }
+        return total / max(1, count)
     }
 }
