@@ -52,6 +52,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
+import io.livekit.android.room.track.video.CameraCapturerUtils
+import livekit.org.webrtc.CameraXHelper
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.MediaItem
@@ -1203,6 +1206,24 @@ private fun VideoLiveRoomScreen(
     onRequireLogin: () -> Unit
 ) {
     val context = LocalContext.current
+
+    // Register LiveKit's CameraX provider before the room attempts to open
+    // the camera. This follows the official Android SDK sample and avoids
+    // relying on the fallback camera capturer on devices with CameraX quirks.
+    val cameraProvider = remember(context.applicationContext) {
+        CameraXHelper.createCameraProvider(ProcessLifecycleOwner.get())
+    }
+    DisposableEffect(cameraProvider) {
+        if (cameraProvider.isSupported(context.applicationContext)) {
+            CameraCapturerUtils.registerCameraProvider(cameraProvider)
+        }
+        onDispose {
+            if (cameraProvider.isSupported(context.applicationContext)) {
+                CameraCapturerUtils.unregisterCameraProvider(cameraProvider)
+            }
+        }
+    }
+
     val liveRoom = remember(roomName) { LiveKit.create(context.applicationContext) }
     val scope = rememberCoroutineScope()
     var cameraEnabled by remember(roomName) { mutableStateOf(false) }
@@ -1220,21 +1241,37 @@ private fun VideoLiveRoomScreen(
         val cameraGranted = grants[android.Manifest.permission.CAMERA] == true
         val microphoneGranted = grants[android.Manifest.permission.RECORD_AUDIO] == true
 
-        // Do not start native camera/microphone capture from the Android
-        // permission-result callback. Keep the room alive first; the user
-        // can start each device explicitly from the room controls.
-        cameraEnabled = false
-        micEnabled = false
-        localVideoTrack = null
-        connectionError = when {
-            cameraGranted && microphoneGranted ->
-                "تم السماح بالكاميرا والمايك. شغّل كل واحد من أزراره داخل الغرفة."
-            cameraGranted ->
-                "تم السماح بالكاميرا. اضغط زر الكاميرا داخل الغرفة لتشغيلها."
-            microphoneGranted ->
-                "تم السماح بالمايك. اضغط زر المايك داخل الغرفة لتشغيله."
-            else ->
-                "لم يتم منح صلاحية الكاميرا أو المايك."
+        if (!cameraGranted && !microphoneGranted) {
+            connectionError = "لم يتم منح صلاحية الكاميرا أو المايك."
+            return@rememberLauncherForActivityResult
+        }
+        scope.launch {
+            delay(350)
+            if (cameraGranted) {
+                try {
+                    cameraEnabled = liveRoom.localParticipant.setCameraEnabled(true)
+                    localVideoTrack = liveRoom.localParticipant
+                        .getTrackPublication(Track.Source.CAMERA)?.track as? VideoTrack
+                    if (!cameraEnabled || localVideoTrack == null) {
+                        cameraEnabled = false
+                        connectionError = "تعذر تشغيل الكاميرا. حاول مرة ثانية."
+                    }
+                } catch (e: Throwable) {
+                    cameraEnabled = false
+                    localVideoTrack = null
+                    connectionError = e.message ?: "تعذر تشغيل الكاميرا"
+                }
+            }
+            if (microphoneGranted) {
+                try {
+                    micEnabled = liveRoom.localParticipant.setMicrophoneEnabled(true)
+                    if (!micEnabled) connectionError = "تعذر تشغيل المايك."
+                } catch (e: Throwable) {
+                    micEnabled = false
+                    if (connectionError == null) connectionError = e.message ?: "تعذر تشغيل المايك"
+                }
+            }
+            if (cameraEnabled && micEnabled) connectionError = null
         }
     }
     DisposableEffect(liveRoom) {
