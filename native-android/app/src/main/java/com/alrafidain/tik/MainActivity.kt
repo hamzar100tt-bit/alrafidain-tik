@@ -1219,41 +1219,22 @@ private fun VideoLiveRoomScreen(
     ) { grants ->
         val cameraGranted = grants[android.Manifest.permission.CAMERA] == true
         val microphoneGranted = grants[android.Manifest.permission.RECORD_AUDIO] == true
-        if (!cameraGranted && !microphoneGranted) {
-            connectionError = "اسمح للتطبيق باستخدام الكاميرا أو المايك حتى تبث."
-            return@rememberLauncherForActivityResult
-        }
-        scope.launch {
-            // Give LiveKit a short settling period after Room.connect() and the
-            // Android permission callback before opening the camera capturer.
-            // Start camera first and microphone only after camera initialization
-            // has completed, avoiding simultaneous hardware capture startup.
-            delay(700)
-            if (cameraGranted) {
-                try {
-                    cameraEnabled = liveRoom.localParticipant.setCameraEnabled(true)
-                    localVideoTrack = liveRoom.localParticipant
-                        .getTrackPublication(Track.Source.CAMERA)?.track as? VideoTrack
-                    if (!cameraEnabled || localVideoTrack == null) {
-                        cameraEnabled = false
-                        connectionError = "تعذر تشغيل فيديو البث. تحقق من صلاحية الكاميرا."
-                    }
-                } catch (e: Exception) {
-                    cameraEnabled = false
-                    localVideoTrack = null
-                    connectionError = e.message ?: "تعذر تشغيل الكاميرا"
-                }
-            }
-            if (microphoneGranted) {
-                try {
-                    micEnabled = liveRoom.localParticipant.setMicrophoneEnabled(true)
-                    if (!micEnabled) connectionError = "تعذر تشغيل المايك؛ تحقق من صلاحيته."
-                } catch (e: Exception) {
-                    micEnabled = false
-                    if (connectionError == null) connectionError = e.message ?: "تعذر تشغيل المايك"
-                }
-            }
-            if (cameraEnabled && micEnabled) connectionError = null
+
+        // Do not start native camera/microphone capture from the Android
+        // permission-result callback. Keep the room alive first; the user
+        // can start each device explicitly from the room controls.
+        cameraEnabled = false
+        micEnabled = false
+        localVideoTrack = null
+        connectionError = when {
+            cameraGranted && microphoneGranted ->
+                "تم السماح بالكاميرا والمايك. شغّل كل واحد من أزراره داخل الغرفة."
+            cameraGranted ->
+                "تم السماح بالكاميرا. اضغط زر الكاميرا داخل الغرفة لتشغيلها."
+            microphoneGranted ->
+                "تم السماح بالمايك. اضغط زر المايك داخل الغرفة لتشغيله."
+            else ->
+                "لم يتم منح صلاحية الكاميرا أو المايك."
         }
     }
     DisposableEffect(liveRoom) {
