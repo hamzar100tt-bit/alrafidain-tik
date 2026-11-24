@@ -51,11 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.ProcessLifecycleOwner
-import io.livekit.android.room.track.video.CameraCapturerUtils
-import livekit.org.webrtc.CameraXHelper
-import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwnerimport androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
@@ -1206,23 +1202,6 @@ private fun VideoLiveRoomScreen(
     onRequireLogin: () -> Unit
 ) {
     val context = LocalContext.current
-
-    // Register LiveKit's CameraX provider before the room attempts to open
-    // the camera. This follows the official Android SDK sample and avoids
-    // relying on the fallback camera capturer on devices with CameraX quirks.
-    val cameraProvider = remember(context.applicationContext) {
-        CameraXHelper.createCameraProvider(ProcessLifecycleOwner.get())
-    }
-    DisposableEffect(cameraProvider) {
-        if (cameraProvider.isSupported(context.applicationContext)) {
-            CameraCapturerUtils.registerCameraProvider(cameraProvider)
-        }
-        onDispose {
-            if (cameraProvider.isSupported(context.applicationContext)) {
-                CameraCapturerUtils.unregisterCameraProvider(cameraProvider)
-            }
-        }
-    }
 
     val liveRoom = remember(roomName) { LiveKit.create(context.applicationContext) }
     val scope = rememberCoroutineScope()
