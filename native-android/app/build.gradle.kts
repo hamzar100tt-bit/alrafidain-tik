@@ -43,6 +43,7 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("com.google.android.gms:play-services-mlkit-face-detection:17.1.0")
     implementation("io.livekit:livekit-android:2.30.0")
+    implementation("io.livekit:livekit-android-camerax:2.30.0")
     implementation("io.livekit:livekit-android-compose-components:2.4.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
