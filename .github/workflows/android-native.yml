@@ -40,3 +40,5 @@ jobs:
           name: Alrafidain Tik Android build ${{ github.run_number }}
           prerelease: true
           files: native-android/app/build/outputs/apk/debug/app-debug.apk
+
+# Trigger native APK build after the latest native Android changes.
