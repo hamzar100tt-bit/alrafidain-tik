@@ -396,7 +396,6 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
                     liveScope.launch {
                         try {
                             val roomKey = withContext(Dispatchers.IO) { repository.createLiveRoom(videoRoomTitle, "video") }
-                            rooms = withContext(Dispatchers.IO) { repository.loadLiveRooms() }
                             showCreateVideoRoom = false
                             onRoomExpanded(true)
                             openedVideoRoom = roomKey
@@ -1342,6 +1341,9 @@ private fun VideoLiveRoomScreen(
             liveRoom.connect(auth.serverUrl, auth.participantToken)
             connected = true
             connectionState = "متصل بالغرفة"
+            if (auth.role == "host") {
+                permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA, android.Manifest.permission.RECORD_AUDIO))
+            }
         } catch (e: Exception) {
             connectionState = "فشل الاتصال"
             connectionError = e.message ?: "تعذر الاتصال بالغرفة"
