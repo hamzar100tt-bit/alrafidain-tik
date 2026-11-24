@@ -1238,37 +1238,48 @@ private fun VideoLiveRoomScreen(
         val cameraGranted = grants[android.Manifest.permission.CAMERA] == true
         val microphoneGranted = grants[android.Manifest.permission.RECORD_AUDIO] == true
 
-        if (!cameraGranted && !microphoneGranted) {
-            connectionError = "لم يتم منح صلاحية الكاميرا أو المايك."
+        // Video rooms must never silently fall back to an audio-only host session.
+        if (!cameraGranted) {
+            cameraEnabled = false
+            localVideoTrack = null
+            connectionError = "لا يمكن بدء بث الفيديو بدون السماح للكاميرا. فعّل صلاحية الكاميرا ثم أعد المحاولة."
             return@rememberLauncherForActivityResult
         }
         scope.launch {
-            delay(350)
-            if (cameraGranted) {
-                try {
-                    cameraEnabled = liveRoom.localParticipant.setCameraEnabled(true)
+            delay(500)
+            try {
+                // Start camera first; only proceed to microphone after camera startup succeeds.
+                cameraEnabled = liveRoom.localParticipant.setCameraEnabled(true)
+                if (!cameraEnabled) {
+                    throw IllegalStateException("تعذر تشغيل كاميرا البث. تأكد أن صلاحية الكاميرا مفعّلة.")
+                }
+                // Camera publication may be delivered just after setCameraEnabled returns.
+                repeat(10) {
                     localVideoTrack = liveRoom.localParticipant
                         .getTrackPublication(Track.Source.CAMERA)?.track as? VideoTrack
-                    if (!cameraEnabled || localVideoTrack == null) {
-                        cameraEnabled = false
-                        connectionError = "تعذر تشغيل الكاميرا. حاول مرة ثانية."
-                    }
-                } catch (e: Throwable) {
-                    cameraEnabled = false
-                    localVideoTrack = null
-                    connectionError = e.message ?: "تعذر تشغيل الكاميرا"
+                    if (localVideoTrack != null) return@repeat
+                    delay(200)
                 }
-            }
-            if (microphoneGranted) {
-                try {
+                if (localVideoTrack == null) {
+                    throw IllegalStateException("تم فتح الكاميرا لكن لم يصل مسار الفيديو من LiveKit.")
+                }
+                if (microphoneGranted) {
                     micEnabled = liveRoom.localParticipant.setMicrophoneEnabled(true)
-                    if (!micEnabled) connectionError = "تعذر تشغيل المايك."
-                } catch (e: Throwable) {
+                    if (!micEnabled) connectionError = "الكاميرا تعمل، لكن تعذر تشغيل المايك."
+                } else {
                     micEnabled = false
-                    if (connectionError == null) connectionError = e.message ?: "تعذر تشغيل المايك"
+                    connectionError = "الكاميرا تعمل. اسمح للمايك إذا تريد صوتاً مع البث."
                 }
+                if (cameraEnabled && (micEnabled || !microphoneGranted)) {
+                    if (microphoneGranted) connectionError = null
+                }
+            } catch (e: Throwable) {
+                cameraEnabled = false
+                micEnabled = false
+                localVideoTrack = null
+                connectionError = e.message ?: "تعذر تشغيل بث الفيديو. أعد المحاولة."
+                try { liveRoom.localParticipant.setCameraEnabled(false) } catch (_: Throwable) { }
             }
-            if (cameraEnabled && micEnabled) connectionError = null
         }
     }
     DisposableEffect(liveRoom) {
