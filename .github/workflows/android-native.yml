@@ -40,3 +40,5 @@ jobs:
           name: Alrafidain Tik Android build ${{ github.run_number }}
           prerelease: true
           files: native-android/app/build/outputs/apk/debug/app-debug.apk
+
+# Build the latest profile, video setup, and native Android stage from this branch.
