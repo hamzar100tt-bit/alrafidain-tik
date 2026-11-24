@@ -63,6 +63,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import io.livekit.android.LiveKit
+import io.livekit.android.room.track.video.CameraCapturerUtils
+import livekit.org.webrtc.CameraXHelper
 import io.livekit.android.room.Room
 import io.livekit.android.events.RoomEvent
 import io.livekit.android.events.collect
@@ -1203,6 +1205,21 @@ private fun VideoLiveRoomScreen(
     onRequireLogin: () -> Unit
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    // Register LiveKit's official CameraX provider before camera capture starts.
+    val cameraProvider = remember(lifecycleOwner) {
+        CameraXHelper.createCameraProvider(lifecycleOwner)
+    }
+    DisposableEffect(cameraProvider) {
+        if (cameraProvider.isSupported(context.applicationContext)) {
+            CameraCapturerUtils.registerCameraProvider(cameraProvider)
+        }
+        onDispose {
+            if (cameraProvider.isSupported(context.applicationContext)) {
+                CameraCapturerUtils.unregisterCameraProvider(cameraProvider)
+            }
+        }
+    }
 
     val liveRoom = remember(roomName) { LiveKit.create(context.applicationContext) }
     val scope = rememberCoroutineScope()
