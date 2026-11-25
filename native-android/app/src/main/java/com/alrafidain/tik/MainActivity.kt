@@ -1385,8 +1385,8 @@ private fun VideoLiveRoomScreen(
     var chatRefreshKey by remember(roomName) { mutableStateOf(0) }
     var showMenu by remember(roomName) { mutableStateOf(false) }
     var showReportDialog by remember(roomName) { mutableStateOf(false) }
-    LaunchedEffect(roomName, connected, chatRefreshKey) {
-        if (connected) {
+    LaunchedEffect(roomName, connected, chatRefreshKey, showChat) {
+        if (connected && showChat) {
             while (true) {
                 try {
                     chatItems = withContext(Dispatchers.IO) { repository.loadLiveChatMessages(roomName).map { LiveChatMessage(it.userId, it.body, it.displayName, it.avatarUrl) } }
