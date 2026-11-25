@@ -1312,24 +1312,36 @@ private fun VideoLiveRoomScreen(
     var connected by remember(roomName) { mutableStateOf(false) }
     var credentials by remember(roomName) { mutableStateOf<LiveKitCredentials?>(null) }
     var remoteVideoTrack by remember(roomName) { mutableStateOf<VideoTrack?>(null) }
+    var permissionPurpose by remember(roomName) { mutableStateOf("startup") }
     var showChat by remember(roomName) { mutableStateOf(true) }
     var videoExpanded by remember(roomName) { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { grants ->
-        val granted = grants[android.Manifest.permission.CAMERA] == true &&
-            grants[android.Manifest.permission.RECORD_AUDIO] == true
-        if (granted) {
-            scope.launch {
-                try {
-                    val ok = liveRoom.localParticipant.setCameraEnabled(true)
-                    cameraEnabled = ok
-                    val micOk = liveRoom.localParticipant.setMicrophoneEnabled(true)
-                    micEnabled = micOk
-                    if (!ok || !micOk) connectionError = "تعذر تشغيل الكاميرا أو المايك؛ تأكد من صلاحيات البث."
-                } catch (e: Exception) { connectionError = e.message ?: "تعذر تشغيل الكاميرا والمايك" }
+        val cameraGranted = grants[android.Manifest.permission.CAMERA] == true
+        val audioGranted = grants[android.Manifest.permission.RECORD_AUDIO] == true
+        scope.launch {
+            try {
+                when (permissionPurpose) {
+                    "startup" -> {
+                        if (cameraGranted && audioGranted) {
+                            cameraEnabled = liveRoom.localParticipant.setCameraEnabled(true)
+                            micEnabled = liveRoom.localParticipant.setMicrophoneEnabled(true)
+                        } else connectionError = "اسمح للتطبيق باستخدام الكاميرا والمايك حتى تبث."
+                    }
+                    "camera" -> {
+                        if (cameraGranted) cameraEnabled = liveRoom.localParticipant.setCameraEnabled(!cameraEnabled)
+                        else connectionError = "اسمح للتطبيق باستخدام الكاميرا."
+                    }
+                    "mic" -> {
+                        if (audioGranted) micEnabled = liveRoom.localParticipant.setMicrophoneEnabled(!micEnabled)
+                        else connectionError = "اسمح للتطبيق باستخدام المايك."
+                    }
+                }
+            } catch (e: Exception) {
+                connectionError = e.message ?: "تعذر تغيير إعدادات الكاميرا أو المايك"
             }
-        } else connectionError = "اسمح للتطبيق باستخدام الكاميرا والمايك حتى تبث."
+        }
     }
     DisposableEffect(liveRoom) {
         onDispose { liveRoom.disconnect() }
@@ -1484,8 +1496,8 @@ private fun VideoLiveRoomScreen(
         Row(Modifier.fillMaxWidth().background(Color(0xFF100C13)).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onRequireLogin) { Icon(Icons.Default.CardGiftcard, "هدايا", tint = Color(0xFFFF3D70)) }
-            IconButton(onClick = { if (!connected) connectionError = "انتظر اتصال الغرفة أولاً" else if (credentials?.role == "viewer") connectionError = "أنت مشاهد حالياً؛ المضيف يمنحك صلاحية الكاميرا" else permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA, android.Manifest.permission.RECORD_AUDIO)) }) { Icon(if (cameraEnabled) Icons.Default.Videocam else Icons.Default.VideocamOff, "الكاميرا", tint = Color.White) }
-            IconButton(onClick = { if (!connected) connectionError = "انتظر اتصال الغرفة أولاً" else if (credentials?.role == "viewer") connectionError = "أنت مشاهد حالياً؛ المضيف يمنحك صلاحية المايك" else { permissionLauncher.launch(arrayOf(android.Manifest.permission.RECORD_AUDIO)); scope.launch { try { val next = !micEnabled; liveRoom.localParticipant.setMicrophoneEnabled(next); micEnabled = next } catch (e: Exception) { connectionError = e.message ?: "تعذر تشغيل المايك" } } } }) { Icon(if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff, "المايك", tint = if (micEnabled) Color.Cyan else Color.White) }
+            IconButton(onClick = { if (!connected) connectionError = "انتظر اتصال الغرفة أولاً" else if (credentials?.role == "viewer") connectionError = "أنت مشاهد حالياً؛ المضيف يمنحك صلاحية الكاميرا" else { permissionPurpose = "camera"; permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA)) } }) { Icon(if (cameraEnabled) Icons.Default.Videocam else Icons.Default.VideocamOff, "الكاميرا", tint = Color.White) }
+            IconButton(onClick = { if (!connected) connectionError = "انتظر اتصال الغرفة أولاً" else if (credentials?.role == "viewer") connectionError = "أنت مشاهد حالياً؛ المضيف يمنحك صلاحية المايك" else { permissionPurpose = "mic"; permissionLauncher.launch(arrayOf(android.Manifest.permission.RECORD_AUDIO)) } }) { Icon(if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff, "المايك", tint = if (micEnabled) Color.Cyan else Color.White) }
             TextButton(onClick = onRequireLogin) { Text("الانضمام ✋", color = Color.White) }
             IconButton(onClick = { showChat = !showChat }) { Icon(Icons.Default.Chat, "التعليقات", tint = Color.White) }
         }
