@@ -1371,6 +1371,7 @@ private fun VideoLiveRoomScreen(
     var sendingChat by remember(roomName) { mutableStateOf(false) }
     var chatRefreshKey by remember(roomName) { mutableStateOf(0) }
     var showMenu by remember(roomName) { mutableStateOf(false) }
+    var showReportDialog by remember(roomName) { mutableStateOf(false) }
     LaunchedEffect(roomName, connected, chatRefreshKey) {
         if (connected) {
             while (true) {
@@ -1381,6 +1382,14 @@ private fun VideoLiveRoomScreen(
                 kotlinx.coroutines.delay(5000)
             }
         }
+    }
+    if (showReportDialog) {
+        AlertDialog(
+            onDismissRequest = { showReportDialog = false },
+            title = { Text("الإبلاغ عن الغرفة") },
+            text = { Text("ميزة إرسال البلاغات إلى الإدارة غير مربوطة حالياً. الغرفة: $roomName") },
+            confirmButton = { TextButton(onClick = { showReportDialog = false }) { Text("حسناً") } }
+        )
     }
     Column(Modifier.fillMaxSize().background(Color(0xFF26141A)).statusBarsPadding()) {
         Box(Modifier.fillMaxWidth().height(104.dp).background(Color(0xFF3B202B))) {
@@ -1395,7 +1404,7 @@ private fun VideoLiveRoomScreen(
                 }
                 IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, "المزيد", tint = Color.White) }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                    DropdownMenuItem(text = { Text("الإبلاغ عن الغرفة") }, onClick = { showMenu = false })
+                    DropdownMenuItem(text = { Text("الإبلاغ عن الغرفة") }, onClick = { showMenu = false; showReportDialog = true })
                     DropdownMenuItem(text = { Text("مشاركة") }, onClick = { showMenu = false; val shareIntent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "تعال إلى غرفة البث: $roomName") }; context.startActivity(Intent.createChooser(shareIntent, "مشاركة غرفة البث")) })
                 }
             }
