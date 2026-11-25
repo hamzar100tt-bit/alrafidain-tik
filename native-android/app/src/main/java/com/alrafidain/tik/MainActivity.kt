@@ -1396,7 +1396,7 @@ private fun VideoLiveRoomScreen(
                 IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, "المزيد", tint = Color.White) }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                     DropdownMenuItem(text = { Text("الإبلاغ عن الغرفة") }, onClick = { showMenu = false })
-                    DropdownMenuItem(text = { Text("مشاركة") }, onClick = { showMenu = false })
+                    DropdownMenuItem(text = { Text("مشاركة") }, onClick = { showMenu = false; val shareIntent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "تعال إلى غرفة البث: $roomName") }; context.startActivity(Intent.createChooser(shareIntent, "مشاركة غرفة البث")) })
                 }
             }
             // لا نعرض عدد مشاهدين أو صور حضور وهمية؛ تُضاف عند ربط بيانات الحضور الفعلية.
