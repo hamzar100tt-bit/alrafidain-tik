@@ -1368,8 +1368,9 @@ private fun VideoLiveRoomScreen(
     var chatItems by remember(roomName) { mutableStateOf<List<LiveChatMessage>>(emptyList()) }
     var chatError by remember(roomName) { mutableStateOf<String?>(null) }
     var sendingChat by remember(roomName) { mutableStateOf(false) }
+    var chatRefreshKey by remember(roomName) { mutableStateOf(0) }
     var showMenu by remember(roomName) { mutableStateOf(false) }
-    LaunchedEffect(roomName, connected) {
+    LaunchedEffect(roomName, connected, chatRefreshKey) {
         if (connected) try {
             chatItems = withContext(Dispatchers.IO) { repository.loadLiveChatMessages(roomName).map { LiveChatMessage(it.userId, it.body, it.displayName, it.avatarUrl) } }
             chatError = null
@@ -1380,7 +1381,7 @@ private fun VideoLiveRoomScreen(
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.Default.Close, "إغلاق", tint = Color.White) }
                 IconButton(onClick = { }) { Icon(Icons.Default.Fullscreen, "تكبير", tint = Color.White) }
-                IconButton(onClick = { }) { Icon(Icons.Default.Refresh, "تحديث", tint = Color.White) }
+                IconButton(onClick = { chatRefreshKey++ }) { Icon(Icons.Default.Refresh, "تحديث التعليقات", tint = Color.White) }
                 Spacer(Modifier.weight(1f))
                 Column(horizontalAlignment = Alignment.End) {
                     Text(roomName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
