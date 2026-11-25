@@ -874,7 +874,7 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                                             room.connect(credentials.serverUrl, credentials.participantToken)
                                             canSpeak = true
                                             connected = true
-                                            status = "انضممت إلى المقعد \${i + 1}"
+                                            status = "انضممت إلى المقعد ${i + 1}"
                                             val hasMicPermission = androidx.core.content.ContextCompat.checkSelfPermission(
                                                 context, android.Manifest.permission.RECORD_AUDIO
                                             ) == android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -885,7 +885,7 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
                                             delay(350)
                                             refreshSeats()
                                         } catch (e: Exception) {
-                                            error = e.message ?: "تعذر الانضمام للمقعد \${i + 1}"
+                                            error = e.message ?: "تعذر الانضمام للمقعد ${i + 1}"
                                         } finally { connecting = false }
                                     }
                                 }
