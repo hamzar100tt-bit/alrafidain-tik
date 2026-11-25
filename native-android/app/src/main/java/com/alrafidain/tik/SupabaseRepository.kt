@@ -278,7 +278,7 @@ class SupabaseRepository(private val context: Context) {
         val request = authedRequest("$base/rest/v1/$path").get().build()
         client.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
-            if (!response.isSuccessful) throw IOException("تعذر تحميل بيانات الحساب (\${response.code})")
+            if (!response.isSuccessful) throw IOException("تعذر تحميل بيانات الحساب (${response.code})")
             return JSONArray(body)
         }
     }
