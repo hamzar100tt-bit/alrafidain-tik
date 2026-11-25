@@ -36,7 +36,7 @@ Deno.serve(async (request: Request) => {
   const { data: authData, error: authError } = await supabase.auth.getUser(jwt);
   if (authError || !authData.user) return json({ error: "جلسة الدخول غير صالحة." }, 401);
 
-  let body: { room?: unknown; role?: unknown };
+  let body: { room?: unknown; role?: unknown; action?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -44,6 +44,7 @@ Deno.serve(async (request: Request) => {
   }
   const room = typeof body.room === "string" ? body.room.trim() : "";
   const wantsHost = body.role === "host";
+  const action = body.action === "end" ? "end" : "token";
   if (room.length < 3 || room.length > 60 || !/^[\p{L}\p{N} _.-]+$/u.test(room)) {
     return json({ error: "اسم الغرفة لازم يكون 3 إلى 60 حرفاً أو رقماً." }, 400);
   }
@@ -54,6 +55,16 @@ Deno.serve(async (request: Request) => {
     .eq("room_key", room)
     .maybeSingle();
   if (roomError) return json({ error: "تعذر التحقق من الغرفة." }, 500);
+
+  if (action === "end") {
+    if (!roomRow) return json({ error: "الغرفة غير موجودة." }, 404);
+    if (roomRow.owner_id !== authData.user.id) return json({ error: "فقط صاحب البث يقدر ينهيه." }, 403);
+    const { error: endError } = await supabase.from("live_rooms")
+      .update({ is_live: false, ended_at: new Date().toISOString() })
+      .eq("id", roomRow.id);
+    if (endError) return json({ error: "تعذر إنهاء البث على الخادم." }, 500);
+    return json({ ended: true, room });
+  }
 
   if (!roomRow && wantsHost) {
     const { data: created, error: createError } = await supabase
