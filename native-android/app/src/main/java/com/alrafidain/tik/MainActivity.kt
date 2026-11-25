@@ -692,7 +692,17 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
         } else isFollowingHost = false
     }
 
-    DisposableEffect(room) { onDispose { room.disconnect() } }
+    DisposableEffect(room, roomName, canSpeak, host?.ownerId) {
+        onDispose {
+            // Release a guest speaker seat when leaving; the room host does not own a guest-seat row.
+            if (canSpeak && host?.ownerId != repository.currentUserId()) {
+                kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                    runCatching { repository.leaveLiveRoomSeat(roomName) }
+                }
+            }
+            room.disconnect()
+        }
+    }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) scope.launch {
             try { room.localParticipant.setMicrophoneEnabled(true); micEnabled = true; refreshSeats() }
