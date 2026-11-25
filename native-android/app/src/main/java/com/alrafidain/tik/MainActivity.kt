@@ -1313,6 +1313,7 @@ private fun VideoLiveRoomScreen(
     var credentials by remember(roomName) { mutableStateOf<LiveKitCredentials?>(null) }
     var remoteVideoTrack by remember(roomName) { mutableStateOf<VideoTrack?>(null) }
     var showChat by remember(roomName) { mutableStateOf(true) }
+    var videoExpanded by remember(roomName) { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { grants ->
@@ -1385,7 +1386,7 @@ private fun VideoLiveRoomScreen(
         Box(Modifier.fillMaxWidth().height(104.dp).background(Color(0xFF3B202B))) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.Default.Close, "إغلاق", tint = Color.White) }
-                IconButton(onClick = { }) { Icon(Icons.Default.Fullscreen, "تكبير", tint = Color.White) }
+                IconButton(onClick = { videoExpanded = !videoExpanded }) { Icon(Icons.Default.Fullscreen, if (videoExpanded) "تصغير الفيديو" else "تكبير الفيديو", tint = Color.White) }
                 IconButton(onClick = { chatRefreshKey++ }) { Icon(Icons.Default.Refresh, "تحديث التعليقات", tint = Color.White) }
                 Spacer(Modifier.weight(1f))
                 Column(horizontalAlignment = Alignment.End) {
@@ -1401,7 +1402,7 @@ private fun VideoLiveRoomScreen(
             // لا نعرض عدد مشاهدين أو صور حضور وهمية؛ تُضاف عند ربط بيانات الحضور الفعلية.
         }
         Column(Modifier.weight(1f).fillMaxWidth()) {
-            Row(Modifier.fillMaxWidth().height(390.dp).background(Color(0xFF25171F))) {
+            Row(Modifier.fillMaxWidth().height(if (videoExpanded) 560.dp else 390.dp).background(Color(0xFF25171F))) {
                 Column(Modifier.weight(1f).fillMaxHeight()) {
                     (1..2).forEach { seat ->
                         Box(Modifier.weight(1f).fillMaxWidth().padding(1.dp)
