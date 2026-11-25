@@ -249,6 +249,7 @@ private fun AlrafidainApp() {
 private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, onStartVideoPost: () -> Unit, onRequireLogin: () -> Unit, onRoomExpanded: (Boolean) -> Unit) {
     var openedRoom by remember { mutableStateOf<String?>(null) }
     var openedVideoRoom by remember { mutableStateOf<String?>(null) }
+    var openedVideoRoomIsHost by remember { mutableStateOf(false) }
     var openedAudioRoom by remember { mutableStateOf<String?>(null) }
     var showCreateAudioRoom by remember { mutableStateOf(false) }
     var showCreateVideoRoom by remember { mutableStateOf(false) }
@@ -279,7 +280,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
         return
     }
     if (openedVideoRoom != null) {
-        VideoLiveRoomScreen(repository, roomName = openedVideoRoom!!, onBack = { openedVideoRoom = null; onRoomExpanded(false) }, onRequireLogin = onRequireLogin)
+        VideoLiveRoomScreen(repository, roomName = openedVideoRoom!!, isHost = openedVideoRoomIsHost, onBack = { openedVideoRoom = null; openedVideoRoomIsHost = false; onRoomExpanded(false) }, onRequireLogin = onRequireLogin)
         return
     }
     if (openedRoom != null) {
@@ -399,6 +400,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
                             showCreateVideoRoom = false
                             onRoomExpanded(true)
                             openedVideoRoom = roomKey
+                            openedVideoRoomIsHost = true
                         } catch (e: Exception) {
                             videoRoomError = e.message ?: "تعذر إنشاء بث الفيديو"
                         } finally { creatingVideoRoom = false }
@@ -583,7 +585,7 @@ private fun LiveRoomsScreen(repository: SupabaseRepository, onBack: () -> Unit, 
                 items(shownRooms.size) { i ->
                     val room = shownRooms[i]
                     Column(Modifier.clip(RoundedCornerShape(16.dp)).background(Color(0xFF251B2B))
-                        .clickable { if (room.roomType == "video") openedVideoRoom = room.roomKey else openedAudioRoom = room.roomKey }) {
+                        .clickable { if (room.roomType == "video") { openedVideoRoom = room.roomKey; openedVideoRoomIsHost = false } else openedAudioRoom = room.roomKey }) {
                         Box(Modifier.fillMaxWidth().height(130.dp)
                             .background(listOf(Color(0xFF573C67), Color(0xFF17456A), Color(0xFF70483E))[i % 3], RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
                             Icon(if (room.roomType == "video") Icons.Default.Videocam else Icons.Default.Groups, null, tint = Color.White, modifier = Modifier.size(54.dp))
@@ -1284,6 +1286,7 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
 private fun VideoLiveRoomScreen(
     repository: SupabaseRepository,
     roomName: String,
+    isHost: Boolean,
     onBack: () -> Unit,
     onRequireLogin: () -> Unit
 ) {
@@ -1335,13 +1338,13 @@ private fun VideoLiveRoomScreen(
     LaunchedEffect(roomName) {
         try {
             connectionState = "جارٍ جلب تصريح الدخول..."
-            val auth = withContext(Dispatchers.IO) { repository.requestLiveKitToken(roomName, "host") }
+            val auth = withContext(Dispatchers.IO) { repository.requestLiveKitToken(roomName, if (isHost) "host" else "viewer") }
             credentials = auth
             connectionState = "جارٍ الاتصال بخادم البث..."
             liveRoom.connect(auth.serverUrl, auth.participantToken)
             connected = true
             connectionState = "متصل بالغرفة"
-            if (auth.role == "host") {
+            if (isHost && auth.role == "host") {
                 permissionLauncher.launch(arrayOf(android.Manifest.permission.CAMERA, android.Manifest.permission.RECORD_AUDIO))
             }
         } catch (e: Exception) {
