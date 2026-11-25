@@ -36,36 +36,59 @@ Deno.serve(async (request: Request) => {
   const { data: authData, error: authError } = await supabase.auth.getUser(jwt);
   if (authError || !authData.user) return json({ error: "جلسة الدخول غير صالحة." }, 401);
 
-  let body: { room?: unknown };
+  let body: { room?: unknown; role?: unknown };
   try {
     body = await request.json();
   } catch {
     return json({ error: "طلب غير صالح." }, 400);
   }
   const room = typeof body.room === "string" ? body.room.trim() : "";
+  const wantsHost = body.role === "host";
   if (room.length < 3 || room.length > 60 || !/^[\p{L}\p{N} _.-]+$/u.test(room)) {
     return json({ error: "اسم الغرفة لازم يكون 3 إلى 60 حرفاً أو رقماً." }, 400);
   }
 
-  const { data: roomRow, error: roomError } = await supabase
+  let { data: roomRow, error: roomError } = await supabase
     .from("live_rooms")
     .select("id, owner_id, is_live")
     .eq("room_key", room)
-    .eq("is_live", true)
     .maybeSingle();
   if (roomError) return json({ error: "تعذر التحقق من الغرفة." }, 500);
-  if (!roomRow) return json({ error: "الغرفة غير موجودة أو انتهى البث." }, 404);
+
+  if (!roomRow && wantsHost) {
+    const { data: created, error: createError } = await supabase
+      .from("live_rooms")
+      .insert({ room_key: room, owner_id: authData.user.id, is_live: true })
+      .select("id, owner_id, is_live")
+      .single();
+    if (createError || !created) {
+      return json({ error: createError?.code === "23505" ? "اسم الغرفة مستخدم، جرّب اسماً آخر." : "تعذر إنشاء غرفة البث." }, 409);
+    }
+    roomRow = created;
+  } else if (roomRow && wantsHost && roomRow.owner_id === authData.user.id && !roomRow.is_live) {
+    const { data: reopened, error: reopenError } = await supabase
+      .from("live_rooms")
+      .update({ is_live: true, ended_at: null })
+      .eq("id", roomRow.id)
+      .select("id, owner_id, is_live")
+      .single();
+    if (reopenError || !reopened) return json({ error: "تعذر إعادة تشغيل الغرفة." }, 500);
+    roomRow = reopened;
+  }
+
+  if (!roomRow || !roomRow.is_live) return json({ error: "الغرفة غير موجودة أو انتهى البث." }, 404);
 
   let role = "viewer";
   if (roomRow.owner_id === authData.user.id) {
     role = "host";
   } else {
-    const { data: speaker } = await supabase
+    const { data: speaker, error: speakerError } = await supabase
       .from("live_room_speakers")
       .select("user_id")
       .eq("room_id", roomRow.id)
       .eq("user_id", authData.user.id)
       .maybeSingle();
+    if (speakerError) return json({ error: "تعذر التحقق من صلاحية المايك." }, 500);
     if (speaker) role = "speaker";
   }
 
@@ -89,8 +112,7 @@ Deno.serve(async (request: Request) => {
   });
 
   try {
-    const serverUrl = livekitUrl.trim();
-    return json({ serverUrl, participantToken: await token.toJwt(), room, role });
+    return json({ serverUrl: livekitUrl.trim(), participantToken: await token.toJwt(), room, role });
   } catch {
     return json({ error: "تعذر إنشاء تصريح البث." }, 500);
   }
