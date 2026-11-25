@@ -1326,11 +1326,16 @@ private fun VideoLiveRoomScreen(
             try {
                 when (permissionPurpose) {
                     "startup" -> {
-                        if (cameraGranted && audioGranted) {
+                        if (cameraGranted) {
                             cameraEnabled = liveRoom.localParticipant.setCameraEnabled(true)
                             localVideoTrack = liveRoom.localParticipant.getTrackPublication(Track.Source.CAMERA)?.track as? VideoTrack
+                        }
+                        if (audioGranted) {
                             micEnabled = liveRoom.localParticipant.setMicrophoneEnabled(true)
-                        } else connectionError = "اسمح للتطبيق باستخدام الكاميرا والمايك حتى تبث."
+                        }
+                        if (!cameraGranted || !audioGranted) {
+                            connectionError = "تم تشغيل الوسائط المسموح بها؛ يمكنك منح الإذن الناقص من أزرار الكاميرا أو المايك."
+                        }
                     }
                     "camera" -> {
                         if (cameraGranted) {
