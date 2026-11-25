@@ -1384,15 +1384,7 @@ private fun VideoLiveRoomScreen(
                     DropdownMenuItem(text = { Text("مشاركة") }, onClick = { showMenu = false })
                 }
             }
-            Row(Modifier.align(Alignment.BottomStart).padding(start = 14.dp, bottom = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("100", color = Color.White, modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Color.Black.copy(alpha = .3f)).padding(horizontal = 12.dp, vertical = 5.dp))
-                Spacer(Modifier.width(8.dp))
-                repeat(3) {
-                    Box(Modifier.padding(end = 5.dp).size(32.dp).background(Color(0xFF66516B), CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Person, null, tint = Color.White)
-                    }
-                }
-            }
+            // لا نعرض عدد مشاهدين أو صور حضور وهمية؛ تُضاف عند ربط بيانات الحضور الفعلية.
         }
         Column(Modifier.weight(1f).fillMaxWidth()) {
             Row(Modifier.fillMaxWidth().height(390.dp).background(Color(0xFF25171F))) {
@@ -1415,7 +1407,6 @@ private fun VideoLiveRoomScreen(
                         Icon(Icons.Default.Person, null, tint = Color.White.copy(alpha = .8f), modifier = Modifier.size(86.dp))
                         Text("البث الرئيسي", color = Color.White, modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp))
                     }
-                    Text("5", color = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).background(Color.Black.copy(alpha = .4f), CircleShape).padding(horizontal = 8.dp, vertical = 3.dp))
                     Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomStart).padding(8.dp))
                 }
             }
