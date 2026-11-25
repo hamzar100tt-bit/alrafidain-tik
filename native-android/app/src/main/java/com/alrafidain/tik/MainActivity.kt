@@ -1476,7 +1476,7 @@ private fun VideoLiveRoomScreen(
                             .background(Color.Black.copy(alpha = .28f)).padding(horizontal = 9.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.AccountCircle, null, tint = Color.LightGray, modifier = Modifier.size(24.dp))
-                            Text("${item.displayName}: ${item.text}", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(start = 7.dp))
+                            Text("${item.displayName}: ${item.text}", color = Color.White, fontSize = 13.sp, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(start = 7.dp))
                         }
                     }
                     chatError?.let { Text(it, color = Color(0xFFFFA8B8), fontSize = 11.sp) }
