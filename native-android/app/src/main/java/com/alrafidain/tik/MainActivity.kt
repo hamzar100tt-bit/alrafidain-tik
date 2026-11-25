@@ -1365,7 +1365,7 @@ private fun VideoLiveRoomScreen(
         }
     }
     var message by remember(roomName) { mutableStateOf("") }
-    var chatItems by remember(roomName) { mutableStateOf(listOf("أحمد انضم إلى الغرفة", "نور: هلا بالجميع ❤️")) }
+    var chatItems by remember(roomName) { mutableStateOf(emptyList<String>()) }
     var showMenu by remember(roomName) { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().background(Color(0xFF26141A)).statusBarsPadding()) {
         Box(Modifier.fillMaxWidth().height(104.dp).background(Color(0xFF3B202B))) {
