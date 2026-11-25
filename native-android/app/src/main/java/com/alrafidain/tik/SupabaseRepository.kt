@@ -85,7 +85,7 @@ class SupabaseRepository(private val context: Context) {
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 val message = runCatching { JSONObject(body).optString("message") }.getOrNull()
-                throw IOException(message?.takeIf { it.isNotBlank() } ?: "تعذر حجز المقعد (\${response.code})")
+                throw IOException(message?.takeIf { it.isNotBlank() } ?: "تعذر حجز المقعد (${response.code})")
             }
         }
         return requestLiveKitToken(roomKey, "speaker")
