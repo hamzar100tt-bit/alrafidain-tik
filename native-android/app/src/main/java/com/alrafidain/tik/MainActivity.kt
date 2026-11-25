@@ -1365,8 +1365,16 @@ private fun VideoLiveRoomScreen(
         }
     }
     var message by remember(roomName) { mutableStateOf("") }
-    var chatItems by remember(roomName) { mutableStateOf(emptyList<String>()) }
+    var chatItems by remember(roomName) { mutableStateOf<List<LiveChatMessage>>(emptyList()) }
+    var chatError by remember(roomName) { mutableStateOf<String?>(null) }
+    var sendingChat by remember(roomName) { mutableStateOf(false) }
     var showMenu by remember(roomName) { mutableStateOf(false) }
+    LaunchedEffect(roomName, connected) {
+        if (connected) try {
+            chatItems = withContext(Dispatchers.IO) { repository.loadLiveChatMessages(roomName).map { LiveChatMessage(it.userId, it.body, it.displayName, it.avatarUrl) } }
+            chatError = null
+        } catch (e: Exception) { chatError = e.message ?: "تعذر تحميل التعليقات" }
+    }
     Column(Modifier.fillMaxSize().background(Color(0xFF26141A)).statusBarsPadding()) {
         Box(Modifier.fillMaxWidth().height(104.dp).background(Color(0xFF3B202B))) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1425,20 +1433,31 @@ private fun VideoLiveRoomScreen(
             if (showChat) {
                 Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
                     Spacer(Modifier.weight(1f))
-                    chatItems.takeLast(4).forEach { line ->
+                    chatItems.takeLast(4).forEach { item ->
                         Row(Modifier.padding(top = 6.dp).clip(RoundedCornerShape(18.dp))
                             .background(Color.Black.copy(alpha = .28f)).padding(horizontal = 9.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.AccountCircle, null, tint = Color.LightGray, modifier = Modifier.size(24.dp))
-                            Text(line, color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(start = 7.dp))
+                            Text("${item.displayName}: ${item.text}", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(start = 7.dp))
                         }
                     }
+                    chatError?.let { Text(it, color = Color(0xFFFFA8B8), fontSize = 11.sp) }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(value = message, onValueChange = { message = it }, modifier = Modifier.weight(1f),
                             singleLine = true, placeholder = { Text("اكتب تعليقاً...") })
-                        IconButton(onClick = { if (message.isNotBlank()) { chatItems = chatItems + ("أنت: " + message); message = "" } }) {
-                            Icon(Icons.Default.Send, "إرسال", tint = Color.White)
-                        }
+                        IconButton(enabled = message.isNotBlank() && !sendingChat, onClick = {
+                            val text = message.trim()
+                            scope.launch {
+                                sendingChat = true
+                                try {
+                                    withContext(Dispatchers.IO) { repository.sendLiveChatMessage(roomName, text) }
+                                    chatItems = withContext(Dispatchers.IO) { repository.loadLiveChatMessages(roomName).map { LiveChatMessage(it.userId, it.body, it.displayName, it.avatarUrl) } }
+                                    message = ""
+                                    chatError = null
+                                } catch (e: Exception) { chatError = e.message ?: "تعذر إرسال التعليق" }
+                                finally { sendingChat = false }
+                            }
+                        }) { Icon(Icons.Default.Send, "إرسال", tint = if (message.isBlank()) Color.Gray else Color.White) }
                     }
                 }
             }
