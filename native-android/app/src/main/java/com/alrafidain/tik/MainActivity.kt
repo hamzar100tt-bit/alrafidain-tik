@@ -1371,10 +1371,15 @@ private fun VideoLiveRoomScreen(
     var chatRefreshKey by remember(roomName) { mutableStateOf(0) }
     var showMenu by remember(roomName) { mutableStateOf(false) }
     LaunchedEffect(roomName, connected, chatRefreshKey) {
-        if (connected) try {
-            chatItems = withContext(Dispatchers.IO) { repository.loadLiveChatMessages(roomName).map { LiveChatMessage(it.userId, it.body, it.displayName, it.avatarUrl) } }
-            chatError = null
-        } catch (e: Exception) { chatError = e.message ?: "تعذر تحميل التعليقات" }
+        if (connected) {
+            while (true) {
+                try {
+                    chatItems = withContext(Dispatchers.IO) { repository.loadLiveChatMessages(roomName).map { LiveChatMessage(it.userId, it.body, it.displayName, it.avatarUrl) } }
+                    chatError = null
+                } catch (e: Exception) { chatError = e.message ?: "تعذر تحميل التعليقات" }
+                kotlinx.coroutines.delay(5000)
+            }
+        }
     }
     Column(Modifier.fillMaxSize().background(Color(0xFF26141A)).statusBarsPadding()) {
         Box(Modifier.fillMaxWidth().height(104.dp).background(Color(0xFF3B202B))) {
