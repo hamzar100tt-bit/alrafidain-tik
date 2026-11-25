@@ -66,6 +66,7 @@ import io.livekit.android.events.RoomEvent
 import io.livekit.android.events.collect
 import io.livekit.android.room.participant.Participant
 import io.livekit.android.room.track.VideoTrack
+import io.livekit.android.room.track.Track
 import io.livekit.android.util.flow
 import io.livekit.android.compose.ui.VideoTrackView
 
@@ -1312,6 +1313,7 @@ private fun VideoLiveRoomScreen(
     var connected by remember(roomName) { mutableStateOf(false) }
     var credentials by remember(roomName) { mutableStateOf<LiveKitCredentials?>(null) }
     var remoteVideoTrack by remember(roomName) { mutableStateOf<VideoTrack?>(null) }
+    var localVideoTrack by remember(roomName) { mutableStateOf<VideoTrack?>(null) }
     var permissionPurpose by remember(roomName) { mutableStateOf("startup") }
     var showChat by remember(roomName) { mutableStateOf(true) }
     var videoExpanded by remember(roomName) { mutableStateOf(false) }
@@ -1326,11 +1328,16 @@ private fun VideoLiveRoomScreen(
                     "startup" -> {
                         if (cameraGranted && audioGranted) {
                             cameraEnabled = liveRoom.localParticipant.setCameraEnabled(true)
+                            localVideoTrack = liveRoom.localParticipant.getTrackPublication(Track.Source.CAMERA)?.track as? VideoTrack
                             micEnabled = liveRoom.localParticipant.setMicrophoneEnabled(true)
                         } else connectionError = "اسمح للتطبيق باستخدام الكاميرا والمايك حتى تبث."
                     }
                     "camera" -> {
-                        if (cameraGranted) cameraEnabled = liveRoom.localParticipant.setCameraEnabled(!cameraEnabled)
+                        if (cameraGranted) {
+                            val next = !cameraEnabled
+                            cameraEnabled = liveRoom.localParticipant.setCameraEnabled(next)
+                            localVideoTrack = if (cameraEnabled) liveRoom.localParticipant.getTrackPublication(Track.Source.CAMERA)?.track as? VideoTrack else null
+                        }
                         else connectionError = "اسمح للتطبيق باستخدام الكاميرا."
                     }
                     "mic" -> {
@@ -1436,7 +1443,7 @@ private fun VideoLiveRoomScreen(
                     }
                 }
                 Box(Modifier.weight(2f).fillMaxHeight().padding(1.dp).background(Color(0xFF60414A)), contentAlignment = Alignment.Center) {
-                    LiveKitRemoteVideo(remoteVideoTrack, Modifier.fillMaxSize())
+                    LiveKitRemoteVideo(if (isHost && cameraEnabled) localVideoTrack else remoteVideoTrack, Modifier.fillMaxSize())
                     Text(
                         if (cameraEnabled) "الكاميرا مفعّلة" else "عرض البث",
                         color = Color.White,
