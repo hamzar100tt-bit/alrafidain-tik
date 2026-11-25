@@ -97,6 +97,26 @@ export default function LiveStudio({ user, onClose }) {
   };
 
   const stopLive = async () => {
+    if (mode === "host") {
+      try {
+        const tokenEndpoint = import.meta.env.VITE_LIVEKIT_TOKEN_ENDPOINT;
+        const { data } = await supabase.auth.getSession();
+        if (tokenEndpoint && data.session?.access_token) {
+          const response = await fetch(tokenEndpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + data.session.access_token
+            },
+            body: JSON.stringify({ room: roomName.trim(), action: "end" })
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) setMessage(payload.error || "انقطع الاتصال، لكن تعذر إنهاء الغرفة على الخادم.");
+        }
+      } catch {
+        setMessage("انقطع الاتصال، لكن تعذر تأكيد إنهاء الغرفة على الخادم.");
+      }
+    }
     await roomRef.current?.disconnect();
     roomRef.current = null;
     clearMedia();
