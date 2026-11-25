@@ -1414,13 +1414,15 @@ private fun VideoLiveRoomScreen(
                 }
                 Box(Modifier.weight(2f).fillMaxHeight().padding(1.dp).background(Color(0xFF60414A)), contentAlignment = Alignment.Center) {
                     LiveKitRemoteVideo(remoteVideoTrack, Modifier.fillMaxSize())
-                    if (cameraEnabled) {
-                        Icon(Icons.Default.Videocam, null, tint = Color.White, modifier = Modifier.size(64.dp))
-                        Text("كاميرتك مفعّلة", color = Color.White, modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp))
-                    } else {
-                        Icon(Icons.Default.Person, null, tint = Color.White.copy(alpha = .8f), modifier = Modifier.size(86.dp))
-                        Text("البث الرئيسي", color = Color.White, modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp))
-                    }
+                    Text(
+                        if (cameraEnabled) "الكاميرا مفعّلة" else "عرض البث",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                            .padding(8.dp)
+                            .background(Color.Black.copy(alpha = .45f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
                     Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomStart).padding(8.dp))
                 }
             }
