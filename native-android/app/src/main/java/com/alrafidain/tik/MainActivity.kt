@@ -692,10 +692,12 @@ private fun AudioLiveRoomScreen(repository: SupabaseRepository, roomName: String
         } else isFollowingHost = false
     }
 
-    DisposableEffect(room, roomName, canSpeak, host?.ownerId) {
+    val latestCanSpeak by rememberUpdatedState(canSpeak)
+    val latestHostOwnerId by rememberUpdatedState(host?.ownerId)
+    DisposableEffect(room, roomName) {
         onDispose {
             // Release a guest speaker seat when leaving; the room host does not own a guest-seat row.
-            if (canSpeak && host?.ownerId != repository.currentUserId()) {
+            if (latestCanSpeak && latestHostOwnerId != repository.currentUserId()) {
                 kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                     runCatching { repository.leaveLiveRoomSeat(roomName) }
                 }
