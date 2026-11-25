@@ -20,6 +20,8 @@ export default function LiveStudio({ user, onClose }) {
   const [cameraOn, setCameraOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
   const [selectedBackground, setSelectedBackground] = useState("midnight");
+  const [liveRooms, setLiveRooms] = useState([]);
+  const [roomsLoading, setRoomsLoading] = useState(false);
   const roomRef = useRef(null);
   const videoRef = useRef(null);
   const audioElementsRef = useRef([]);
@@ -123,6 +125,16 @@ export default function LiveStudio({ user, onClose }) {
     setStatus("idle");
   };
 
+  const loadLiveRooms = async () => {
+    setRoomsLoading(true);
+    const { data, error } = await supabase.from("live_rooms").select("room_key,title,room_type").eq("is_live", true).order("created_at", { ascending: false }).limit(50);
+    if (error) setMessage("تعذر تحميل الغرف المباشرة: " + error.message);
+    else setLiveRooms(data || []);
+    setRoomsLoading(false);
+  };
+
+  useEffect(() => { if (mode === "viewer" && status !== "live") loadLiveRooms(); }, [mode, status]);
+
   useEffect(() => () => {
     roomRef.current?.disconnect();
     clearMedia();
@@ -172,6 +184,10 @@ export default function LiveStudio({ user, onClose }) {
           <button type="button" className={mode === "viewer" ? "selected" : ""} onClick={() => {setMode("viewer");setMessage("");}}><Eye size={17}/> مشاهدة بث</button>
         </div>
         <input value={roomName} onChange={e => setRoomName(e.target.value)} placeholder="اسم غرفة البث" required maxLength="60"/>
+        {mode === "viewer" && <div className="live-room-list" style={{ margin: "12px 0", display: "grid", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><strong>الغرف المباشرة</strong><button type="button" onClick={loadLiveRooms}>تحديث</button></div>
+          {roomsLoading ? <small>جاري تحميل الغرف...</small> : liveRooms.length ? liveRooms.map(item => <button key={item.room_key} type="button" onClick={() => setRoomName(item.room_key)} style={{ textAlign: "right", padding: 10, borderRadius: 10 }}>{item.title || item.room_key} — {item.room_type === "audio" ? "صوتي" : "فيديو"}{roomName === item.room_key ? " ✓" : ""}</button>) : <small>ماكو غرف مباشرة حالياً.</small>}
+        </div>
         {message && <p className="auth-error" role="alert">{message}</p>}
         <button className="login-btn modal-submit" disabled={status === "connecting"}>{status === "connecting" ? "جاري الاتصال..." : mode === "host" ? "بدء البث المباشر" : "دخول ومشاهدة البث"}</button>
         <small className="live-setup-note">يلزم إعداد LiveKit وخادم آمن لإصدار رموز الدخول. لا تضع المفتاح السري داخل التطبيق.</small>
