@@ -127,7 +127,7 @@ export default function LiveStudio({ user, onClose }) {
 
   const loadLiveRooms = async () => {
     setRoomsLoading(true);
-    const { data, error } = await supabase.from("live_rooms").select("room_key,title,room_type").eq("is_live", true).order("created_at", { ascending: false }).limit(50);
+    const { data, error } = await supabase.from("live_rooms").select("room_key,title,room_type,owner_id,profiles:owner_id(display_name,username)").eq("is_live", true).order("created_at", { ascending: false }).limit(50);
     if (error) setMessage("تعذر تحميل الغرف المباشرة: " + error.message);
     else setLiveRooms(data || []);
     setRoomsLoading(false);
@@ -186,7 +186,7 @@ export default function LiveStudio({ user, onClose }) {
         <input value={roomName} onChange={e => setRoomName(e.target.value)} placeholder="اسم غرفة البث" required maxLength="60"/>
         {mode === "viewer" && <div className="live-room-list" style={{ margin: "12px 0", display: "grid", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><strong>الغرف المباشرة</strong><button type="button" onClick={loadLiveRooms}>تحديث</button></div>
-          {roomsLoading ? <small>جاري تحميل الغرف...</small> : liveRooms.length ? liveRooms.map(item => <button key={item.room_key} type="button" onClick={() => setRoomName(item.room_key)} style={{ textAlign: "right", padding: 10, borderRadius: 10 }}>{item.title || item.room_key} — {item.room_type === "audio" ? "صوتي" : "فيديو"}{roomName === item.room_key ? " ✓" : ""}</button>) : <small>ماكو غرف مباشرة حالياً.</small>}
+          {roomsLoading ? <small>جاري تحميل الغرف...</small> : liveRooms.length ? liveRooms.map(item => <button key={item.room_key} type="button" onClick={() => setRoomName(item.room_key)} style={{ textAlign: "right", padding: 10, borderRadius: 10 }}>{item.title || item.room_key} — {item.room_type === "audio" ? "صوتي" : "فيديو"} · {item.profiles?.display_name || item.profiles?.username || "مذيع"}{roomName === item.room_key ? " ✓" : ""}</button>) : <small>ماكو غرف مباشرة حالياً.</small>}
         </div>
         {message && <p className="auth-error" role="alert">{message}</p>}
         <button className="login-btn modal-submit" disabled={status === "connecting"}>{status === "connecting" ? "جاري الاتصال..." : mode === "host" ? "بدء البث المباشر" : "دخول ومشاهدة البث"}</button>
