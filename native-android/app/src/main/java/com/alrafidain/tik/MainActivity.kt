@@ -1469,7 +1469,7 @@ private fun VideoLiveRoomScreen(
                 }
             }
             if (showChat) {
-                Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).imePadding()) {
                     Spacer(Modifier.weight(1f))
                     chatItems.takeLast(4).forEach { item ->
                         Row(Modifier.padding(top = 6.dp).clip(RoundedCornerShape(18.dp))
